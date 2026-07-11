@@ -1,0 +1,372 @@
+"use client";
+
+import React, { useState, useRef } from "react";
+
+/* ─── Static suggestion lists ────────────────────────────────────── */
+const SUGGESTED_NAMES = [
+  "Appendectomy",
+  "Cholecystectomy",
+  "Hernia Repair",
+  "Cataract Surgery",
+  "Coronary Artery Bypass",
+  "Knee Replacement",
+  "Tonsillectomy"
+];
+
+const SUGGESTED_STATUSES = ["Yes (Active)", "No (Inactive)", "Completed", "Resolved"];
+const SUGGESTED_NOTES = ["No complications", "Recovered", "Scheduled follow-up"];
+
+/* ─── Helpers ────────────────────────────────────────────────────── */
+const convertToISODate = (displayDate: string) => {
+  if (!displayDate) return "";
+  try {
+    const parts = displayDate.split("/");
+    if (parts.length < 3) return "";
+    const day = parts[0].padStart(2, "0");
+    const month = parts[1].padStart(2, "0");
+    const year = parts[2];
+    return `${year}-${month}-${day}`;
+  } catch (e) {
+    return "";
+  }
+};
+
+const formatISODateToDisplay = (isoDate: string) => {
+  if (!isoDate) return "";
+  try {
+    const parts = isoDate.split("-");
+    if (parts.length < 3) return isoDate;
+    const year = parts[0];
+    const month = parts[1].padStart(2, "0");
+    const day = parts[2].padStart(2, "0");
+    return `${day}/${month}/${year}`;
+  } catch (e) {
+    return isoDate;
+  }
+};
+
+/* ─── Types ──────────────────────────────────────────────────────── */
+export interface SurgicalProcedure {
+  id: string;
+  name: string;
+  date: string;
+  status: string;
+  notes: string;
+}
+
+interface SurgicalProceduresDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  procedures: SurgicalProcedure[];
+  setProcedures: React.Dispatch<React.SetStateAction<SurgicalProcedure[]>>;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SurgicalProceduresDrawer Component
+═══════════════════════════════════════════════════════════════════ */
+export default function SurgicalProceduresDrawer({
+  isOpen,
+  onClose,
+  procedures,
+  setProcedures,
+}: SurgicalProceduresDrawerProps) {
+  /* search bar */
+  const [searchVal, setSearchVal]   = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchHi, setSearchHi]     = useState(-1);
+
+  /* inline cell suggestions highlight */
+  const [focusId, setFocusId]       = useState<string | null>(null);
+  const [focusField, setFocusField] = useState<string | null>(null);
+  const [rowHi, setRowHi]           = useState(-1);
+
+  /* drag */
+  const dragIdx = useRef<number | null>(null);
+
+  if (!isOpen) return null;
+
+  /* ─── helpers ─── */
+  const addProcedure = (name: string) => {
+    if (!name.trim()) return;
+    const todayStr = formatISODateToDisplay(new Date().toISOString().split("T")[0]);
+    const newProc = {
+      id: Date.now().toString(),
+      name: name.trim(),
+      date: todayStr,
+      status: "Yes (Active)",
+      notes: ""
+    };
+    setProcedures((p) => [...p, newProc]);
+    setSearchVal("");
+    setSearchOpen(false);
+    setSearchHi(-1);
+  };
+
+  const patch  = (id: string, diff: Partial<SurgicalProcedure>) => setProcedures((p) => p.map((c) => (c.id === id ? { ...c, ...diff } : c)));
+  const remove = (id: string) => setProcedures((p) => p.filter((c) => c.id !== id));
+
+  /* drag reorder */
+  const onDragStart = (i: number) => { dragIdx.current = i; };
+  const onDragOver  = (e: React.DragEvent, i: number) => {
+    e.preventDefault();
+    if (dragIdx.current === null || dragIdx.current === i) return;
+    const r = [...procedures]; const [m] = r.splice(dragIdx.current, 1); r.splice(i, 0, m);
+    dragIdx.current = i; setProcedures(r);
+  };
+  const onDragEnd = () => { dragIdx.current = null; };
+
+  /* inline suggestions list component */
+  const InlineDD = ({ id, field, opts, val }: { id: string; field: string; opts: string[]; val: string }) => {
+    if (focusId !== id || focusField !== field) return null;
+    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
+    if (!list.length) return null;
+    return (
+      <div className="absolute left-0 top-full mt-0.5 z-40 w-full min-w-[125px] bg-white border border-[#E2E8F0] rounded-lg shadow-xl overflow-hidden max-h-44 overflow-y-auto text-left">
+        {list.map((opt, i) => (
+          <div key={opt}
+            onMouseDown={() => { patch(id, { [field]: opt }); setFocusId(null); setFocusField(null); setRowHi(-1); }}
+            className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
+              ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
+          >{opt}</div>
+        ))}
+      </div>
+    );
+  };
+
+  const handleRowKey = (e: React.KeyboardEvent, id: string, field: string, opts: string[], val: string) => {
+    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
+    if (e.key === "ArrowDown") { e.preventDefault(); setRowHi((p) => Math.min(p + 1, list.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setRowHi((p) => Math.max(p - 1, 0)); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (rowHi >= 0 && list[rowHi]) { patch(id, { [field]: list[rowHi] }); setFocusId(null); setFocusField(null); setRowHi(-1); }
+    }
+    else if (e.key === "Escape") { setFocusId(null); setFocusField(null); setRowHi(-1); }
+  };
+
+  /* search key events */
+  const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const list = SUGGESTED_NAMES.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+    if (e.key === "ArrowDown") { e.preventDefault(); setSearchHi((p) => Math.min(p + 1, list.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setSearchHi((p) => Math.max(p - 1, 0)); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (searchHi >= 0 && list[searchHi]) addProcedure(list[searchHi]);
+      else addProcedure(searchVal);
+    }
+    else if (e.key === "Escape") { setSearchOpen(false); setSearchHi(-1); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/35 backdrop-blur-[2px] select-none">
+      
+      {/* Sidebar Container */}
+      <div className="w-[88vw] max-w-[850px] h-full bg-white shadow-2xl flex flex-col overflow-hidden animate-slide-in relative border-l border-[#E2E8F0]">
+        
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-[#F1F5F9] flex items-center justify-between shrink-0 bg-[#FAFBFC]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-6.5 h-6.5 rounded-md bg-rose-100 flex items-center justify-center text-rose-700 text-xs shadow-sm">
+              📕
+            </div>
+            <span className="text-[13px] font-extrabold text-[#1E293B]">Past Surgical Procedures</span>
+          </div>
+          <button type="button" onClick={onClose}
+            className="w-7 h-7 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] flex items-center justify-center text-[#94A3B8] hover:text-[#475569] transition-all">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Body Content */}
+        <div className="p-5 flex-1 flex flex-col space-y-4 overflow-y-auto min-h-0">
+          
+          {/* Top Search bar */}
+          <div className="relative">
+            <div className="relative flex items-center">
+              <svg className="absolute left-3 w-3.5 h-3.5 fill-[#CBD5E0] pointer-events-none" viewBox="0 0 512 512">
+                <path d="M505 442.7L405.3 343c-4.5-4.5-10.6-7-17-7H372c27.6-35.3 44-79.7 44-128C416 93.1 322.9 0 208 0S0 93.1 0 208s93.1 208 208 208c48.3 0 92.7-16.4 128-44v16.3c0 6.4 2.5 12.5 7 17l99.7 99.7c9.4 9.4 24.6 9.4 33.9 0l28.3-28.3c9.4-9.4 9.4-24.6.1-34zM208 336c-70.7 0-128-57.2-128-128 0-70.7 57.2-128 128-128 70.7 0 128 57.2 128 128 0 70.7-57.2 128-128 128z"/>
+              </svg>
+              <input
+                type="text"
+                placeholder="Start typing a parameter..."
+                value={searchVal}
+                onChange={(e) => { setSearchVal(e.target.value); setSearchHi(-1); setSearchOpen(true); }}
+                onFocus={() => { setSearchOpen(true); setSearchHi(-1); }}
+                onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
+                onKeyDown={handleSearchKey}
+                className="w-full h-9 pl-9 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-semibold transition-all"
+              />
+              {searchVal.trim() && (
+                <button type="button" onClick={() => addProcedure(searchVal)}
+                  className="absolute right-3 text-blue-600 hover:text-blue-700 text-[10px] font-bold tracking-wide">+ Add</button>
+              )}
+            </div>
+
+            {/* Suggestions Overlay */}
+            {searchOpen && (() => {
+              const list = SUGGESTED_NAMES.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+              if (!list.length) return null;
+              return (
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-[60] bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+                  {list.map((opt, i) => (
+                    <div key={opt} onMouseDown={() => addProcedure(opt)}
+                      className={`flex items-center gap-2.5 px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
+                        ${i === searchHi ? "bg-blue-50" : "hover:bg-[#F8FAFC]"}`}
+                    >
+                      <span className="text-[11.5px] font-semibold text-[#1E293B]">{opt}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Grid list container */}
+          <div className="flex-1 border border-[#E2E8F0] rounded-xl overflow-y-auto min-h-0 bg-[#FAFBFC]">
+            
+            {/* Headers row */}
+            <div className="flex items-stretch border-b border-[#E2E8F0] bg-white text-[9px] font-extrabold text-[#718096] uppercase sticky top-0 z-30 select-none py-1 h-9">
+              <div className="w-8 shrink-0" />
+              <div className="w-[28%] shrink-0 border-r border-[#E2E8F0] px-3 flex items-center">Name</div>
+              <div className="w-[22%] shrink-0 border-r border-[#E2E8F0] px-3 flex items-center">Date</div>
+              <div className="w-[22%] shrink-0 border-r border-[#E2E8F0] px-3 flex items-center">Status</div>
+              <div className="w-[22%] shrink-0 border-r border-[#E2E8F0] px-3 flex items-center">Notes</div>
+              <div className="flex-1" />
+            </div>
+
+            {/* List block */}
+            {procedures.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-[#CBD5E0]">
+                <span className="text-3xl mb-1.5">📋</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider">No surgical procedures added yet</span>
+              </div>
+            ) : (
+              <div className="p-3.5 space-y-2">
+                {procedures.map((proc, idx) => (
+                  <div key={proc.id}
+                    data-drag-row="true"
+                    draggable="false"
+                    onDragStart={() => onDragStart(idx)}
+                    onDragOver={(e) => onDragOver(e, idx)}
+                    onDragEnd={(e) => { onDragEnd(); e.currentTarget.setAttribute("draggable", "false"); }}
+                    className="group flex flex-col w-full text-left bg-white rounded-lg border border-[#E2E8F0] overflow-visible"
+                  >
+                    <div className="flex items-stretch min-h-[38px] w-full">
+                      {/* drag handle */}
+                      <div
+                        onMouseDown={(e) => { const rEl = e.currentTarget.closest("[data-drag-row]"); if (rEl) rEl.setAttribute("draggable", "true"); }}
+                        onMouseUp={(e) => { const rEl = e.currentTarget.closest("[data-drag-row]"); if (rEl) rEl.setAttribute("draggable", "false"); }}
+                        className="flex items-center justify-center w-8 shrink-0 border-r border-[#E2E8F0] bg-slate-50/50 cursor-grab active:cursor-grabbing text-slate-400"
+                      >
+                        <svg viewBox="0 0 10 16" fill="currentColor" className="w-2.5 h-3.5">
+                          <circle cx="2" cy="2" r="1.2"/><circle cx="8" cy="2" r="1.2"/>
+                          <circle cx="2" cy="8" r="1.2"/><circle cx="8" cy="8" r="1.2"/>
+                          <circle cx="2" cy="14" r="1.2"/><circle cx="8" cy="14" r="1.2"/>
+                        </svg>
+                      </div>
+
+                      {/* name */}
+                      <div className="relative w-[28%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
+                        <input type="text" value={proc.name}
+                          onChange={(e) => patch(proc.id, { name: e.target.value })}
+                          onFocus={() => { setFocusId(proc.id); setFocusField("name"); setRowHi(-1); }}
+                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
+                          onKeyDown={(e) => handleRowKey(e, proc.id, "name", SUGGESTED_NAMES, proc.name)}
+                          placeholder="Name"
+                          className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-300"
+                        />
+                        <InlineDD id={proc.id} field="name" opts={SUGGESTED_NAMES} val={proc.name} />
+                      </div>
+
+                      {/* Date Picker Column */}
+                      <div className="relative w-[22%] shrink-0 border-r border-[#E2E8F0] flex items-center justify-between bg-white px-3">
+                        <span className="text-[11px] font-semibold text-[#334155] pointer-events-none truncate">
+                          {proc.date || "Select Date"}
+                        </span>
+                        <div className="flex items-center gap-1.5 text-slate-350 pointer-events-none">
+                          {proc.date && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); patch(proc.id, { date: "" }); }}
+                              className="pointer-events-auto hover:text-red-500 text-xs px-0.5 leading-none transition-colors"
+                            >
+                              ✕
+                            </button>
+                          )}
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                          </svg>
+                        </div>
+                        <input
+                          type="date"
+                          value={convertToISODate(proc.date)}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              patch(proc.id, { date: formatISODateToDisplay(e.target.value) });
+                            }
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                        />
+                      </div>
+
+                      {/* status */}
+                      <div className="relative w-[22%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
+                        <input type="text" value={proc.status}
+                          onChange={(e) => patch(proc.id, { status: e.target.value })}
+                          onFocus={() => { setFocusId(proc.id); setFocusField("status"); setRowHi(-1); }}
+                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
+                          onKeyDown={(e) => handleRowKey(e, proc.id, "status", SUGGESTED_STATUSES, proc.status)}
+                          placeholder="Status"
+                          className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-emerald-600 bg-transparent outline-none placeholder:text-slate-350"
+                        />
+                        <InlineDD id={proc.id} field="status" opts={SUGGESTED_STATUSES} val={proc.status} />
+                      </div>
+
+                      {/* notes */}
+                      <div className="relative w-[22%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
+                        <input type="text" value={proc.notes}
+                          onChange={(e) => patch(proc.id, { notes: e.target.value })}
+                          onFocus={() => { setFocusId(proc.id); setFocusField("notes"); setRowHi(-1); }}
+                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
+                          onKeyDown={(e) => handleRowKey(e, proc.id, "notes", SUGGESTED_NOTES, proc.notes)}
+                          placeholder="Add notes here"
+                          className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
+                        />
+                        <InlineDD id={proc.id} field="notes" opts={SUGGESTED_NOTES} val={proc.notes} />
+                      </div>
+
+                      {/* delete action */}
+                      <div className="flex-1 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors cursor-pointer bg-white">
+                        <button type="button" onClick={() => remove(proc.id)} className="p-1">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer controls */}
+        <div className="px-5 py-4.5 border-t border-[#F1F5F9] bg-[#FAFBFC] flex items-center justify-end gap-2.5 shrink-0">
+          <button type="button" onClick={onClose}
+            className="px-4 py-2 border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[11.5px] font-bold text-[#64748B] rounded-lg transition-all"
+          >Cancel</button>
+          <button type="button" onClick={onClose}
+            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-[11.5px] font-extrabold text-white rounded-lg transition-all shadow-md"
+          >Save & Close</button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
