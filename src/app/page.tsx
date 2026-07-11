@@ -17,6 +17,7 @@ import CurrentMedicationsDrawer, { CurrentMedication } from "@/components/Curren
 import ExistingConditionsDrawer, { ExistingCondition } from "@/components/ExistingConditionsDrawer";
 import SurgicalProceduresDrawer, { SurgicalProcedure } from "@/components/SurgicalProceduresDrawer";
 import FamilyHistoryDrawer, { FamilyHistoryItem } from "@/components/FamilyHistoryDrawer";
+import DrugAllergiesDrawer, { DrugAllergy } from "@/components/DrugAllergiesDrawer";
 
 // ==========================================
 // SUPABASE DATABASE SCHEMA DOCUMENTATION
@@ -477,6 +478,10 @@ function DashboardContent() {
   // Family History state
   const [familyItems, setFamilyItems] = useState<FamilyHistoryItem[]>([]);
   const [isFamilyOpen, setIsFamilyOpen] = useState(false);
+
+  // Drug Allergies state
+  const [allergies, setAllergies] = useState<DrugAllergy[]>([]);
+  const [isAllergiesOpen, setIsAllergiesOpen] = useState(false);
 
   // Symptoms state
   // DB Map: public.visit_symptoms
@@ -1205,6 +1210,9 @@ function DashboardContent() {
             familyItems={familyItems}
             setFamilyItems={setFamilyItems}
             onOpenFamily={() => setIsFamilyOpen(true)}
+            allergies={allergies}
+            setAllergies={setAllergies}
+            onOpenAllergies={() => setIsAllergiesOpen(true)}
           />
 
           <CurrentMedicationsDrawer
@@ -1233,6 +1241,13 @@ function DashboardContent() {
             onClose={() => setIsFamilyOpen(false)}
             items={familyItems}
             setItems={setFamilyItems}
+          />
+
+          <DrugAllergiesDrawer
+            isOpen={isAllergiesOpen}
+            onClose={() => setIsAllergiesOpen(false)}
+            allergies={allergies}
+            setAllergies={setAllergies}
           />
 
           <SymptomsCard

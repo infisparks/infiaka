@@ -359,7 +359,64 @@ export default function MedicalHistoryCard({
             + Add
           </button>
         </div>
-      )}      {/* Dynamic surgical procedures list rows */}
+      )}      {/* Dynamic drug allergies list rows */}
+      {allergies.length > 0 && (
+        <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
+          <div className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none">
+            DRUG ALLERGY
+          </div>
+          
+          <div className="flex flex-wrap gap-5 flex-1 min-w-0">
+            {allergies.map((item) => {
+              const details = [
+                item.since ? `Since: ${item.since}` : ""
+              ].filter(Boolean).join(" | ");
+
+              const isActive = item.status === "Yes (Active)";
+              const isNo = item.status === "No (Inactive)" || item.status.toLowerCase().startsWith("no");
+              let badgeText = "-";
+              let badgeClass = "bg-slate-50 border-slate-200 text-slate-400";
+              if (isActive) {
+                badgeText = "Y";
+                badgeClass = "bg-[#E6F4EA] border-[#CEEAD6] text-[#137333]";
+              } else if (isNo) {
+                badgeText = "N";
+                badgeClass = "bg-[#FCE8E6] border-[#FAD2CF] text-[#C5221F]";
+              }
+
+              return (
+                <div key={item.id} className="flex items-center gap-2">
+                  <div
+                    onClick={() => toggleAllergyStatus(item.id, item.status)}
+                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-[10px] select-none transition-colors cursor-pointer ${badgeClass}`}
+                  >
+                    <div className="flex items-center gap-0.5">
+                      <span>{badgeText}</span>
+                      <svg className="w-1.5 h-2 fill-current" viewBox="0 0 320 512">
+                        <path d="M27.66 224h264.7c24.6 0 36.89-29.78 19.54-47.12l-132.3-136.8c-5.406-5.406-12.47-8.107-19.53-8.107c-7.055 0-14.09 2.701-19.45 8.107L8.119 176.9C-9.229 194.2 3.055 224 27.66 224zM292.3 288H27.66c-24.6 0-36.89 29.77-19.54 47.12l132.5 136.8C145.9 477.3 152.1 480 160 480c7.053 0 14.12-2.703 19.53-8.109l132.3-136.8C329.2 317.8 316.9 288 292.3 288z"/>
+                      </svg>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{item.name}</p>
+                    {details && <p className="text-[9.5px] text-[#8A95A5] font-semibold mt-0.5 leading-none">{details}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          
+          <button
+            type="button"
+            onClick={onOpenAllergies}
+            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-[10px] font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
+          >
+            + Add
+          </button>
+        </div>
+      )}
+
+      {/* Dynamic surgical procedures list rows */}
       {procedures.length > 0 && (
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
           <div className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none">
@@ -489,7 +546,9 @@ export default function MedicalHistoryCard({
         )}
         <button type="button" className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Lifestyle Habit</button>
         <button type="button" className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Food/Other Allergy</button>
-        <button type="button" className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Drug Allergy</button>
+        {allergies.length === 0 && (
+          <button type="button" onClick={onOpenAllergies} className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Drug Allergy</button>
+        )}
         {procedures.length === 0 && (
           <button type="button" onClick={onOpenProcedures} className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Past Surgical Procedures</button>
         )}
