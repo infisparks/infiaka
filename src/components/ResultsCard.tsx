@@ -1,20 +1,49 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { AutoComplete } from "primereact/autocomplete";
 
-/* ─── Static suggestion lists ────────────────────────────────────── */
-const SUGGESTED_INVESTIGATIONS = [
-  { name: "Hemoglobin S/Total Hemoglobin (%), (HPLC)", unit: "%" },
-  { name: "Complete Blood Count (CBC)", unit: "-" },
-  { name: "Coronary Angiography", unit: "-" },
-  { name: "Lipid Profile", unit: "mg/dL" },
-  { name: "Blood Glucose (Fasting)", unit: "mg/dL" },
-  { name: "Serum Creatinine", unit: "mg/dL" },
-  { name: "TSH (Thyroid Stimulating Hormone)", unit: "mIU/L" }
-];
+/* ─── Supabase helpers ──────────────────────────────────────────── */
+async function fetchOptions(categoryId: number): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("value")
+      .eq("category_id", categoryId)
+      .order("usage_count", { ascending: false })
+      .limit(40);
+    if (error) throw error;
+    return (data || []).map((d: any) => d.value);
+  } catch (err) {
+    console.error("Error fetching lab result options:", err);
+    return [];
+  }
+}
 
-const SUGGESTED_UNITS = ["%", "mg/dL", "g/dL", "mIU/L", "-"];
-const SUGGESTED_INTERPRETATIONS = ["High", "Normal", "Low", "Borderline"];
+async function incrementOption(categoryId: number, value: string) {
+  if (!value?.trim()) return;
+  try {
+    const { data: existing } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("id, usage_count")
+      .eq("category_id", categoryId)
+      .ilike("value", value.trim())
+      .maybeSingle();
+    if (existing) {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .update({ usage_count: (existing.usage_count || 0) + 1 })
+        .eq("id", existing.id);
+    } else {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .insert({ category_id: categoryId, value: value.trim(), usage_count: 1 });
+    }
+  } catch (err) {
+    console.error("Error incrementing option:", err);
+  }
+}
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
 const initials = (name: string) =>
@@ -24,7 +53,6 @@ const initials = (name: string) =>
 const convertToISODate = (displayDate: string) => {
   if (!displayDate) return "";
   try {
-    // Normalizes punctuation like "11 Jul'26" or "11 Jul 26"
     const cleaned = displayDate.replace(/'/g, " ");
     const parts = cleaned.split(/\s+/).filter(Boolean);
     if (parts.length < 3) return "";
@@ -52,7 +80,7 @@ const formatISODateToDisplay = (isoDate: string) => {
   try {
     const parts = isoDate.split("-");
     if (parts.length < 3) return isoDate;
-    const year = parts[0].slice(2); // e.g. "26"
+    const year = parts[0].slice(2);
     const monthIdx = parseInt(parts[1], 10) - 1;
     const day = parseInt(parts[2], 10);
     
@@ -81,36 +109,268 @@ interface ResultsCardProps {
   setLabResults: React.Dispatch<React.SetStateAction<LabResult[]>>;
 }
 
+/* ─── Reusable AutoComplete inline input ─────────────────────────── */
+function InlineAutoComplete({
+  value,
+  onChange,
+  onBlur,
+  options,
+  placeholder,
+  onAfterSelect,
+  onInputRef,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onBlur: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+  onAfterSelect?: () => void;
+  onInputRef?: (el: HTMLInputElement | null) => void;
+}) {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const dropdownClicked = useRef(false);
+
+  const search = (event: { query: string }) => {
+    const q = event.query.trim().toLowerCase();
+    let results = options.filter((o) => o.toLowerCase().includes(q));
+    if (!q) results = options;
+    if (q && !options.some((o) => o.toLowerCase() === q)) {
+      results = [...results, `+ Create "${event.query.trim()}"`];
+    }
+    setSuggestions(results);
+  };
+
+  const handleSelect = (e: { value: string }) => {
+    const val = e.value;
+    dropdownClicked.current = true;
+    if (val.startsWith('+ Create "')) {
+      const match = val.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : val;
+      onChange(custom); onBlur(custom);
+    } else {
+      onChange(val); onBlur(val);
+    }
+    setTimeout(() => onAfterSelect?.(), 60);
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const val = e.target.value.trim();
+    setTimeout(() => {
+      if (dropdownClicked.current) { dropdownClicked.current = false; return; }
+      onChange(val); onBlur(val);
+    }, 180);
+  };
+
+  const itemTemplate = (item: string) => {
+    if (item.startsWith('+ Create "')) {
+      const match = item.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : item;
+      return (
+        <span className="text-blue-600 font-bold flex items-center gap-1 text-[11px]">
+          <span>+ Create</span><span className="italic">"{custom}"</span>
+        </span>
+      );
+    }
+    return <span className="text-[11px] font-semibold text-[#334155]">{item}</span>;
+  };
+
+  return (
+    <div className="w-full h-full relative primereact-autocomplete-inline">
+      <AutoComplete
+        value={value}
+        suggestions={suggestions}
+        completeMethod={search}
+        onChange={(e) => onChange(e.value)}
+        onSelect={handleSelect}
+        onBlur={handleBlur}
+        itemTemplate={itemTemplate}
+        placeholder={placeholder}
+        inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-350"
+        className="w-full h-full"
+        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+      />
+    </div>
+  );
+}
+
+/* ─── Parameter name autocomplete with Supabase search ──────────── */
+function InlineParameterAutoComplete({
+  value,
+  onChange,
+  placeholder,
+  paramOptions,
+  onAfterSelect,
+  onInputRef,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  paramOptions: string[];
+  onAfterSelect?: () => void;
+  onInputRef?: (el: HTMLInputElement | null) => void;
+}) {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const dropdownClicked = useRef(false);
+
+  const search = (event: { query: string }) => {
+    const q = event.query.trim().toLowerCase();
+    let results = paramOptions.filter((o) => o.toLowerCase().includes(q));
+    if (!q) results = paramOptions;
+    if (q && !paramOptions.some((o) => o.toLowerCase() === q)) {
+      results = [...results, `+ Create "${event.query.trim()}"`];
+    }
+    setSuggestions(results);
+  };
+
+  const handleSelect = (e: { value: string }) => {
+    dropdownClicked.current = true;
+    const val = e.value;
+    if (val.startsWith('+ Create "')) {
+      const match = val.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : val;
+      onChange(custom);
+    } else {
+      onChange(val);
+    }
+    setTimeout(() => onAfterSelect?.(), 80);
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const val = e.target.value.trim();
+    setTimeout(() => {
+      if (dropdownClicked.current) { dropdownClicked.current = false; return; }
+      onChange(val);
+    }, 180);
+  };
+
+  const itemTemplate = (item: string) => {
+    if (item.startsWith('+ Create "')) {
+      const match = item.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : item;
+      return (
+        <div className="p-1">
+          <span className="text-blue-600 font-bold text-[11px]">+ Create "{custom}"</span>
+        </div>
+      );
+    }
+    return (
+      <div className="p-1">
+        <div className="text-[11px] font-bold text-[#1e293b]">{item}</div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="w-full h-full relative primereact-autocomplete-inline flex items-center">
+      <AutoComplete
+        value={value}
+        suggestions={suggestions}
+        completeMethod={search}
+        onChange={(e) => { if (typeof e.value === "string") onChange(e.value); }}
+        onSelect={handleSelect}
+        onBlur={handleBlur}
+        itemTemplate={itemTemplate}
+        placeholder={placeholder}
+        inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none p-0 placeholder:text-slate-350"
+        className="w-full h-full"
+        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+      />
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    ResultsCard Component
 ═══════════════════════════════════════════════════════════════════ */
 export default function ResultsCard({ labResults, setLabResults }: ResultsCardProps) {
-  /* search bar state */
-  const [searchVal, setSearchVal]   = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchHi, setSearchHi]     = useState(-1);
+  // Category IDs: 40=lab_result_parameter, 41=lab_result_unit, 42=lab_result_interpretation, 43=lab_result_notes
+  const [paramOptions, setParamOptions]           = useState<string[]>([]);
+  const [unitOptions, setUnitOptions]             = useState<string[]>([]);
+  const [interpretationOptions, setInterpretationOptions] = useState<string[]>([]);
+  const [notesOptions, setNotesOptions]           = useState<string[]>([]);
 
-  /* inline cell suggestions highlight */
-  const [focusId, setFocusId]       = useState<string | null>(null);
-  const [focusField, setFocusField] = useState<string | null>(null);
-  const [rowHi, setRowHi]           = useState(-1);
+  const [searchVal, setSearchVal]                 = useState("");
+  const [searchOpen, setSearchOpen]               = useState(false);
+  const [searchHi, setSearchHi]                   = useState(-1);
+  const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
 
   /* drag & drop handle */
   const dragIdx = useRef<number | null>(null);
 
+  /* ─── Auto-focus refs ─── */
+  type ResFieldKey = 'unit' | 'reading' | 'interpretation' | 'notes';
+  const fieldInputRefs = useRef<Record<string, Partial<Record<ResFieldKey, HTMLInputElement | null>>>>({});
+
+  const focusField = (resId: string, field: ResFieldKey) => {
+    setTimeout(() => {
+      fieldInputRefs.current[resId]?.[field]?.focus();
+    }, 80);
+  };
+
+  const setFieldRef = (resId: string, field: ResFieldKey) => (el: HTMLInputElement | null) => {
+    if (!fieldInputRefs.current[resId]) fieldInputRefs.current[resId] = {};
+    fieldInputRefs.current[resId][field] = el;
+  };
+
+  /* Load all dropdown options from Supabase on mount */
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      const [params, units, interpretations, notes] = await Promise.all([
+        fetchOptions(40),
+        fetchOptions(41),
+        fetchOptions(42),
+        fetchOptions(43),
+      ]);
+      if (!active) return;
+      setParamOptions(params);
+      setUnitOptions(units);
+      setInterpretationOptions(interpretations);
+      setNotesOptions(notes);
+    };
+    load();
+    return () => { active = false; };
+  }, []);
+
+  /* Debounced search suggestions */
+  useEffect(() => {
+    let active = true;
+    const timer = setTimeout(() => {
+      const q = searchVal.trim();
+      if (!q) {
+        if (active) setSearchSuggestions(paramOptions.slice(0, 12));
+        return;
+      }
+      const qLower = q.toLowerCase();
+      let results = paramOptions.filter((o) => o.toLowerCase().includes(qLower));
+      
+      const hasPerfectMatch = paramOptions.some((o) => o.toLowerCase() === qLower);
+      if (!hasPerfectMatch) {
+        results = [...results, `+ Create "${q}"`];
+      }
+      
+      if (active) setSearchSuggestions(results);
+    }, 200);
+    return () => { active = false; clearTimeout(timer); };
+  }, [searchVal, paramOptions]);
+
   /* ─── helpers ─── */
-  const addLabResult = (item: { name: string; unit: string }) => {
+  const addLabResult = (name: string) => {
+    if (!name.trim()) return;
     const formattedDate = formatISODateToDisplay(new Date().toISOString().split("T")[0]);
-    const newRes = {
+    const newRes: LabResult = {
       id: Date.now().toString(),
-      name: item.name,
-      unit: item.unit,
+      name: name.trim(),
+      unit: "",
       reading: "",
       interpretation: "",
       date: formattedDate,
-      notes: ""
+      notes: "",
     };
     setLabResults((p) => [...p, newRes]);
+    incrementOption(40, name.trim());
     setSearchVal("");
     setSearchOpen(false);
     setSearchHi(-1);
@@ -118,6 +378,10 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
 
   const patch  = (id: string, diff: Partial<LabResult>) => setLabResults((p) => p.map((r) => (r.id === id ? { ...r, ...diff } : r)));
   const remove = (id: string) => setLabResults((p) => p.filter((r) => r.id !== id));
+
+  const handleInputBlur = (categoryId: number, value: string) => {
+    if (value?.trim()) incrementOption(categoryId, value.trim());
+  };
 
   /* drag reorder */
   const onDragStart = (i: number) => { dragIdx.current = i; };
@@ -129,44 +393,13 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
   };
   const onDragEnd = () => { dragIdx.current = null; };
 
-  /* inline suggestions list component */
-  const InlineDD = ({ id, field, opts, val }: { id: string; field: string; opts: string[]; val: string }) => {
-    if (focusId !== id || focusField !== field) return null;
-    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
-    if (!list.length) return null;
-    return (
-      <div className="absolute left-0 top-full mt-0.5 z-40 w-full min-w-[125px] bg-white border border-[#E2E8F0] rounded-lg shadow-xl overflow-hidden max-h-44 overflow-y-auto text-left">
-        {list.map((opt, i) => (
-          <div key={opt}
-            onMouseDown={() => { patch(id, { [field]: opt }); setFocusId(null); setFocusField(null); setRowHi(-1); }}
-            className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
-              ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
-          >{opt}</div>
-        ))}
-      </div>
-    );
-  };
-
-  const handleRowKey = (e: React.KeyboardEvent, id: string, field: string, opts: string[], val: string) => {
-    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
-    if (e.key === "ArrowDown") { e.preventDefault(); setRowHi((p) => Math.min(p + 1, list.length - 1)); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); setRowHi((p) => Math.max(p - 1, 0)); }
-    else if (e.key === "Enter") {
-      e.preventDefault();
-      if (rowHi >= 0 && list[rowHi]) { patch(id, { [field]: list[rowHi] }); setFocusId(null); setFocusField(null); setRowHi(-1); }
-    }
-    else if (e.key === "Escape") { setFocusId(null); setFocusField(null); setRowHi(-1); }
-  };
-
-  /* search key events */
   const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const list = SUGGESTED_INVESTIGATIONS.filter((o) => !searchVal || o.name.toLowerCase().includes(searchVal.toLowerCase()));
-    if (e.key === "ArrowDown") { e.preventDefault(); setSearchHi((p) => Math.min(p + 1, list.length - 1)); }
+    if (e.key === "ArrowDown") { e.preventDefault(); setSearchHi((p) => Math.min(p + 1, searchSuggestions.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setSearchHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {
       e.preventDefault();
-      if (searchHi >= 0 && list[searchHi]) addLabResult(list[searchHi]);
-      else addLabResult({ name: searchVal, unit: "-" });
+      if (searchHi >= 0 && searchSuggestions[searchHi]) addLabResult(searchSuggestions[searchHi]);
+      else if (searchVal.trim()) addLabResult(searchVal);
     }
     else if (e.key === "Escape") { setSearchOpen(false); setSearchHi(-1); }
   };
@@ -206,44 +439,17 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
 
       {/* Grid Headers Row */}
       <div className="flex items-stretch border-b border-[#E2E8F0] bg-slate-50/50 text-[9px] font-bold text-[#718096] uppercase select-none">
-        {/* drag blank */}
         <div className="w-7 shrink-0 border-r border-[#E2E8F0]" />
-        
-        {/* Col 1: Investigation Name */}
-        <div className="w-[28%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">
-          Investigation Name
-        </div>
-
-        {/* Col 2: Unit */}
-        <div className="w-[8%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">
-          Unit
-        </div>
-
-        {/* Col 3: Reading/Observations */}
-        <div className="w-[16%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">
-          Reading/Observations
-        </div>
-
-        {/* Col 4: Interpretation */}
-        <div className="w-[16%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">
-          Interpretation
-        </div>
-
-        {/* Col 5: Date */}
-        <div className="w-[12%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">
-          Date
-        </div>
-
-        {/* Col 6: Additional Notes */}
-        <div className="w-[16%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">
-          Additional Notes
-        </div>
-
-        {/* Action Column */}
-        <div className="flex-1" />
+        <div className="w-[28%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">Parameter Name</div>
+        <div className="w-[8%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">Unit</div>
+        <div className="w-[16%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">Reading/Observations</div>
+        <div className="w-[16%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">Interpretation</div>
+        <div className="w-[12%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">Date</div>
+        <div className="flex-1 border-r border-[#E2E8F0] px-3 py-2 flex items-center">Additional Notes</div>
+        <div className="w-8 shrink-0" />
       </div>
 
-      {/* Row list */}
+      {/* Rows */}
       {labResults.length > 0 && (
         <div className="p-3 space-y-2">
           {labResults.map((row, idx) => (
@@ -255,7 +461,7 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
               onDragEnd={(e) => { onDragEnd(); e.currentTarget.setAttribute("draggable", "false"); }}
               className="group flex flex-col w-full text-left"
             >
-              <div className="flex items-stretch border border-[#E2E8F0] rounded-lg bg-white overflow-visible h-9">
+              <div className="flex items-stretch border border-[#E2E8F0] rounded-lg bg-white overflow-visible min-h-[44px]">
                 
                 {/* drag grip */}
                 <div
@@ -270,55 +476,63 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
                   </svg>
                 </div>
 
-                {/* Col 1: Investigation Name */}
+                {/* Col 1: Parameter Name */}
                 <div className="relative w-[28%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white overflow-visible">
-                  <input type="text" value={row.name}
-                    onChange={(e) => patch(row.id, { name: e.target.value })}
-                    onFocus={() => { setFocusId(row.id); setFocusField("name"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, row.id, "name", SUGGESTED_INVESTIGATIONS.map(i => i.name), row.name)}
-                    placeholder="Investigation Name"
-                    className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-300"
+                  <InlineParameterAutoComplete
+                    value={row.name}
+                    onChange={(v) => patch(row.id, { name: v })}
+                    paramOptions={paramOptions}
+                    placeholder="Parameter name"
+                    onAfterSelect={() => focusField(row.id, 'unit')}
                   />
-                  <InlineDD id={row.id} field="name" opts={SUGGESTED_INVESTIGATIONS.map(i => i.name)} val={row.name} />
                 </div>
 
                 {/* Col 2: Unit */}
                 <div className="relative w-[8%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white overflow-visible">
-                  <input type="text" value={row.unit}
-                    onChange={(e) => patch(row.id, { unit: e.target.value })}
-                    onFocus={() => { setFocusId(row.id); setFocusField("unit"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, row.id, "unit", SUGGESTED_UNITS, row.unit)}
+                  <InlineAutoComplete
+                    value={row.unit}
+                    onChange={(v) => patch(row.id, { unit: v })}
+                    onBlur={(v) => handleInputBlur(41, v)}
+                    options={unitOptions}
                     placeholder="Unit"
-                    className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
+                    onInputRef={setFieldRef(row.id, 'unit')}
+                    onAfterSelect={() => focusField(row.id, 'reading')}
                   />
-                  <InlineDD id={row.id} field="unit" opts={SUGGESTED_UNITS} val={row.unit} />
                 </div>
 
                 {/* Col 3: Reading/Observations */}
                 <div className="relative w-[16%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white overflow-visible">
                   <input type="text" value={row.reading}
+                    ref={(el) => {
+                      if (!fieldInputRefs.current[row.id]) fieldInputRefs.current[row.id] = {};
+                      fieldInputRefs.current[row.id].reading = el;
+                    }}
                     onChange={(e) => patch(row.id, { reading: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        focusField(row.id, 'interpretation');
+                      }
+                    }}
                     placeholder="Reading"
-                    className="w-full h-full border-0 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350 transition-all"
+                    className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                   />
                 </div>
 
                 {/* Col 4: Interpretation */}
                 <div className="relative w-[16%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white overflow-visible">
-                  <input type="text" value={row.interpretation}
-                    onChange={(e) => patch(row.id, { interpretation: e.target.value })}
-                    onFocus={() => { setFocusId(row.id); setFocusField("interpretation"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, row.id, "interpretation", SUGGESTED_INTERPRETATIONS, row.interpretation)}
+                  <InlineAutoComplete
+                    value={row.interpretation}
+                    onChange={(v) => patch(row.id, { interpretation: v })}
+                    onBlur={(v) => handleInputBlur(42, v)}
+                    options={interpretationOptions}
                     placeholder="High/Normal/Low"
-                    className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
+                    onInputRef={setFieldRef(row.id, 'interpretation')}
+                    onAfterSelect={() => focusField(row.id, 'notes')}
                   />
-                  <InlineDD id={row.id} field="interpretation" opts={SUGGESTED_INTERPRETATIONS} val={row.interpretation} />
                 </div>
 
-                {/* Col 5: Date (Formatted display with underlying native Date Picker) */}
+                {/* Col 5: Date */}
                 <div className="relative w-[12%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white overflow-visible px-3">
                   <span className="text-[11px] font-semibold text-[#334155] pointer-events-none truncate">
                     {row.date || "Date"}
@@ -336,16 +550,19 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
                 </div>
 
                 {/* Col 6: Additional Notes */}
-                <div className="relative w-[16%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white overflow-hidden">
-                  <input type="text" value={row.notes}
-                    onChange={(e) => patch(row.id, { notes: e.target.value })}
+                <div className="relative flex-1 border-r border-[#E2E8F0] flex items-center bg-white overflow-visible">
+                  <InlineAutoComplete
+                    value={row.notes}
+                    onChange={(v) => patch(row.id, { notes: v })}
+                    onBlur={(v) => handleInputBlur(43, v)}
+                    options={notesOptions}
                     placeholder="Add notes here"
-                    className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350 truncate"
+                    onInputRef={setFieldRef(row.id, 'notes')}
                   />
                 </div>
 
-                {/* Col 7: Trash */}
-                <div className="flex-1 flex items-center justify-center bg-white text-slate-300 hover:text-red-500 transition-colors cursor-pointer">
+                {/* Trash */}
+                <div className="w-8 flex items-center justify-center bg-white text-slate-300 hover:text-red-500 transition-colors cursor-pointer shrink-0">
                   <button type="button" onClick={() => remove(row.id)} className="p-1">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -366,7 +583,7 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
           </svg>
           <input
             type="text"
-            placeholder="Start typing a parameter..."
+            placeholder="Start typing a blood parameter (e.g. Platelets, Hemoglobin, WBC)..."
             value={searchVal}
             onChange={(e) => { setSearchVal(e.target.value); setSearchHi(-1); setSearchOpen(true); }}
             onFocus={() => { setSearchOpen(true); setSearchHi(-1); }}
@@ -375,31 +592,45 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
             className="w-full h-8.5 pl-8 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-medium transition-all"
           />
           {searchVal.trim() && (
-            <button type="button" onClick={() => addLabResult({ name: searchVal, unit: "-" })}
+            <button type="button" onClick={() => addLabResult(searchVal)}
               className="absolute right-2 text-blue-600 hover:text-blue-700 text-[10px] font-bold tracking-wide">+ Add</button>
           )}
         </div>
 
-        {/* Dropdown search suggestions */}
-        {searchOpen && (() => {
-          const list = SUGGESTED_INVESTIGATIONS.filter((o) => !searchVal || o.name.toLowerCase().includes(searchVal.toLowerCase()));
-          if (!list.length) return null;
-          return (
-            <div className="absolute left-3 right-3 top-full mt-0.5 z-40 bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
-              {list.map((opt, i) => (
-                <div key={opt.name} onMouseDown={() => addLabResult(opt)}
+        {/* Dropdown suggestions */}
+        {searchOpen && (searchSuggestions.length > 0 || searchVal.trim()) && (
+          <div className="absolute left-3 right-3 top-full mt-0.5 z-40 bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+            <div className="px-3 pt-2 pb-1 text-[9px] font-bold text-[#94A3B8] uppercase tracking-wide">
+              {searchVal.trim() ? "Matching Parameters" : "Sample Parameters"}
+            </div>
+            {searchSuggestions.map((opt, i) => {
+              const isCreate = opt.startsWith('+ Create "');
+              let displayVal = opt;
+              if (isCreate) {
+                const match = opt.match(/\+ Create "(.*)"/);
+                displayVal = match ? match[1] : opt;
+              }
+              
+              return (
+                <div key={opt} onMouseDown={() => addLabResult(displayVal)}
                   className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
                     ${i === searchHi ? "bg-blue-50" : "hover:bg-[#F8FAFC]"}`}
                 >
                   <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center text-[8px] font-extrabold text-amber-700 shrink-0 leading-none">
-                    {initials(opt.name) || "Lr"}
+                    {isCreate ? "+" : (initials(opt) || "Lr")}
                   </div>
-                  <span className="text-[11.5px] font-semibold text-[#1E293B]">{opt.name}</span>
+                  {isCreate ? (
+                    <span className="text-[11.5px] font-bold text-blue-600">
+                      + Create <span className="italic font-semibold">"{displayVal}"</span>
+                    </span>
+                  ) : (
+                    <span className="text-[11.5px] font-semibold text-[#1E293B]">{opt}</span>
+                  )}
                 </div>
-              ))}
-            </div>
-          );
-        })()}
+              );
+            })}
+          </div>
+        )}
       </div>
 
     </section>
