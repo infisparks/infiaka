@@ -1,114 +1,61 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-
-/* ─── Static suggestion lists ────────────────────────────────────── */
-const SUGGESTED_DIAGNOSES = [
-  "Period pain",
-  "Head Pain",
-  "Body Pain",
-  "Fever",
-  "Cough",
-  "Migraine",
-  "Essential hypertension",
-  "Type 2 diabetes mellitus",
-  "Gastro-esophageal reflux disease",
-  "Acute upper respiratory infection",
-];
-
-const SUGGESTED_SINCE = [
-  "Since childhood",
-  "1 Day",
-  "2 Days",
-  "1 Week",
-  "2 Weeks",
-  "1 Month",
-  "3 Months",
-  "6 Months",
-  "1 Year",
-];
-
-const SUGGESTED_STATUS = [
-  "Active",
-  "Suspected",
-  "Resolved",
-  "Chronic",
-];
-
-const SUGGESTED_SEVERITIES = ["Mild", "Moderate", "Severe"];
-
-const SUGGESTED_ABDOMINAL_REGIONS = [
-  "Umbilical region",
-  "Left hypochondriac region",
-  "Epigastric region",
-  "Suprapubic / Hypogastric region",
-  "Right upper quadrant (RUQ)",
-  "Left upper quadrant (LUQ)",
-  "Right lower quadrant (RLQ)",
-  "Left lower quadrant (LLQ)",
-  "Generalized abdomen"
-];
-
-const SUGGESTED_PAIN_TYPES = [
-  "Burning pain",
-  "Shooting pain",
-  "Stabbing pain",
-  "Throbbing pain",
-  "Cramping pain",
-  "Dull pain",
-  "Tingling pain",
-  "Colicky pain"
-];
-
-const SUGGESTED_RELIEVED_BY = [
-  "Pain relief by medicine",
-  "Rest",
-  "Warm compress",
-  "Defecation / Passing gas",
-  "Eating food",
-  "Vomiting"
-];
-
-const SUGGESTED_TENDERNESS = [
-  "Absent",
-  "Present",
-  "Rebound tenderness",
-  "Guarding",
-  "Rigidity"
-];
-
-const SUGGESTED_PALPATIONS = [
-  "Abdominal guarding",
-  "Fluid thrill in abdomen",
-  "Splenomegaly",
-  "Soft, non-tender",
-  "Soft, mild tenderness",
-  "Rigidity present",
-  "Distended abdomen"
-];
-
-const SUGGESTED_AUSCULTATIONS = [
-  "Normal bowel sounds",
-  "Borborygmi",
-  "Hyperactive bowel sounds",
-  "Hypoactive bowel sounds",
-  "Absent bowel sounds"
-];
-
-const CLINICAL_COURSES = [
-  "Acute",
-  "Subacute",
-  "Chronic",
-  "Recurrent",
-  "Acute-on-chronic",
-  "Intermittent",
-  "Progressive",
-  "Seasonal"
-];
+import React, { useState, useRef, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { AutoComplete } from "primereact/autocomplete";
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
 const initials = (name: string) =>
   name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+
+// Database helper functions
+async function fetchOptions(categoryId: number, search: string = "") {
+  try {
+    let query = supabase
+      .from("aka_master_dropdown_catalog")
+      .select("value")
+      .eq("category_id", categoryId)
+      .order("usage_count", { ascending: false })
+      .limit(40);
+
+    if (search) {
+      query = query.ilike("value", `%${search}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data.map((d: any) => d.value);
+  } catch (err) {
+    console.error("Error fetching options:", err);
+    return [];
+  }
+}
+
+async function incrementOption(categoryId: number, value: string) {
+  if (!value || !value.trim()) return;
+  const val = value.trim();
+  try {
+    const { data } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("id, usage_count")
+      .eq("category_id", categoryId)
+      .eq("value", val)
+      .maybeSingle();
+
+    if (data) {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .update({ usage_count: data.usage_count + 1 })
+        .eq("id", data.id);
+    } else {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .insert({ category_id: categoryId, value: val, usage_count: 1 });
+    }
+  } catch (err) {
+    console.error("Error incrementing option:", err);
+  }
+}
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 interface Diagnosis {
@@ -132,76 +79,8 @@ interface DiagnosisCardProps {
   setDiagnoses: React.Dispatch<React.SetStateAction<Diagnosis[]>>;
 }
 
-/* ─── Reusable autocomplete text input for modal ─────────────────── */
-function ModalAutoInput({
-  label,
-  value,
-  onChange,
-  options,
-  placeholder,
-  hasChevron,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: string[];
-  placeholder?: string;
-  hasChevron?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [hi, setHi]     = useState(-1);
-
-  const filtered = options.filter(
-    (o) => !value || o.toLowerCase().includes(value.toLowerCase())
-  );
-
-  const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!open) { setOpen(true); return; }
-    if (e.key === "ArrowDown") { e.preventDefault(); setHi((p) => Math.min(p + 1, filtered.length - 1)); }
-    else if (e.key === "ArrowUp")  { e.preventDefault(); setHi((p) => Math.max(p - 1, 0)); }
-    else if (e.key === "Enter")    { e.preventDefault(); if (hi >= 0 && filtered[hi]) { onChange(filtered[hi]); setHi(-1); setOpen(false); } }
-    else if (e.key === "Escape")   { setOpen(false); setHi(-1); }
-  };
-
-  return (
-    <div className="space-y-1 relative text-left">
-      <label className="block text-[11px] font-semibold text-[#556376]">{label}</label>
-      <div className="relative">
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => { onChange(e.target.value); setHi(-1); setOpen(true); }}
-          onFocus={() => { setOpen(true); setHi(-1); }}
-          onBlur={() => setTimeout(() => { setOpen(false); setHi(-1); }, 160)}
-          onKeyDown={handleKey}
-          placeholder={placeholder ?? label}
-          className="w-full h-8.5 px-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] bg-white focus:outline-none font-semibold text-[#334155] placeholder:text-[#C0CADC] transition-all"
-        />
-        {hasChevron && (
-          <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </span>
-        )}
-        {open && filtered.length > 0 && (
-          <div className="absolute left-0 top-full mt-1 z-[60] w-full bg-white border border-[#E2E8F0] rounded-lg shadow-xl overflow-hidden max-h-40 overflow-y-auto">
-            {filtered.map((opt, i) => (
-              <div key={opt}
-                onMouseDown={() => { onChange(opt); setOpen(false); setHi(-1); }}
-                className={`px-3 py-2 text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
-                  ${i === hi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F8FAFC] text-[#334155]"}`}
-              >{opt}</div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Reusable chip-tag multi-selector for modal ─────────────────── */
-function ModalChipTagField({
+/* ─── Reusable chip-tag multi-selector ────────────────────────── */
+function ChipTagField({
   label,
   options,
   selected,
@@ -212,65 +91,263 @@ function ModalChipTagField({
   selected: string[];
   onToggle: (v: string) => void;
 }) {
-  const [search, setSearch] = useState("");
-  const [open, setOpen]     = useState(false);
-  const [hi, setHi]         = useState(-1);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
-  const filtered = options.filter(
-    (o) => !search || o.toLowerCase().includes(search.toLowerCase())
-  );
+  const search = (event: { query: string }) => {
+    const query = event.query.trim();
+    let results = options.filter((o) =>
+      o.toLowerCase().includes(query.toLowerCase())
+    );
+    if (query && !options.some((o) => o.toLowerCase() === query.toLowerCase())) {
+      results = [...results, `+ Create "${query}"`];
+    }
+    setSuggestions(results);
+  };
 
-  const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!open) { setOpen(true); return; }
-    if (e.key === "ArrowDown") { e.preventDefault(); setHi((p) => Math.min(p + 1, filtered.length - 1)); }
-    else if (e.key === "ArrowUp")  { e.preventDefault(); setHi((p) => Math.max(p - 1, 0)); }
-    else if (e.key === "Enter")    { e.preventDefault(); if (hi >= 0 && filtered[hi]) { onToggle(filtered[hi]); setSearch(""); setHi(-1); } }
-    else if (e.key === "Escape")   { setOpen(false); setHi(-1); }
+  const handleChange = (e: { value: string[] }) => {
+    if (!e.value) return;
+    const lastItem = e.value[e.value.length - 1];
+    if (lastItem && lastItem.startsWith('+ Create "')) {
+      const match = lastItem.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : lastItem;
+      if (!selected.includes(custom)) {
+        onToggle(custom);
+      }
+    } else {
+      const added = e.value.find((x) => !selected.includes(x));
+      const removed = selected.find((x) => !e.value.includes(x));
+      if (added) onToggle(added);
+      if (removed) onToggle(removed);
+    }
+  };
+
+  const itemTemplate = (item: string) => {
+    if (item.startsWith('+ Create "')) {
+      const match = item.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : item;
+      return (
+        <span className="text-blue-600 font-bold flex items-center gap-1">
+          <span>+ Create</span>
+          <span className="italic">"{custom}"</span>
+        </span>
+      );
+    }
+    return <span>{item}</span>;
   };
 
   return (
-    <div className="space-y-1 relative text-left">
+    <div className="space-y-1 relative primereact-autocomplete-custom text-left">
       <label className="block text-[11px] font-semibold text-[#556376]">{label}</label>
-      <div
-        className="border border-[#E2E8F0] focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100 rounded-md p-1.5 flex flex-wrap gap-1.5 bg-white min-h-[38px] transition-all cursor-text"
-        onClick={() => setOpen(true)}
-      >
-        {selected.map((v) => (
-          <span key={v} className="inline-flex items-center gap-1 bg-slate-50 text-[#334155] border border-slate-200 text-[10px] font-bold px-2 py-0.5 rounded select-none">
-            {v}
-            <button type="button" onMouseDown={(e) => { e.stopPropagation(); onToggle(v); }}
-              className="text-slate-400 hover:text-red-500 font-bold leading-none text-[12px]">×</button>
-          </span>
-        ))}
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setHi(-1); setOpen(true); }}
-          onFocus={() => { setOpen(true); setHi(-1); }}
-          onBlur={() => setTimeout(() => { setOpen(false); setHi(-1); }, 160)}
-          onKeyDown={handleKey}
+      <div className="border border-[#E2E8F0] focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100 rounded-md bg-white min-h-[36px] transition-all cursor-text flex items-center">
+        <AutoComplete
+          value={selected}
+          suggestions={suggestions}
+          completeMethod={search}
+          onChange={handleChange}
+          multiple
+          itemTemplate={itemTemplate}
           placeholder={selected.length === 0 ? label : ""}
-          className="flex-1 bg-transparent min-w-[100px] text-[11px] font-semibold text-[#1e293b] focus:outline-none placeholder:text-[#C0CADC]"
+          inputClassName="w-full text-[11px] font-semibold text-[#1e293b] focus:outline-none placeholder:text-[#C0CADC] bg-transparent border-0 shadow-none p-1.5 focus:ring-0"
+          className="w-full"
+          panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
         />
       </div>
-      {open && filtered.length > 0 && (
-        <div className="absolute left-0 top-full mt-1 z-[60] w-full bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-40 overflow-y-auto">
-          {filtered.map((opt, i) => (
-            <div key={opt}
-              onMouseDown={() => { onToggle(opt); setSearch(""); setHi(-1); }}
-              className={`px-3 py-2 text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 flex items-center justify-between transition-colors
-                ${i === hi ? "bg-blue-50 text-blue-700" : selected.includes(opt) ? "bg-purple-50 text-purple-700" : "hover:bg-[#F8FAFC] text-[#334155]"}`}
-            >
-              {opt}
-              {selected.includes(opt) && (
-                <svg className="w-3 h-3 fill-current shrink-0" viewBox="0 0 20 20">
-                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-                </svg>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+    </div>
+  );
+}
+
+/* ─── Reusable autocomplete text input ───────────────────────── */
+function AutoInput({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  clearable,
+  onBlur,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+  clearable?: boolean;
+  onBlur?: (v: string) => void;
+}) {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const dropdownClicked = useRef(false);
+
+  const search = (event: { query: string }) => {
+    const query = event.query.trim();
+    let results = options.filter((o) =>
+      o.toLowerCase().includes(query.toLowerCase())
+    );
+    if (!query || options.some(opt => opt === query)) {
+      results = options;
+    }
+    if (query && !options.some((o) => o.toLowerCase() === query.toLowerCase())) {
+      results = [...results, `+ Create "${query}"`];
+    }
+    setSuggestions(results);
+  };
+
+  const handleSelect = (e: { value: string }) => {
+    const val = e.value;
+    dropdownClicked.current = true;
+    if (val.startsWith('+ Create "')) {
+      const match = val.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : val;
+      onChange(custom);
+      if (onBlur) onBlur(custom);
+    } else {
+      onChange(val);
+      if (onBlur) onBlur(val);
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const val = e.target.value.trim();
+    setTimeout(() => {
+      if (dropdownClicked.current) {
+        dropdownClicked.current = false;
+        return;
+      }
+      onChange(val);
+      if (onBlur) onBlur(val);
+    }, 180);
+  };
+
+  const itemTemplate = (item: string) => {
+    if (item.startsWith('+ Create "')) {
+      const match = item.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : item;
+      return (
+        <span className="text-blue-600 font-bold flex items-center gap-1 text-[11px]">
+          <span>+ Create</span>
+          <span className="italic">"{custom}"</span>
+        </span>
+      );
+    }
+    return <span className="text-[11px] font-semibold text-[#334155]">{item}</span>;
+  };
+
+  return (
+    <div className="space-y-1 relative primereact-autocomplete-custom text-left">
+      <label className="block text-[11px] font-semibold text-[#556376]">{label}</label>
+      <div className="relative">
+        <AutoComplete
+          value={value}
+          suggestions={suggestions}
+          completeMethod={search}
+          onChange={(e) => onChange(e.value)}
+          onSelect={handleSelect}
+          onBlur={handleBlur}
+          itemTemplate={itemTemplate}
+          placeholder={placeholder ?? label}
+          inputClassName="w-full h-8.5 px-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] bg-white focus:outline-none font-semibold text-[#334155] placeholder:text-[#C0CADC] transition-all"
+          className="w-full"
+          panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+        />
+        {clearable && value && (
+          <button type="button" onMouseDown={() => onChange("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#475569] z-10">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"/>
+              <path strokeLinecap="round" d="M15 9l-6 6M9 9l6 6"/>
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Reusable autocomplete inline input ───────────────────────── */
+function InlineAutoComplete({
+  value,
+  onChange,
+  onBlur,
+  options,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onBlur: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+}) {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const dropdownClicked = useRef(false);
+
+  const search = (event: { query: string }) => {
+    const query = event.query.trim();
+    let results = options.filter((o) =>
+      o.toLowerCase().includes(query.toLowerCase())
+    );
+    if (!query || options.some(opt => opt === query)) {
+      results = options;
+    }
+    if (query && !options.some((o) => o.toLowerCase() === query.toLowerCase())) {
+      results = [...results, `+ Create "${query}"`];
+    }
+    setSuggestions(results);
+  };
+
+  const handleSelect = (e: { value: string }) => {
+    const val = e.value;
+    dropdownClicked.current = true;
+    if (val.startsWith('+ Create "')) {
+      const match = val.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : val;
+      onChange(custom);
+      onBlur(custom);
+    } else {
+      onChange(val);
+      onBlur(val);
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const val = e.target.value.trim();
+    setTimeout(() => {
+      if (dropdownClicked.current) {
+        dropdownClicked.current = false;
+        return;
+      }
+      onChange(val);
+      onBlur(val);
+    }, 180);
+  };
+
+  const itemTemplate = (item: string) => {
+    if (item.startsWith('+ Create "')) {
+      const match = item.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : item;
+      return (
+        <span className="text-blue-600 font-bold flex items-center gap-1 text-[11px]">
+          <span>+ Create</span>
+          <span className="italic">"{custom}"</span>
+        </span>
+      );
+    }
+    return <span className="text-[11px] font-semibold text-[#334155]">{item}</span>;
+  };
+
+  return (
+    <div className="w-full relative primereact-autocomplete-custom">
+      <AutoComplete
+        value={value}
+        suggestions={suggestions}
+        completeMethod={search}
+        onChange={(e) => onChange(e.value)}
+        onSelect={handleSelect}
+        onBlur={handleBlur}
+        itemTemplate={itemTemplate}
+        placeholder={placeholder}
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-300"
+        className="w-full h-full"
+        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+      />
     </div>
   );
 }
@@ -279,15 +356,44 @@ function ModalChipTagField({
    Diagnosis Component
 ═══════════════════════════════════════════════════════════════════ */
 export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCardProps) {
+  // Option Suggestion Lists from Supabase
+  const [diagnosisOptions, setDiagnosisOptions] = useState<string[]>([]);
+  const [sinceOptions, setSinceOptions] = useState<string[]>([]);
+  const [statusOptions, setStatusOptions] = useState<string[]>([]);
+  const [severityOptions, setSeverityOptions] = useState<string[]>([]);
+  const [regionOptions, setRegionOptions] = useState<string[]>([]);
+  const [painOptions, setPainOptions] = useState<string[]>([]);
+  const [relievedOptions, setRelievedOptions] = useState<string[]>([]);
+  const [tendernessOptions, setTendernessOptions] = useState<string[]>([]);
+  const [palpationOptions, setPalpationOptions] = useState<string[]>([]);
+  const [auscultationOptions, setAuscultationOptions] = useState<string[]>([]);
+  const [courseOptions, setCourseOptions] = useState<string[]>([]);
+  const [notesOptions, setNotesOptions] = useState<string[]>([]);
+
+  // Fetch initial suggestion options from Supabase on mount
+  const refreshAllOptions = async () => {
+    setDiagnosisOptions(await fetchOptions(8));
+    setSinceOptions(await fetchOptions(9));
+    setStatusOptions(await fetchOptions(10));
+    setSeverityOptions(await fetchOptions(11));
+    setRegionOptions(await fetchOptions(12));
+    setPainOptions(await fetchOptions(13));
+    setRelievedOptions(await fetchOptions(14));
+    setTendernessOptions(await fetchOptions(15));
+    setPalpationOptions(await fetchOptions(16));
+    setAuscultationOptions(await fetchOptions(17));
+    setCourseOptions(await fetchOptions(18));
+    setNotesOptions(await fetchOptions(19));
+  };
+
+  useEffect(() => {
+    refreshAllOptions();
+  }, []);
+
   /* search bar */
   const [searchVal, setSearchVal]   = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchHi, setSearchHi]     = useState(-1);
-
-  /* inline row highlight dropdowns */
-  const [focusId, setFocusId]       = useState<string | null>(null);
-  const [focusField, setFocusField] = useState<string | null>(null);
-  const [rowHi, setRowHi]           = useState(-1);
 
   /* drag */
   const dragIdx = useRef<number | null>(null);
@@ -305,12 +411,34 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
   const [mNote, setMNote]                 = useState("");
 
   /* ─── helpers ─── */
-  const addDiagnosis = (name: string) => {
+  const addDiagnosis = async (name: string) => {
     if (!name.trim()) return;
-    setDiagnoses((p) => [...p, { id: Date.now().toString(), name: name.trim(), since: "", status: "" }]);
+    const cleanName = name.trim();
+    setDiagnoses((p) => [...p, { id: Date.now().toString(), name: cleanName, since: "", status: "" }]);
     setSearchVal(""); setSearchOpen(false); setSearchHi(-1);
+
+    // Save selection / create custom option in Supabase
+    await incrementOption(8, cleanName);
+    // Refresh suggestions list
+    setDiagnosisOptions(await fetchOptions(8));
   };
+
+  const dropdownClicked = useRef(false);
+
   const patch  = (id: string, diff: Partial<Diagnosis>) => setDiagnoses((p) => p.map((d) => (d.id === id ? { ...d, ...diff } : d)));
+  
+  const handleInputBlur = async (categoryId: number, value: string) => {
+    if (!value || !value.trim()) return;
+    setTimeout(async () => {
+      if (dropdownClicked.current) {
+        dropdownClicked.current = false;
+        return;
+      }
+      await incrementOption(categoryId, value.trim());
+      refreshAllOptions();
+    }, 180);
+  };
+
   const remove = (id: string) => setDiagnoses((p) => p.filter((d) => d.id !== id));
 
   /* drag and drop */
@@ -355,38 +483,9 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
 
   const activeDiag = diagnoses.find((d) => d.id === modalId);
 
-  /* inline dropdown keyboard navigation */
-  const InlineDD = ({ id, field, opts, val }: { id: string; field: string; opts: string[]; val: string }) => {
-    if (focusId !== id || focusField !== field) return null;
-    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
-    if (!list.length) return null;
-    return (
-      <div className="absolute left-0 top-full mt-0.5 z-40 w-full min-w-[120px] bg-white border border-[#E2E8F0] rounded-lg shadow-xl overflow-hidden max-h-44 overflow-y-auto">
-        {list.map((opt, i) => (
-          <div key={opt}
-            onMouseDown={() => { patch(id, { [field]: opt }); setFocusId(null); setFocusField(null); setRowHi(-1); }}
-            className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
-              ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
-          >{opt}</div>
-        ))}
-      </div>
-    );
-  };
-
-  const handleRowKey = (e: React.KeyboardEvent, id: string, field: string, opts: string[], val: string) => {
-    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
-    if (e.key === "ArrowDown") { e.preventDefault(); setRowHi((p) => Math.min(p + 1, list.length - 1)); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); setRowHi((p) => Math.max(p - 1, 0)); }
-    else if (e.key === "Enter") {
-      e.preventDefault();
-      if (rowHi >= 0 && list[rowHi]) { patch(id, { [field]: list[rowHi] }); setFocusId(null); setFocusField(null); setRowHi(-1); }
-    }
-    else if (e.key === "Escape") { setFocusId(null); setFocusField(null); setRowHi(-1); }
-  };
-
   /* search key actions */
   const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const list = SUGGESTED_DIAGNOSES.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+    const list = diagnosisOptions.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
     if (e.key === "ArrowDown") { e.preventDefault(); setSearchHi((p) => Math.min(p + 1, list.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setSearchHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {
@@ -448,41 +547,35 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
 
                   {/* diagnosis name (35%) */}
                   <div className="relative w-[35%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
-                    <input type="text" value={diag.name}
-                      onChange={(e) => patch(diag.id, { name: e.target.value })}
-                      onFocus={() => { setFocusId(diag.id); setFocusField("name"); setRowHi(-1); }}
-                      onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                      onKeyDown={(e) => handleRowKey(e, diag.id, "name", SUGGESTED_DIAGNOSES, diag.name)}
+                    <InlineAutoComplete
+                      value={diag.name}
+                      onChange={(v) => patch(diag.id, { name: v })}
+                      onBlur={(v) => handleInputBlur(8, v)}
+                      options={diagnosisOptions}
                       placeholder="Diagnosis"
-                      className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-300"
                     />
-                    <InlineDD id={diag.id} field="name" opts={SUGGESTED_DIAGNOSES} val={diag.name} />
                   </div>
 
                   {/* since (18%) */}
                   <div className="relative w-[18%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
-                    <input type="text" value={diag.since}
-                      onChange={(e) => patch(diag.id, { since: e.target.value })}
-                      onFocus={() => { setFocusId(diag.id); setFocusField("since"); setRowHi(-1); }}
-                      onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                      onKeyDown={(e) => handleRowKey(e, diag.id, "since", SUGGESTED_SINCE, diag.since)}
+                    <InlineAutoComplete
+                      value={diag.since}
+                      onChange={(v) => patch(diag.id, { since: v })}
+                      onBlur={(v) => handleInputBlur(9, v)}
+                      options={sinceOptions}
                       placeholder="Since"
-                      className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                     />
-                    <InlineDD id={diag.id} field="since" opts={SUGGESTED_SINCE} val={diag.since} />
                   </div>
 
                   {/* status (18%) */}
                   <div className="relative w-[18%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
-                    <input type="text" value={diag.status}
-                      onChange={(e) => patch(diag.id, { status: e.target.value })}
-                      onFocus={() => { setFocusId(diag.id); setFocusField("status"); setRowHi(-1); }}
-                      onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                      onKeyDown={(e) => handleRowKey(e, diag.id, "status", SUGGESTED_STATUS, diag.status)}
+                    <InlineAutoComplete
+                      value={diag.status}
+                      onChange={(v) => patch(diag.id, { status: v })}
+                      onBlur={(v) => handleInputBlur(10, v)}
+                      options={statusOptions}
                       placeholder="Status"
-                      className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                     />
-                    <InlineDD id={diag.id} field="status" opts={SUGGESTED_STATUS} val={diag.status} />
                   </div>
 
                   {/* more options (18%) */}
@@ -563,8 +656,9 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
         </div>
 
         {searchOpen && (() => {
-          const list = SUGGESTED_DIAGNOSES.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
-          if (!list.length) return null;
+          const list = diagnosisOptions.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+          const hasCustomVal = searchVal.trim() && !diagnosisOptions.some(o => o.toLowerCase() === searchVal.trim().toLowerCase());
+          if (list.length === 0 && !hasCustomVal) return null;
           return (
             <div className="absolute left-3 right-3 top-full mt-0.5 z-40 bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
               {list.map((opt, i) => (
@@ -578,6 +672,17 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
                   <span className="text-[11.5px] font-semibold text-[#1E293B]">{opt}</span>
                 </div>
               ))}
+              {hasCustomVal && (
+                <div
+                  onMouseDown={() => addDiagnosis(searchVal)}
+                  className="px-3 py-2.5 text-[11.5px] font-bold text-blue-600 hover:bg-blue-50 border-t border-[#F8FAFC] cursor-pointer flex items-center gap-2.5"
+                >
+                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-extrabold text-blue-700 shrink-0 leading-none">
+                    +
+                  </div>
+                  <span>Create "{searchVal.trim()}"</span>
+                </div>
+              )}
             </div>
           );
         })()}
@@ -613,75 +718,124 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
 
             {/* Body */}
             <div className="p-5 space-y-4 overflow-y-auto flex-1 text-left">
-              
               {/* 1. Severity */}
-              <ModalAutoInput
+              <AutoInput
                 label="Severity"
                 value={mSeverity}
                 onChange={setMSeverity}
-                options={SUGGESTED_SEVERITIES}
+                onBlur={async (v) => {
+                  if (v && v.trim()) {
+                    await incrementOption(11, v.trim());
+                    refreshAllOptions();
+                  }
+                }}
+                options={severityOptions}
                 placeholder="Severity"
-                hasChevron
               />
 
               {/* 2. Select Abdominal region */}
-              <ModalChipTagField
+              <ChipTagField
                 label="Select Abdominal region"
-                options={SUGGESTED_ABDOMINAL_REGIONS}
+                options={regionOptions}
                 selected={mRegions}
-                onToggle={(v) => setMRegions((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v])}
+                onToggle={async (v) => {
+                  const isAdding = !mRegions.includes(v);
+                  setMRegions((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v]);
+                  if (isAdding) {
+                    await incrementOption(12, v);
+                    refreshAllOptions();
+                  }
+                }}
               />
 
               {/* 3. Select Type of pain */}
-              <ModalChipTagField
+              <ChipTagField
                 label="Select Type of pain"
-                options={SUGGESTED_PAIN_TYPES}
+                options={painOptions}
                 selected={mPainTypes}
-                onToggle={(v) => setMPainTypes((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v])}
+                onToggle={async (v) => {
+                  const isAdding = !mPainTypes.includes(v);
+                  setMPainTypes((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v]);
+                  if (isAdding) {
+                    await incrementOption(13, v);
+                    refreshAllOptions();
+                  }
+                }}
               />
 
               {/* 4. Select Abdominal symptom relieved by */}
-              <ModalChipTagField
+              <ChipTagField
                 label="Select Abdominal symptom relieved by"
-                options={SUGGESTED_RELIEVED_BY}
+                options={relievedOptions}
                 selected={mRelieved}
-                onToggle={(v) => setMRelieved((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v])}
+                onToggle={async (v) => {
+                  const isAdding = !mRelieved.includes(v);
+                  setMRelieved((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v]);
+                  if (isAdding) {
+                    await incrementOption(14, v);
+                    refreshAllOptions();
+                  }
+                }}
               />
 
               {/* 5. Abdominal tenderness */}
-              <ModalAutoInput
+              <AutoInput
                 label="Abdominal tenderness"
                 value={mTenderness}
                 onChange={setMTenderness}
-                options={SUGGESTED_TENDERNESS}
+                onBlur={async (v) => {
+                  if (v && v.trim()) {
+                    await incrementOption(15, v.trim());
+                    refreshAllOptions();
+                  }
+                }}
+                options={tendernessOptions}
                 placeholder="Abdominal tenderness"
-                hasChevron
               />
 
               {/* 6. Select Per abdomen palpation */}
-              <ModalChipTagField
+              <ChipTagField
                 label="Select Per abdomen palpation"
-                options={SUGGESTED_PALPATIONS}
+                options={palpationOptions}
                 selected={mPalpations}
-                onToggle={(v) => setMPalpations((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v])}
+                onToggle={async (v) => {
+                  const isAdding = !mPalpations.includes(v);
+                  setMPalpations((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v]);
+                  if (isAdding) {
+                    await incrementOption(16, v);
+                    refreshAllOptions();
+                  }
+                }}
               />
 
               {/* 7. Select Abdomen auscultatory finding */}
-              <ModalChipTagField
+              <ChipTagField
                 label="Select Abdomen auscultatory finding"
-                options={SUGGESTED_AUSCULTATIONS}
+                options={auscultationOptions}
                 selected={mAuscultations}
-                onToggle={(v) => setMAuscultations((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v])}
+                onToggle={async (v) => {
+                  const isAdding = !mAuscultations.includes(v);
+                  setMAuscultations((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v]);
+                  if (isAdding) {
+                    await incrementOption(17, v);
+                    refreshAllOptions();
+                  }
+                }}
               />
 
               {/* 8. Clinical course */}
-              <ModalAutoInput
+              <AutoInput
                 label="Clinical course"
                 value={mCourse}
                 onChange={setMCourse}
-                options={CLINICAL_COURSES}
+                onBlur={async (v) => {
+                  if (v && v.trim()) {
+                    await incrementOption(18, v.trim());
+                    refreshAllOptions();
+                  }
+                }}
+                options={courseOptions}
                 placeholder="Clinical course"
-                hasChevron
               />
 
               {/* 9. Note */}
@@ -698,13 +852,20 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
                     <div className="flex-1" />
                     <button type="button" className="text-[10px] text-[#CBD5E0] hover:text-[#94A3B8] px-1">⤢</button>
                   </div>
-                  <textarea rows={3} value={mNote} onChange={(e) => setMNote(e.target.value)}
+                  <textarea rows={3} value={mNote}
+                    onChange={(e) => setMNote(e.target.value)}
+                    onBlur={async (e) => {
+                      const v = e.target.value.trim();
+                      if (v) {
+                        await incrementOption(19, v);
+                        refreshAllOptions();
+                      }
+                    }}
                     placeholder="Add clinical notes, findings or observations…"
                     className="w-full px-3 py-2 text-[11px] focus:outline-none bg-white font-medium text-[#475569] resize-none placeholder:text-[#CBD5E0]"
                   />
                 </div>
               </div>
-
             </div>
 
             {/* Footer */}
