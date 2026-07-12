@@ -1,49 +1,49 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { AutoComplete } from "primereact/autocomplete";
 
-/* ─── Static suggestion lists ────────────────────────────────────── */
-const SUGGESTED_INVESTIGATIONS = [
-  "Liver Function Test (LFT)",
-  "Cone Beam CT Scan (CBCT) Temporomandibular Joint (Both)",
-  "Complete Blood Count (CBC)",
-  "Kidney Function Test (KFT)",
-  "Lipid Profile",
-  "Thyroid Profile (T3, T4, TSH)",
-  "Urine Routine & Microscopy",
-  "Chest X-Ray",
-  "Electrocardiogram (ECG)",
-  "Ultrasonography (USG) Abdomen"
-];
+/* ─── Supabase helpers ──────────────────────────────────────────── */
+async function fetchOptions(categoryId: number): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("value")
+      .eq("category_id", categoryId)
+      .order("usage_count", { ascending: false })
+      .limit(40);
+    if (error) throw error;
+    return (data || []).map((d: any) => d.value);
+  } catch (err) {
+    console.error("Error fetching lab options:", err);
+    return [];
+  }
+}
 
-const SUGGESTED_TEST_ON = [
-  "Today",
-  "Tomorrow",
-  "Today / After 3 Days",
-  "After 3 Days",
-  "After 1 Week",
-  "After 2 Weeks",
-  "After 1 Month"
-];
-
-const SUGGESTED_REPEAT_ON = [
-  "After 3 Days",
-  "After 1 Week",
-  "After 2 Weeks",
-  "After 1 Month",
-  "After 3 Months",
-  "After 6 Months",
-  "Every Year"
-];
-
-const SUGGESTED_REMARKS = [
-  "Instructions",
-  "Empty stomach",
-  "Fasting for 12 hours",
-  "Before breakfast",
-  "Fasting required",
-  "Drink plenty of water"
-];
+async function incrementOption(categoryId: number, value: string) {
+  if (!value?.trim()) return;
+  try {
+    const { data: existing } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("id, usage_count")
+      .eq("category_id", categoryId)
+      .ilike("value", value.trim())
+      .maybeSingle();
+    if (existing) {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .update({ usage_count: (existing.usage_count || 0) + 1 })
+        .eq("id", existing.id);
+    } else {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .insert({ category_id: categoryId, value: value.trim(), usage_count: 1 });
+    }
+  } catch (err) {
+    console.error("Error incrementing option:", err);
+  }
+}
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
 const initials = (name: string) =>
@@ -63,41 +63,271 @@ interface LabsCardProps {
   setLabs: React.Dispatch<React.SetStateAction<Lab[]>>;
 }
 
+/* ─── Reusable PrimeReact inline autocomplete for lab columns ────── */
+function InlineAutoComplete({
+  value,
+  onChange,
+  onBlur,
+  options,
+  placeholder,
+  onAfterSelect,
+  onInputRef,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onBlur: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+  onAfterSelect?: () => void;
+  onInputRef?: (el: HTMLInputElement | null) => void;
+}) {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const dropdownClicked = useRef(false);
+
+  const search = (event: { query: string }) => {
+    const q = event.query.trim().toLowerCase();
+    let results = options.filter((o) => o.toLowerCase().includes(q));
+    if (!q) results = options;
+    if (q && !options.some((o) => o.toLowerCase() === q)) {
+      results = [...results, `+ Create "${event.query.trim()}"`];
+    }
+    setSuggestions(results);
+  };
+
+  const handleSelect = (e: { value: string }) => {
+    const val = e.value;
+    dropdownClicked.current = true;
+    if (val.startsWith('+ Create "')) {
+      const match = val.match(/\+ Create "(.*)"/)
+      const custom = match ? match[1] : val;
+      onChange(custom); onBlur(custom);
+    } else {
+      onChange(val); onBlur(val);
+    }
+    setTimeout(() => onAfterSelect?.(), 60);
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const val = e.target.value.trim();
+    setTimeout(() => {
+      if (dropdownClicked.current) { dropdownClicked.current = false; return; }
+      onChange(val); onBlur(val);
+    }, 180);
+  };
+
+  const itemTemplate = (item: string) => {
+    if (item.startsWith('+ Create "')) {
+      const match = item.match(/\+ Create "(.*)"/)
+      const custom = match ? match[1] : item;
+      return (
+        <span className="text-blue-600 font-bold flex items-center gap-1 text-[11px]">
+          <span>+ Create</span><span className="italic">"{custom}"</span>
+        </span>
+      );
+    }
+    return <span className="text-[11px] font-semibold text-[#334155]">{item}</span>;
+  };
+
+  return (
+    <div className="w-full h-full relative primereact-autocomplete-inline">
+      <AutoComplete
+        value={value}
+        suggestions={suggestions}
+        completeMethod={search}
+        onChange={(e) => onChange(e.value)}
+        onSelect={handleSelect}
+        onBlur={handleBlur}
+        itemTemplate={itemTemplate}
+        placeholder={placeholder}
+        inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-350"
+        className="w-full h-full"
+        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+      />
+    </div>
+  );
+}
+
+/* ─── Investigation name autocomplete with Supabase search ──────── */
+function InlineLabAutoComplete({
+  value,
+  onChange,
+  placeholder,
+  labOptions,
+  onAfterSelect,
+  onInputRef,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  labOptions: string[];
+  onAfterSelect?: () => void;
+  onInputRef?: (el: HTMLInputElement | null) => void;
+}) {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const dropdownClicked = useRef(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const search = (event: { query: string }) => {
+    clearTimeout(searchTimer.current);
+    const q = event.query.trim().toLowerCase();
+    searchTimer.current = setTimeout(() => {
+      let results = labOptions.filter((o) => o.toLowerCase().includes(q));
+      if (!q) results = labOptions;
+      if (q && !labOptions.some((o) => o.toLowerCase() === q)) {
+        results = [...results, `+ Add "${event.query.trim()}"`];
+      }
+      setSuggestions(results);
+    }, 200);
+  };
+
+  const handleSelect = (e: { value: string }) => {
+    dropdownClicked.current = true;
+    const val = e.value;
+    if (val.startsWith('+ Add "')) {
+      const match = val.match(/\+ Add "(.*)"/)
+      const custom = match ? match[1] : val;
+      onChange(custom);
+    } else {
+      onChange(val);
+    }
+    setTimeout(() => onAfterSelect?.(), 80);
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const val = e.target.value.trim();
+    setTimeout(() => {
+      if (dropdownClicked.current) { dropdownClicked.current = false; return; }
+      onChange(val);
+    }, 180);
+  };
+
+  const itemTemplate = (item: string) => {
+    if (item.startsWith('+ Add "')) {
+      const match = item.match(/\+ Add "(.*)"/)
+      const custom = match ? match[1] : item;
+      return (
+        <div className="p-1">
+          <span className="text-blue-600 font-bold text-[11px]">+ Add "{custom}"</span>
+        </div>
+      );
+    }
+    return (
+      <div className="p-1">
+        <div className="text-[11px] font-bold text-[#1e293b]">{item}</div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="w-full h-full relative primereact-autocomplete-inline flex items-center">
+      <AutoComplete
+        value={value}
+        suggestions={suggestions}
+        completeMethod={search}
+        onChange={(e) => { if (typeof e.value === "string") onChange(e.value); }}
+        onSelect={handleSelect}
+        onBlur={handleBlur}
+        itemTemplate={itemTemplate}
+        placeholder={placeholder}
+        inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none p-0 placeholder:text-slate-350"
+        className="w-full h-full"
+        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+      />
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    LabsCard Component
 ═══════════════════════════════════════════════════════════════════ */
 export default function LabsCard({ labs, setLabs }: LabsCardProps) {
-  /* search bar */
-  const [searchVal, setSearchVal]   = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchHi, setSearchHi]     = useState(-1);
+  // Category IDs: 30=lab_name, 31=lab_test_on, 32=lab_repeat_on, 33=lab_remarks
+  const [labNameOptions, setLabNameOptions] = useState<string[]>([]);
+  const [testOnOptions, setTestOnOptions]   = useState<string[]>([]);
+  const [repeatOnOptions, setRepeatOnOptions] = useState<string[]>([]);
+  const [remarksOptions, setRemarksOptions] = useState<string[]>([]);
 
-  /* inline cell highlight dropdowns */
-  const [focusId, setFocusId]       = useState<string | null>(null);
-  const [focusField, setFocusField] = useState<string | null>(null);
-  const [rowHi, setRowHi]           = useState(-1);
+  const [medInput, setMedInput]             = useState("");
+  const [medInputFocused, setMedInputFocused] = useState(false);
+  const [searchHi, setSearchHi]             = useState(-1);
+  const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
 
   /* drag */
   const dragIdx = useRef<number | null>(null);
 
+  /* ─── Auto-focus refs ─── */
+  type LabFieldKey = 'testOn' | 'repeatOn' | 'remarks';
+  const fieldInputRefs = useRef<Record<string, Partial<Record<LabFieldKey, HTMLInputElement | null>>>>({});
+
+  const focusField = (labId: string, field: LabFieldKey) => {
+    setTimeout(() => {
+      fieldInputRefs.current[labId]?.[field]?.focus();
+    }, 80);
+  };
+
+  const setFieldRef = (labId: string, field: LabFieldKey) => (el: HTMLInputElement | null) => {
+    if (!fieldInputRefs.current[labId]) fieldInputRefs.current[labId] = {};
+    fieldInputRefs.current[labId][field] = el;
+  };
+
+  /* Load all dropdown options from Supabase on mount */
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      const [names, testOn, repeatOn, remarks] = await Promise.all([
+        fetchOptions(30),
+        fetchOptions(31),
+        fetchOptions(32),
+        fetchOptions(33),
+      ]);
+      if (!active) return;
+      setLabNameOptions(names);
+      setTestOnOptions(testOn);
+      setRepeatOnOptions(repeatOn);
+      setRemarksOptions(remarks);
+    };
+    load();
+    return () => { active = false; };
+  }, []);
+
+  /* Debounced search suggestions */
+  useEffect(() => {
+    let active = true;
+    const timer = setTimeout(() => {
+      const q = medInput.trim().toLowerCase();
+      const results = q
+        ? labNameOptions.filter((o) => o.toLowerCase().includes(q))
+        : labNameOptions.slice(0, 12);
+      if (active) setSearchSuggestions(results);
+    }, 200);
+    return () => { active = false; clearTimeout(timer); };
+  }, [medInput, labNameOptions]);
+
   /* ─── helpers ─── */
   const addLab = (name: string) => {
     if (!name.trim()) return;
-    const newLab = {
+    const newLab: Lab = {
       id: Date.now().toString(),
       name: name.trim(),
-      testOn: "Today / After 3 Days",
-      repeatOn: "After 3 Days",
-      remarks: ""
+      testOn: "Today",
+      repeatOn: "",
+      remarks: "",
     };
     setLabs((p) => [...p, newLab]);
-    setSearchVal("");
-    setSearchOpen(false);
+    incrementOption(30, name.trim());
+    setMedInput("");
+    setMedInputFocused(false);
     setSearchHi(-1);
   };
 
   const patch  = (id: string, diff: Partial<Lab>) => setLabs((p) => p.map((l) => (l.id === id ? { ...l, ...diff } : l)));
   const remove = (id: string) => setLabs((p) => p.filter((l) => l.id !== id));
+
+  const handleInputBlur = (categoryId: number, value: string) => {
+    if (value?.trim()) incrementOption(categoryId, value.trim());
+  };
 
   /* drag reorder */
   const onDragStart = (i: number) => { dragIdx.current = i; };
@@ -109,46 +339,15 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
   };
   const onDragEnd = () => { dragIdx.current = null; };
 
-  /* inline dropdown component */
-  const InlineDD = ({ id, field, opts, val }: { id: string; field: string; opts: string[]; val: string }) => {
-    if (focusId !== id || focusField !== field) return null;
-    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
-    if (!list.length) return null;
-    return (
-      <div className="absolute left-0 top-full mt-0.5 z-40 w-full min-w-[120px] bg-white border border-[#E2E8F0] rounded-lg shadow-xl overflow-hidden max-h-44 overflow-y-auto text-left">
-        {list.map((opt, i) => (
-          <div key={opt}
-            onMouseDown={() => { patch(id, { [field]: opt }); setFocusId(null); setFocusField(null); setRowHi(-1); }}
-            className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
-              ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
-          >{opt}</div>
-        ))}
-      </div>
-    );
-  };
-
-  const handleRowKey = (e: React.KeyboardEvent, id: string, field: string, opts: string[], val: string) => {
-    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
-    if (e.key === "ArrowDown") { e.preventDefault(); setRowHi((p) => Math.min(p + 1, list.length - 1)); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); setRowHi((p) => Math.max(p - 1, 0)); }
-    else if (e.key === "Enter") {
-      e.preventDefault();
-      if (rowHi >= 0 && list[rowHi]) { patch(id, { [field]: list[rowHi] }); setFocusId(null); setFocusField(null); setRowHi(-1); }
-    }
-    else if (e.key === "Escape") { setFocusId(null); setFocusField(null); setRowHi(-1); }
-  };
-
-  /* search key actions */
   const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const list = SUGGESTED_INVESTIGATIONS.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
-    if (e.key === "ArrowDown") { e.preventDefault(); setSearchHi((p) => Math.min(p + 1, list.length - 1)); }
+    if (e.key === "ArrowDown") { e.preventDefault(); setSearchHi((p) => Math.min(p + 1, searchSuggestions.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setSearchHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {
       e.preventDefault();
-      if (searchHi >= 0 && list[searchHi]) addLab(list[searchHi]);
-      else addLab(searchVal);
+      if (searchHi >= 0 && searchSuggestions[searchHi]) addLab(searchSuggestions[searchHi]);
+      else if (medInput.trim()) addLab(medInput);
     }
-    else if (e.key === "Escape") { setSearchOpen(false); setSearchHi(-1); }
+    else if (e.key === "Escape") { setMedInputFocused(false); setSearchHi(-1); }
   };
 
   return (
@@ -156,7 +355,7 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
       {/* Header */}
       <div className="flex justify-between items-center px-4 py-2.5 border-b border-[#F1F5F9]">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-gradient-to-br from-yellow-600 to-yellow-800 flex items-center justify-center text-white text-xs shadow-sm">
+          <div className="w-6 h-6 rounded-md bg-gradient-to-br from-yellow-500 to-amber-600 flex items-center justify-center text-white text-xs shadow-sm">
             🧪
           </div>
           <span className="text-[12px] font-bold text-[#1E293B] tracking-tight">Lab Investigations</span>
@@ -178,36 +377,17 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
         </div>
       </div>
 
-      {/* Grid Headers Row */}
+      {/* Grid Column Headers */}
       <div className="flex items-stretch border-b border-[#E2E8F0] bg-slate-50/50 text-[9px] font-bold text-[#718096] uppercase select-none">
-        {/* drag grip blank */}
         <div className="w-7 shrink-0 border-r border-[#E2E8F0]" />
-        
-        {/* Col 1: Investigation Name */}
-        <div className="w-[40%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">
-          Investigation Name
-        </div>
-
-        {/* Col 2: Test On */}
-        <div className="w-[18%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">
-          Test On
-        </div>
-
-        {/* Col 3: Repeat On */}
-        <div className="w-[18%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">
-          Repeat On
-        </div>
-
-        {/* Col 4: Remarks */}
-        <div className="w-[18%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">
-          Remarks
-        </div>
-
-        {/* Action Column */}
-        <div className="flex-1" />
+        <div className="w-[38%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">Investigation Name</div>
+        <div className="w-[18%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">Test On</div>
+        <div className="w-[18%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">Repeat On</div>
+        <div className="flex-1 border-r border-[#E2E8F0] px-3 py-2 flex items-center">Remarks</div>
+        <div className="w-8 shrink-0" />
       </div>
 
-      {/* Row list */}
+      {/* Rows */}
       {labs.length > 0 && (
         <div className="p-3 space-y-2">
           {labs.map((row, idx) => (
@@ -219,12 +399,12 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
               onDragEnd={(e) => { onDragEnd(); e.currentTarget.setAttribute("draggable", "false"); }}
               className="group flex flex-col w-full text-left"
             >
-              <div className="flex items-stretch border border-[#E2E8F0] rounded-lg bg-white overflow-visible min-h-[46px]">
-                
+              <div className="flex items-stretch border border-[#E2E8F0] rounded-lg bg-white overflow-visible min-h-[44px]">
+
                 {/* drag handle */}
                 <div
-                  onMouseDown={(e) => { const rEl = e.currentTarget.closest("[data-drag-row]"); if (rEl) rEl.setAttribute("draggable", "true"); }}
-                  onMouseUp={(e) => { const rEl = e.currentTarget.closest("[data-drag-row]"); if (rEl) rEl.setAttribute("draggable", "false"); }}
+                  onMouseDown={(e) => { const r = e.currentTarget.closest("[data-drag-row]"); if (r) r.setAttribute("draggable", "true"); }}
+                  onMouseUp={(e) => { const r = e.currentTarget.closest("[data-drag-row]"); if (r) r.setAttribute("draggable", "false"); }}
                   className="flex items-center justify-center w-7 shrink-0 border-r border-[#E2E8F0] bg-slate-50/50 cursor-grab active:cursor-grabbing text-slate-400"
                 >
                   <svg viewBox="0 0 10 16" fill="currentColor" className="w-2.5 h-3.5">
@@ -235,89 +415,62 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
                 </div>
 
                 {/* Col 1: Investigation Name */}
-                <div className="relative w-[40%] shrink-0 border-r border-[#E2E8F0] bg-white px-3 py-1 flex flex-col justify-between overflow-visible">
-                  <input type="text" value={row.name}
-                    onChange={(e) => patch(row.id, { name: e.target.value })}
-                    onFocus={() => { setFocusId(row.id); setFocusField("name"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, row.id, "name", SUGGESTED_INVESTIGATIONS, row.name)}
-                    placeholder="Investigation Name"
-                    className="w-full border-0 focus:ring-0 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none p-0 placeholder:text-slate-300"
+                <div className="relative w-[38%] shrink-0 border-r border-[#E2E8F0] bg-white flex items-center overflow-visible">
+                  <InlineLabAutoComplete
+                    value={row.name}
+                    onChange={(v) => patch(row.id, { name: v })}
+                    labOptions={labNameOptions}
+                    placeholder="Investigation name"
+                    onAfterSelect={() => focusField(row.id, 'testOn')}
                   />
-                  <div className="flex items-center justify-between w-full text-slate-350 pt-0.5">
-                    <span className="cursor-pointer hover:text-slate-500 transition-colors">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
-                        <path d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125"/>
-                      </svg>
-                    </span>
-                  </div>
-                  <InlineDD id={row.id} field="name" opts={SUGGESTED_INVESTIGATIONS} val={row.name} />
                 </div>
 
                 {/* Col 2: Test On */}
-                <div className="relative w-[18%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white overflow-visible">
-                  <input type="text" value={row.testOn}
-                    onChange={(e) => patch(row.id, { testOn: e.target.value })}
-                    onFocus={() => { setFocusId(row.id); setFocusField("testOn"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, row.id, "testOn", SUGGESTED_TEST_ON, row.testOn)}
-                    placeholder="Today / After 3 Days"
-                    className="w-full h-full border-0 focus:ring-0 pl-3 pr-8 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-300"
+                <div className="relative w-[18%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
+                  <InlineAutoComplete
+                    value={row.testOn}
+                    onChange={(v) => patch(row.id, { testOn: v })}
+                    onBlur={(v) => handleInputBlur(31, v)}
+                    options={testOnOptions}
+                    placeholder="Test On"
+                    onInputRef={setFieldRef(row.id, 'testOn')}
+                    onAfterSelect={() => focusField(row.id, 'repeatOn')}
                   />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                      <line x1="16" y1="2" x2="16" y2="6"/>
-                      <line x1="8" y1="2" x2="8" y2="6"/>
-                      <line x1="3" y1="10" x2="21" y2="10"/>
-                    </svg>
-                  </span>
-                  <InlineDD id={row.id} field="testOn" opts={SUGGESTED_TEST_ON} val={row.testOn} />
                 </div>
 
                 {/* Col 3: Repeat On */}
-                <div className="relative w-[18%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white overflow-visible">
-                  <input type="text" value={row.repeatOn}
-                    onChange={(e) => patch(row.id, { repeatOn: e.target.value })}
-                    onFocus={() => { setFocusId(row.id); setFocusField("repeatOn"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, row.id, "repeatOn", SUGGESTED_REPEAT_ON, row.repeatOn)}
-                    placeholder="After 3 Days"
-                    className="w-full h-full border-0 focus:ring-0 pl-3 pr-8 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-300"
+                <div className="relative w-[18%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
+                  <InlineAutoComplete
+                    value={row.repeatOn}
+                    onChange={(v) => patch(row.id, { repeatOn: v })}
+                    onBlur={(v) => handleInputBlur(32, v)}
+                    options={repeatOnOptions}
+                    placeholder="Repeat On"
+                    onInputRef={setFieldRef(row.id, 'repeatOn')}
+                    onAfterSelect={() => focusField(row.id, 'remarks')}
                   />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                      <line x1="16" y1="2" x2="16" y2="6"/>
-                      <line x1="8" y1="2" x2="8" y2="6"/>
-                      <line x1="3" y1="10" x2="21" y2="10"/>
-                    </svg>
-                  </span>
-                  <InlineDD id={row.id} field="repeatOn" opts={SUGGESTED_REPEAT_ON} val={row.repeatOn} />
                 </div>
 
                 {/* Col 4: Remarks */}
-                <div className="relative w-[18%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white overflow-visible">
-                  <input type="text" value={row.remarks}
-                    onChange={(e) => patch(row.id, { remarks: e.target.value })}
-                    onFocus={() => { setFocusId(row.id); setFocusField("remarks"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, row.id, "remarks", SUGGESTED_REMARKS, row.remarks)}
+                <div className="relative flex-1 border-r border-[#E2E8F0] flex items-center bg-white">
+                  <InlineAutoComplete
+                    value={row.remarks}
+                    onChange={(v) => patch(row.id, { remarks: v })}
+                    onBlur={(v) => handleInputBlur(33, v)}
+                    options={remarksOptions}
                     placeholder="Instructions"
-                    className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-300"
+                    onInputRef={setFieldRef(row.id, 'remarks')}
                   />
-                  <InlineDD id={row.id} field="remarks" opts={SUGGESTED_REMARKS} val={row.remarks} />
                 </div>
 
                 {/* Trash */}
-                <div className="flex-1 flex items-center justify-center bg-white text-slate-300 hover:text-red-500 transition-colors cursor-pointer">
+                <div className="w-8 flex items-center justify-center bg-white text-slate-300 hover:text-red-500 transition-colors cursor-pointer shrink-0">
                   <button type="button" onClick={() => remove(row.id)} className="p-1">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                     </svg>
                   </button>
                 </div>
-
               </div>
             </div>
           ))}
@@ -332,42 +485,40 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
           </svg>
           <input
             type="text"
-            placeholder="Start typing Lab test / Radiology"
-            value={searchVal}
-            onChange={(e) => { setSearchVal(e.target.value); setSearchHi(-1); setSearchOpen(true); }}
-            onFocus={() => { setSearchOpen(true); setSearchHi(-1); }}
-            onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
+            placeholder="Start typing Lab test / Radiology / Investigation..."
+            value={medInput}
+            onChange={(e) => { setMedInput(e.target.value); setSearchHi(-1); setMedInputFocused(true); }}
+            onFocus={() => { setMedInputFocused(true); setSearchHi(-1); }}
+            onBlur={() => setTimeout(() => setMedInputFocused(false), 200)}
             onKeyDown={handleSearchKey}
             className="w-full h-8.5 pl-8 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-medium transition-all"
           />
-          {searchVal.trim() && (
-            <button type="button" onClick={() => addLab(searchVal)}
+          {medInput.trim() && (
+            <button type="button" onClick={() => addLab(medInput)}
               className="absolute right-2 text-blue-600 hover:text-blue-700 text-[10px] font-bold tracking-wide">+ Add</button>
           )}
         </div>
 
-        {/* Autocomplete Search suggestions */}
-        {searchOpen && (() => {
-          const list = SUGGESTED_INVESTIGATIONS.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
-          if (!list.length) return null;
-          return (
-            <div className="absolute left-3 right-3 top-full mt-0.5 z-40 bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
-              {list.map((opt, i) => (
-                <div key={opt} onMouseDown={() => addLab(opt)}
-                  className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
-                    ${i === searchHi ? "bg-blue-50" : "hover:bg-[#F8FAFC]"}`}
-                >
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center text-[8px] font-extrabold text-yellow-800 shrink-0 leading-none">
-                    {initials(opt) || "Li"}
-                  </div>
-                  <span className="text-[11.5px] font-semibold text-[#1E293B]">{opt}</span>
-                </div>
-              ))}
+        {/* Dropdown suggestions */}
+        {medInputFocused && searchSuggestions.length > 0 && (
+          <div className="absolute left-3 right-3 top-full mt-0.5 z-40 bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+            <div className="px-3 pt-2 pb-1 text-[9px] font-bold text-[#94A3B8] uppercase tracking-wide">
+              {medInput.trim() ? "Matching Tests" : "Sample Tests"}
             </div>
-          );
-        })()}
+            {searchSuggestions.map((opt, i) => (
+              <div key={opt} onMouseDown={() => addLab(opt)}
+                className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
+                  ${i === searchHi ? "bg-blue-50" : "hover:bg-[#F8FAFC]"}`}
+              >
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-yellow-100 to-amber-200 flex items-center justify-center text-[8px] font-extrabold text-yellow-800 shrink-0 leading-none">
+                  {initials(opt) || "Li"}
+                </div>
+                <span className="text-[11.5px] font-semibold text-[#1E293B]">{opt}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-
     </section>
   );
 }
