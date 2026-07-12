@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 export interface ReferralItem {
   id: string;
@@ -13,20 +14,95 @@ interface ReferToDoctorCardProps {
   setReferrals: React.Dispatch<React.SetStateAction<ReferralItem[]>>;
 }
 
-const SUGGESTED_DOCTORS = [
-  "shaikh mudassir (Cardiologist)",
-  "Dr. John Doe (General Physician)",
-  "Dr. Jane Smith (Pediatrician)",
-  "Dr. Sarah Connor (Neurologist)",
-  "Dr. Alan Grant (Orthopedic)",
-  "Dr. Ellie Sattler (Dermatologist)"
-];
+/* ─── Supabase helpers ──────────────────────────────────────────── */
+async function fetchDoctors(): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("value")
+      .eq("category_id", 50)
+      .order("usage_count", { ascending: false })
+      .limit(40);
+    if (error) throw error;
+    
+    // Ensure we always have "DR. LAXMAN SALVE" in the suggestions
+    const list = (data || []).map((d: any) => d.value);
+    if (!list.some(d => d.toLowerCase() === "dr. laxman salve")) {
+      list.unshift("DR. LAXMAN SALVE");
+    }
+    return list;
+  } catch (err) {
+    console.error("Error fetching referred doctors:", err);
+    return ["DR. LAXMAN SALVE"];
+  }
+}
+
+async function incrementOption(categoryId: number, value: string) {
+  if (!value?.trim()) return;
+  try {
+    const { data: existing } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("id, usage_count")
+      .eq("category_id", categoryId)
+      .ilike("value", value.trim())
+      .maybeSingle();
+    if (existing) {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .update({ usage_count: (existing.usage_count || 0) + 1 })
+        .eq("id", existing.id);
+    } else {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .insert({ category_id: categoryId, value: value.trim(), usage_count: 1 });
+    }
+  } catch (err) {
+    console.error("Error incrementing doctor option:", err);
+  }
+}
 
 export default function ReferToDoctorCard({ referrals, setReferrals }: ReferToDoctorCardProps) {
-  const [searchVal, setSearchVal] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchHi, setSearchHi] = useState(-1);
+  const [searchVal, setSearchVal]                 = useState("");
+  const [searchOpen, setSearchOpen]               = useState(false);
+  const [searchHi, setSearchHi]                   = useState(-1);
+  const [doctorSuggestions, setDoctorSuggestions] = useState<string[]>([]);
+  const [doctorOptions, setDoctorOptions]         = useState<string[]>([]);
   const dragIdx = useRef<number | null>(null);
+
+  // Load options on mount
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      const list = await fetchDoctors();
+      if (active) {
+        setDoctorOptions(list);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, []);
+
+  // Filter options with debounced suggestions
+  useEffect(() => {
+    let active = true;
+    const timer = setTimeout(() => {
+      const q = searchVal.trim();
+      if (!q) {
+        if (active) setDoctorSuggestions(doctorOptions.slice(0, 12));
+        return;
+      }
+      const qLower = q.toLowerCase();
+      let results = doctorOptions.filter((o) => o.toLowerCase().includes(qLower));
+      
+      const hasPerfectMatch = doctorOptions.some((o) => o.toLowerCase() === qLower);
+      if (!hasPerfectMatch) {
+        results = [...results, `+ Create "${q}"`];
+      }
+      
+      if (active) setDoctorSuggestions(results);
+    }, 180);
+    return () => { active = false; clearTimeout(timer); };
+  }, [searchVal, doctorOptions]);
 
   const addReferral = (doctorName: string) => {
     if (!doctorName.trim()) return;
@@ -38,6 +114,7 @@ export default function ReferToDoctorCard({ referrals, setReferrals }: ReferToDo
         notes: ""
       }
     ]);
+    incrementOption(50, doctorName.trim());
     setSearchVal("");
     setSearchOpen(false);
     setSearchHi(-1);
@@ -64,17 +141,16 @@ export default function ReferToDoctorCard({ referrals, setReferrals }: ReferToDo
   };
 
   const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const list = SUGGESTED_DOCTORS.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSearchHi((p) => Math.min(p + 1, list.length - 1));
+      setSearchHi((p) => Math.min(p + 1, doctorSuggestions.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSearchHi((p) => Math.max(p - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (searchHi >= 0 && list[searchHi]) addReferral(list[searchHi]);
-      else addReferral(searchVal);
+      if (searchHi >= 0 && doctorSuggestions[searchHi]) addReferral(doctorSuggestions[searchHi]);
+      else if (searchVal.trim()) addReferral(searchVal);
     } else if (e.key === "Escape") {
       setSearchOpen(false);
       setSearchHi(-1);
@@ -204,25 +280,35 @@ export default function ReferToDoctorCard({ referrals, setReferrals }: ReferToDo
             </button>
           )}
         </div>
-        {searchOpen && (() => {
-          const list = SUGGESTED_DOCTORS.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
-          if (!list.length) return null;
-          return (
-            <div className="absolute left-0 right-0 top-full mt-1.5 z-[60] bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
-              {list.map((opt, i) => (
+        {searchOpen && (doctorSuggestions.length > 0 || searchVal.trim()) && (
+          <div className="absolute left-0 right-0 top-full mt-1.5 z-[60] bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+            {doctorSuggestions.map((opt, i) => {
+              const isCreate = opt.startsWith('+ Create "');
+              let displayVal = opt;
+              if (isCreate) {
+                const match = opt.match(/\+ Create "(.*)"/);
+                displayVal = match ? match[1] : opt;
+              }
+              return (
                 <div
                   key={opt}
-                  onMouseDown={() => addReferral(opt)}
-                  className={`px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 text-[11.5px] font-semibold text-[#1E293B] transition-colors ${
-                    i === searchHi ? "bg-blue-50" : "hover:bg-[#F8FAFC]"
+                  onMouseDown={() => addReferral(displayVal)}
+                  className={`px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 text-[11.5px] font-semibold transition-colors ${
+                    i === searchHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F8FAFC] text-[#1E293B]"
                   }`}
                 >
-                  {opt}
+                  {isCreate ? (
+                    <span className="text-[11.5px] font-bold text-blue-600">
+                      + Create <span className="italic font-semibold">"{displayVal}"</span>
+                    </span>
+                  ) : (
+                    <span>{opt}</span>
+                  )}
                 </div>
-              ))}
-            </div>
-          );
-        })()}
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );
