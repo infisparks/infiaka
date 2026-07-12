@@ -1,51 +1,67 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-
-/* ─── Data ─────────────────────────────────────────────────────── */
-const SUGGESTED_SYMPTOMS = [
-  "Head Pain", "Body Pain", "Fever", "Cough", "Period pain",
-  "Abdominal pain", "Nausea", "Vomiting", "Back Pain", "Chest Pain",
-  "Shortness of breath", "Dizziness", "Fatigue", "Sore throat",
-  "Pain Radiating To Head", "Pain Of Head And Neck Region",
-];
-const SUGGESTED_DURATIONS = [
-  "1 Hour", "2 Hours", "6 Hours", "1 Day", "2 Days",
-  "3 Days", "1 Week", "2 Weeks", "1 Month", "3 Months", "1 Year",
-];
-const SUGGESTED_SEVERITIES = ["Mild", "Moderate", "Severe"];
-
-const HEADACHE_SITES = [
-  "Unilateral left sided headache",
-  "Unilateral right sided headache",
-  "Bilateral headache",
-  "Frontal headache",
-  "Occipital headache",
-  "Temporal headache",
-  "Vertex headache",
-  "Periorbital headache",
-];
-
-const PAIN_TYPES = [
-  "Throbbing pain", "Burning pain", "Cramping pain", "Shooting pain",
-  "Dull pain", "Stabbing pain", "Tingling pain", "Colicky pain",
-];
-
-const CLINICAL_COURSES = [
-  "Acute", "Subacute", "Chronic", "Recurrent",
-  "Acute-on-chronic", "Intermittent", "Progressive",
-];
+import React, { useState, useRef, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 /* ─── Helpers ─────────────────────────────────────────────────── */
 const severityColor = (s: string) => {
   const l = s.toLowerCase();
-  if (l === "severe")   return "bg-red-50 text-red-600 border-red-200";
+  if (l === "severe") return "bg-red-50 text-red-600 border-red-200";
   if (l === "moderate") return "bg-amber-50 text-amber-600 border-amber-200";
   return "bg-emerald-50 text-emerald-600 border-emerald-200";
 };
 
 const initials = (name: string) =>
   name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+
+// Database helper functions
+async function fetchOptions(categoryId: number, search: string = "") {
+  try {
+    let query = supabase
+      .from("aka_master_dropdown_catalog")
+      .select("value")
+      .eq("category_id", categoryId)
+      .order("usage_count", { ascending: false })
+      .limit(40);
+
+    if (search) {
+      query = query.ilike("value", `%${search}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data.map((d: any) => d.value);
+  } catch (err) {
+    console.error("Error fetching options:", err);
+    return [];
+  }
+}
+
+async function incrementOption(categoryId: number, value: string) {
+  if (!value || !value.trim()) return;
+  const val = value.trim();
+  try {
+    const { data } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("id, usage_count")
+      .eq("category_id", categoryId)
+      .eq("value", val)
+      .maybeSingle();
+
+    if (data) {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .update({ usage_count: data.usage_count + 1 })
+        .eq("id", data.id);
+    } else {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .insert({ category_id: categoryId, value: val, usage_count: 1 });
+    }
+  } catch (err) {
+    console.error("Error updating dropdown option:", err);
+  }
+}
 
 /* ─── Types ───────────────────────────────────────────────────── */
 interface Symptom {
@@ -58,6 +74,7 @@ interface Symptom {
   clinicalCourse?: string;
   note?: string;
 }
+
 interface SymptomsCardProps {
   symptoms: Symptom[];
   setSymptoms: React.Dispatch<React.SetStateAction<Symptom[]>>;
@@ -76,8 +93,8 @@ function ChipTagField({
   onToggle: (v: string) => void;
 }) {
   const [search, setSearch] = useState("");
-  const [open, setOpen]     = useState(false);
-  const [hi, setHi]         = useState(-1);
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(-1);
 
   const filtered = options.filter(
     (o) => !search || o.toLowerCase().includes(search.toLowerCase())
@@ -86,9 +103,9 @@ function ChipTagField({
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!open) { setOpen(true); return; }
     if (e.key === "ArrowDown") { e.preventDefault(); setHi((p) => Math.min(p + 1, filtered.length - 1)); }
-    else if (e.key === "ArrowUp")  { e.preventDefault(); setHi((p) => Math.max(p - 1, 0)); }
-    else if (e.key === "Enter")    { e.preventDefault(); if (hi >= 0 && filtered[hi]) { onToggle(filtered[hi]); setSearch(""); setHi(-1); } }
-    else if (e.key === "Escape")   { setOpen(false); setHi(-1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setHi((p) => Math.max(p - 1, 0)); }
+    else if (e.key === "Enter") { e.preventDefault(); if (hi >= 0 && filtered[hi]) { onToggle(filtered[hi]); setSearch(""); setHi(-1); } }
+    else if (e.key === "Escape") { setOpen(false); setHi(-1); }
   };
 
   return (
@@ -126,7 +143,7 @@ function ChipTagField({
             >
               {opt}
               {selected.includes(opt) && (
-                <svg className="w-3 h-3 fill-current shrink-0" viewBox="0 0 20 20">
+                <svg className="w-3.5 h-3.5 fill-current shrink-0 text-blue-600" viewBox="0 0 20 20">
                   <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
                 </svg>
               )}
@@ -155,7 +172,7 @@ function AutoInput({
   clearable?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [hi, setHi]     = useState(-1);
+  const [hi, setHi] = useState(-1);
 
   const filtered = options.filter(
     (o) => !value || o.toLowerCase().includes(value.toLowerCase())
@@ -164,9 +181,9 @@ function AutoInput({
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!open) { setOpen(true); return; }
     if (e.key === "ArrowDown") { e.preventDefault(); setHi((p) => Math.min(p + 1, filtered.length - 1)); }
-    else if (e.key === "ArrowUp")  { e.preventDefault(); setHi((p) => Math.max(p - 1, 0)); }
-    else if (e.key === "Enter")    { e.preventDefault(); if (hi >= 0 && filtered[hi]) { onChange(filtered[hi]); setHi(-1); setOpen(false); } }
-    else if (e.key === "Escape")   { setOpen(false); setHi(-1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setHi((p) => Math.max(p - 1, 0)); }
+    else if (e.key === "Enter") { e.preventDefault(); if (hi >= 0 && filtered[hi]) { onChange(filtered[hi]); setHi(-1); setOpen(false); } }
+    else if (e.key === "Escape") { setOpen(false); setHi(-1); }
   };
 
   return (
@@ -212,39 +229,89 @@ function AutoInput({
    Main component
 ═══════════════════════════════════════════════════════════════ */
 export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProps) {
+  // Option Suggestion Lists from Supabase
+  const [symptomOptions, setSymptomOptions] = useState<string[]>([]);
+  const [durationOptions, setDurationOptions] = useState<string[]>([]);
+  const [severityOptions, setSeverityOptions] = useState<string[]>([]);
+  const [headacheOptions, setHeadacheOptions] = useState<string[]>([]);
+  const [painOptions, setPainOptions] = useState<string[]>([]);
+  const [courseOptions, setCourseOptions] = useState<string[]>([]);
+  const [notesOptions, setNotesOptions] = useState<string[]>([]);
+
+  // Fetch initial suggestion options from Supabase on mount
+  const refreshAllOptions = async () => {
+    setSymptomOptions(await fetchOptions(1));
+    setDurationOptions(await fetchOptions(2));
+    setSeverityOptions(await fetchOptions(3));
+    setHeadacheOptions(await fetchOptions(4));
+    setPainOptions(await fetchOptions(5));
+    setCourseOptions(await fetchOptions(6));
+    setNotesOptions(await fetchOptions(7));
+  };
+
+  useEffect(() => {
+    refreshAllOptions();
+  }, []);
+
   /* search bar */
-  const [searchVal,  setSearchVal]  = useState("");
+  const [searchVal, setSearchVal] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchHi,   setSearchHi]   = useState(-1);
+  const [searchHi, setSearchHi] = useState(-1);
 
   /* inline row highlight */
-  const [focusId,    setFocusId]    = useState<string | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(null);
   const [focusField, setFocusField] = useState<string | null>(null);
-  const [rowHi,      setRowHi]      = useState(-1);  // highlight index for inline DD
+  const [rowHi, setRowHi] = useState(-1);  // highlight index for inline DD
 
   /* drag */
   const dragIdx = useRef<number | null>(null);
 
   /* modal */
-  const [modalId,    setModalId]    = useState<string | null>(null);
-  const [mSeverity,  setMSeverity]  = useState("");
-  const [mHeadache,  setMHeadache]  = useState<string[]>([]);
+  const [modalId, setModalId] = useState<string | null>(null);
+  const [mSeverity, setMSeverity] = useState("");
+  const [mHeadache, setMHeadache] = useState<string[]>([]);
   const [mPainTypes, setMPainTypes] = useState<string[]>([]);
-  const [mCourse,    setMCourse]    = useState("");
-  const [mNote,      setMNote]      = useState("");
+  const [mCourse, setMCourse] = useState("");
+  const [mNote, setMNote] = useState("");
 
   /* ─── helpers ─── */
-  const addSymptom = (name: string) => {
+  const addSymptom = async (name: string) => {
     if (!name.trim()) return;
-    setSymptoms((p) => [...p, { id: Date.now().toString(), name: name.trim(), duration: "1 Day", severity: "Mild" }]);
-    setSearchVal(""); setSearchOpen(false); setSearchHi(-1);
+    const cleanName = name.trim();
+    setSymptoms((p) => [...p, { id: Date.now().toString(), name: cleanName, duration: "1 Day", severity: "Mild" }]);
+    setSearchVal("");
+    setSearchOpen(false);
+    setSearchHi(-1);
+    
+    // Save selection / create new custom option in Supabase
+    await incrementOption(1, cleanName);
+    // Refresh suggestions list
+    setSymptomOptions(await fetchOptions(1));
   };
-  const patch  = (id: string, diff: Partial<Symptom>) => setSymptoms((p) => p.map((s) => (s.id === id ? { ...s, ...diff } : s)));
+
+  const patch = async (id: string, diff: Partial<Symptom>) => {
+    setSymptoms((p) => p.map((s) => (s.id === id ? { ...s, ...diff } : s)));
+    
+    // If inline properties are changed, save their selections to Supabase
+    if (diff.name) {
+      await incrementOption(1, diff.name);
+      setSymptomOptions(await fetchOptions(1));
+    }
+    if (diff.duration) {
+      await incrementOption(2, diff.duration);
+      setDurationOptions(await fetchOptions(2));
+    }
+    if (diff.severity) {
+      await incrementOption(3, diff.severity);
+      setSeverityOptions(await fetchOptions(3));
+    }
+  };
+
   const remove = (id: string) => setSymptoms((p) => p.filter((s) => s.id !== id));
 
   /* drag */
   const onDragStart = (i: number) => { dragIdx.current = i; };
-  const onDragOver  = (e: React.DragEvent, i: number) => {
+  const onDragOver = (e: React.DragEvent, i: number) => {
     e.preventDefault();
     if (dragIdx.current === null || dragIdx.current === i) return;
     const r = [...symptoms]; const [m] = r.splice(dragIdx.current, 1); r.splice(i, 0, m);
@@ -261,7 +328,8 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
     setMCourse(sym.clinicalCourse ?? "");
     setMNote(sym.note ?? "");
   };
-  const saveModal = () => {
+
+  const saveModal = async () => {
     if (!modalId) return;
     patch(modalId, {
       severity: mSeverity,
@@ -271,7 +339,23 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
       note: mNote,
     });
     setModalId(null);
+
+    // Save and increment all selections modified inside the modal
+    if (mSeverity) await incrementOption(3, mSeverity);
+    
+    for (const site of mHeadache) {
+      await incrementOption(4, site);
+    }
+    for (const type of mPainTypes) {
+      await incrementOption(5, type);
+    }
+    if (mCourse) await incrementOption(6, mCourse);
+    if (mNote.trim()) await incrementOption(7, mNote);
+
+    // Refresh option lists
+    refreshAllOptions();
   };
+
   const activeSym = symptoms.find((s) => s.id === modalId);
 
   /* ─── inline dropdown w/ keyboard nav ─── */
@@ -293,7 +377,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
   };
 
   const handleRowKey = (e: React.KeyboardEvent, id: string, field: string, opts: string[], val: string) => {
-    const list = opts.filter((o) => !val || o.toLowerCase().includes(o.toLowerCase()));
+    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
     if (e.key === "ArrowDown") { e.preventDefault(); setRowHi((p) => Math.min(p + 1, list.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setRowHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {
@@ -305,7 +389,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
 
   /* search bar keyboard nav */
   const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const list = SUGGESTED_SYMPTOMS.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+    const list = symptomOptions.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
     if (e.key === "ArrowDown") { e.preventDefault(); setSearchHi((p) => Math.min(p + 1, list.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setSearchHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {
@@ -355,7 +439,6 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
 
           {symptoms.map((sym, idx) => {
             const hasDetails = (sym.headacheSites?.length ?? 0) > 0 || (sym.painTypes?.length ?? 0) > 0 || sym.clinicalCourse || sym.note;
-            const badge = initials(sym.name) || "Sx";
 
             return (
               <div key={sym.id}
@@ -385,11 +468,11 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                     onChange={(e) => patch(sym.id, { name: e.target.value })}
                     onFocus={() => { setFocusId(sym.id); setFocusField("name"); setRowHi(-1); }}
                     onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, sym.id, "name", SUGGESTED_SYMPTOMS, sym.name)}
+                    onKeyDown={(e) => handleRowKey(e, sym.id, "name", symptomOptions, sym.name)}
                     placeholder="Symptom name"
                     className="w-full h-7 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] px-2 font-semibold text-[#1e293b] bg-white focus:outline-none placeholder:text-[#CBD5E0] transition-all"
                   />
-                  <InlineDD id={sym.id} field="name" opts={SUGGESTED_SYMPTOMS} val={sym.name} />
+                  <InlineDD id={sym.id} field="name" opts={symptomOptions} val={sym.name} />
                 </div>
 
                 {/* duration */}
@@ -398,11 +481,11 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                     onChange={(e) => patch(sym.id, { duration: e.target.value })}
                     onFocus={() => { setFocusId(sym.id); setFocusField("duration"); setRowHi(-1); }}
                     onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, sym.id, "duration", SUGGESTED_DURATIONS, sym.duration)}
+                    onKeyDown={(e) => handleRowKey(e, sym.id, "duration", durationOptions, sym.duration)}
                     placeholder="Duration"
                     className="w-full h-7 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] px-2 font-semibold text-[#334155] bg-white focus:outline-none placeholder:text-[#CBD5E0] transition-all"
                   />
-                  <InlineDD id={sym.id} field="duration" opts={SUGGESTED_DURATIONS} val={sym.duration} />
+                  <InlineDD id={sym.id} field="duration" opts={durationOptions} val={sym.duration} />
                 </div>
 
                 {/* severity */}
@@ -411,11 +494,11 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                     onChange={(e) => patch(sym.id, { severity: e.target.value })}
                     onFocus={() => { setFocusId(sym.id); setFocusField("severity"); setRowHi(-1); }}
                     onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, sym.id, "severity", SUGGESTED_SEVERITIES, sym.severity)}
+                    onKeyDown={(e) => handleRowKey(e, sym.id, "severity", severityOptions, sym.severity)}
                     placeholder="Severity"
                     className="w-full h-7 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] px-2 font-semibold text-[#334155] bg-white focus:outline-none placeholder:text-[#CBD5E0] transition-all"
                   />
-                  <InlineDD id={sym.id} field="severity" opts={SUGGESTED_SEVERITIES} val={sym.severity} />
+                  <InlineDD id={sym.id} field="severity" opts={severityOptions} val={sym.severity} />
                 </div>
 
                 {/* saved details */}
@@ -481,7 +564,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
         </div>
 
         {searchOpen && (() => {
-          const list = SUGGESTED_SYMPTOMS.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+          const list = symptomOptions.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
           if (!list.length) return null;
           return (
             <div className="absolute left-3 right-3 top-full mt-0.5 z-40 bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
@@ -543,7 +626,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                   />
                 </div>
                 <div className="flex gap-1.5 flex-wrap pt-0.5">
-                  {SUGGESTED_SEVERITIES.map((s) => (
+                  {severityOptions.map((s) => (
                     <button key={s} type="button" onMouseDown={() => setMSeverity(s)}
                       className={`text-[9.5px] font-bold px-2.5 py-0.5 rounded-full border transition-all ${
                         mSeverity === s ? severityColor(s) : "bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0] hover:border-[#CBD5E0]"
@@ -556,7 +639,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
               {/* Select Headache site */}
               <ChipTagField
                 label="Select Headache site"
-                options={HEADACHE_SITES}
+                options={headacheOptions}
                 selected={mHeadache}
                 onToggle={(v) => setMHeadache((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v])}
               />
@@ -564,7 +647,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
               {/* Select Type of pain */}
               <ChipTagField
                 label="Select Type of pain"
-                options={PAIN_TYPES}
+                options={painOptions}
                 selected={mPainTypes}
                 onToggle={(v) => setMPainTypes((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v])}
               />
@@ -574,7 +657,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                 label="Clinical course"
                 value={mCourse}
                 onChange={setMCourse}
-                options={CLINICAL_COURSES}
+                options={courseOptions}
                 placeholder="Clinical course"
                 clearable
               />
