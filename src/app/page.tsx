@@ -120,11 +120,12 @@ interface Patient {
 const initialAddressCache = ["mumbra", "thane", "dadar", "mumbai", "bandra", "kalyan"];
 const initialDoctorCache = ["DR. LAXMAN SALVE", "DR. KABIR SHAH", "DR. POOJA SHARMA"];
 const initialServiceCache = [
-  { name: "First consultation", price: 2000 },
-  { name: "Follow-up consultation", price: 1000 },
-  { name: "Routine checkup", price: 500 },
-  { name: "ECG Test", price: 800 },
-  { name: "Blood Report Analysis", price: 1200 }
+  { name: "First consultation", price: 2000, type: "service" as const },
+  { name: "Follow-up consultation", price: 1000, type: "service" as const },
+  { name: "Routine checkup", price: 500, type: "service" as const },
+  { name: "Injection", price: 100, type: "product" as const },
+  { name: "ECG Test", price: 800, type: "service" as const },
+  { name: "Blood Report Analysis", price: 1200, type: "service" as const }
 ];
 
 const SUGGESTED_SYMPTOMS = [
@@ -427,6 +428,50 @@ function DashboardContent() {
     }
   }, [sessionLoaded, selectedDate]);
 
+  // Load master booking suggestions from Supabase on mount/session loaded
+  useEffect(() => {
+    if (!sessionLoaded) return;
+    const fetchMasterCaches = async () => {
+      try {
+        const { data: dbCatalog, error: cError } = await supabase
+          .from("aka_master_dropdown_catalog")
+          .select("category_id, value, metadata")
+          .in("category_id", [160, 161, 162, 163, 164, 165, 166])
+          .order("usage_count", { ascending: false });
+
+        if (!cError && dbCatalog) {
+          const docList = dbCatalog.filter(c => c.category_id === 160).map(c => c.value);
+          const addrList = dbCatalog.filter(c => c.category_id === 161).map(c => c.value);
+          const clinicList = dbCatalog.filter(c => c.category_id === 162).map(c => c.value);
+          const refDocList = dbCatalog.filter(c => c.category_id === 163).map(c => c.value);
+          
+          const servicesList = dbCatalog.filter(c => c.category_id === 164).map(c => {
+            const meta = c.metadata && typeof c.metadata === "object" ? c.metadata as any : {};
+            return {
+              name: c.value,
+              price: Number(meta.price) || 0,
+              type: (meta.type === "product" ? "product" : "service") as "service" | "product"
+            };
+          });
+
+          const countries = dbCatalog.filter(c => c.category_id === 165).map(c => c.value);
+          const states = dbCatalog.filter(c => c.category_id === 166).map(c => c.value);
+
+          if (docList.length > 0) setDoctorCache(docList);
+          if (addrList.length > 0) setAddressCache(addrList);
+          if (servicesList.length > 0) setServiceCache(servicesList);
+          if (countries.length > 0) setCountryCache(countries);
+          if (states.length > 0) setStateCache(states);
+          if (clinicList.length > 0) setClinicCache(clinicList);
+          if (refDocList.length > 0) setReferringDoctorCache(refDocList);
+        }
+      } catch (err) {
+        console.error("Error loading master dropdown caches:", err);
+      }
+    };
+    fetchMasterCaches();
+  }, [sessionLoaded]);
+
   const [patients, setPatients] = useState<Patient[]>(initialPatients);
   const [patientDirectory, setPatientDirectory] = useState<Patient[]>([]);
 
@@ -477,6 +522,18 @@ function DashboardContent() {
   const [addressCache, setAddressCache] = useState(initialAddressCache);
   const [doctorCache, setDoctorCache] = useState(initialDoctorCache);
   const [serviceCache, setServiceCache] = useState(initialServiceCache);
+  const [countryCache, setCountryCache] = useState<string[]>(["India", "United States", "United Kingdom"]);
+  const [stateCache, setStateCache] = useState<string[]>(["Maharashtra", "Delhi", "Karnataka", "Gujarat", "Tamil Nadu"]);
+  const [clinicCache, setClinicCache] = useState<string[]>(["DLPC - Dadar", "DLPC - East", "DLPC - West"]);
+  const [referringDoctorCache, setReferringDoctorCache] = useState<string[]>(["Dadar East", "Dadar West"]);
+
+  // Autocomplete focus states
+  const [addressFocused, setAddressFocused] = useState(false);
+  const [doctorFocused, setDoctorFocused] = useState(false);
+  const [countryFocused, setCountryFocused] = useState(false);
+  const [stateFocused, setStateFocused] = useState(false);
+  const [referringDoctorFocused, setReferringDoctorFocused] = useState(false);
+  const [serviceRowFocused, setServiceRowFocused] = useState<string | null>(null);
 
   // Standalone vitals modals
   const [isVitalsOpen, setIsVitalsOpen] = useState(false);
@@ -515,8 +572,8 @@ function DashboardContent() {
   const [referringDoctor, setReferringDoctor] = useState("Dadar East");
   const [discountAmount, setDiscountAmount] = useState(0);
 
-  const [servicesRows, setServicesRows] = useState<Array<{ id: string; name: string; fee: number }>>([
-    { id: "1", name: "First consultation", fee: 2000 }
+  const [servicesRows, setServicesRows] = useState<Array<{ id: string; name: string; fee: number; qty?: number; type?: 'service' | 'product' }>>([
+    { id: "1", name: "First consultation", fee: 2000, qty: 1, type: "service" }
   ]);
   const [paymentsRows, setPaymentsRows] = useState<Array<{ id: string; mode: string; amount: number }>>([
     { id: "1", mode: "Cash", amount: 0 }
@@ -560,9 +617,7 @@ function DashboardContent() {
     );
   }, [patientDirectory, bookingSearch]);
 
-  const [addressFocused, setAddressFocused] = useState(false);
-  const [doctorFocused, setDoctorFocused] = useState(false);
-  const [serviceRowFocused, setServiceRowFocused] = useState<string | null>(null);
+
 
   // --- PRESCRIPTION PAD DYNAMIC STATE VARIABLES (Screenshots #1-#5) ---
   // DB Map: public.visit_vitals
@@ -712,6 +767,40 @@ function DashboardContent() {
     { id: "1", doctorName: "shaikh mudassir", notes: "" }
   ]);
 
+  const incrementOption = async (categoryId: number, value: string, metadata?: any) => {
+    if (!value?.trim()) return;
+    try {
+      const { data: existing } = await supabase
+        .from("aka_master_dropdown_catalog")
+        .select("id, usage_count, metadata")
+        .eq("category_id", categoryId)
+        .ilike("value", value.trim())
+        .maybeSingle();
+      
+      if (existing) {
+        const mergedMeta = metadata ? { ...(existing.metadata || {}), ...metadata } : existing.metadata;
+        await supabase
+          .from("aka_master_dropdown_catalog")
+          .update({ 
+            usage_count: (existing.usage_count || 0) + 1,
+            metadata: mergedMeta
+          })
+          .eq("id", existing.id);
+      } else {
+        await supabase
+          .from("aka_master_dropdown_catalog")
+          .insert({ 
+            category_id: categoryId, 
+            value: value.trim(), 
+            usage_count: 1,
+            metadata: metadata || null
+          });
+      }
+    } catch (err) {
+      console.error("Error incrementing option:", err);
+    }
+  };
+
   // Reset form inputs helper
   const resetForm = () => {
     setTitle("Mr");
@@ -726,13 +815,13 @@ function DashboardContent() {
     setLocalAddress("");
     setCountry("India");
     setState("Maharashtra");
-    setAppointmentDateTime("2026-07-11T19:48");
+    setAppointmentDateTime(getInitialAppointmentDateTime());
     setClinicName("DLPC - Dadar");
     setTreatingDoctor("DR. LAXMAN SALVE");
     setVisitCategory("First consultation");
     setReferringDoctor("Dadar East");
     setDiscountAmount(0);
-    setServicesRows([{ id: "1", name: "First consultation", fee: 2000 }]);
+    setServicesRows([{ id: "1", name: "First consultation", fee: 2000, qty: 1, type: "service" }]);
     setPaymentsRows([{ id: "1", mode: "Cash", amount: 0 }]);
     setInitialBp("120/80");
     setInitialPulse("");
@@ -974,9 +1063,30 @@ function DashboardContent() {
     );
   }, [doctorCache, treatingDoctor]);
 
+  const matchingReferringDoctors = useMemo(() => {
+    if (referringDoctor.length < 1) return referringDoctorCache;
+    return referringDoctorCache.filter((doc) =>
+      doc.toLowerCase().includes(referringDoctor.toLowerCase())
+    );
+  }, [referringDoctorCache, referringDoctor]);
+
+  const matchingCountries = useMemo(() => {
+    if (country.length < 1) return countryCache;
+    return countryCache.filter((c) =>
+      c.toLowerCase().includes(country.toLowerCase())
+    );
+  }, [countryCache, country]);
+
+  const matchingStates = useMemo(() => {
+    if (state.length < 1) return stateCache;
+    return stateCache.filter((s) =>
+      s.toLowerCase().includes(state.toLowerCase())
+    );
+  }, [stateCache, state]);
+
   // Services dynamic totals calculations
   const totalServiceFees = useMemo(() => {
-    return servicesRows.reduce((acc, row) => acc + (row.fee || 0), 0);
+    return servicesRows.reduce((acc, row) => acc + (row.fee || 0) * (row.type === "product" ? (row.qty || 1) : 1), 0);
   }, [servicesRows]);
 
   const totalPaid = useMemo(() => {
@@ -1077,7 +1187,7 @@ function DashboardContent() {
   // Dynamic Add / Remove Service Rows
   const addServiceRow = () => {
     const newId = Date.now().toString();
-    setServicesRows([...servicesRows, { id: newId, name: "", fee: 0 }]);
+    setServicesRows([...servicesRows, { id: newId, name: "", fee: 0, qty: 1, type: "service" }]);
   };
 
   const removeServiceRow = (id: string) => {
@@ -1085,9 +1195,25 @@ function DashboardContent() {
     setServicesRows(servicesRows.filter((row) => row.id !== id));
   };
 
-  const updateServiceRow = (id: string, name: string, fee: number) => {
+  const updateServiceRow = (
+    id: string,
+    name: string,
+    fee: number,
+    type?: "service" | "product",
+    qty?: number
+  ) => {
     setServicesRows(
-      servicesRows.map((row) => (row.id === id ? { ...row, name, fee } : row))
+      servicesRows.map((row) =>
+        row.id === id
+          ? {
+              ...row,
+              name,
+              fee,
+              type: type ?? row.type ?? "service",
+              qty: qty ?? row.qty ?? 1
+            }
+          : row
+      )
     );
   };
 
@@ -1114,23 +1240,41 @@ function DashboardContent() {
     if (!fullName || !phone) return;
 
     // Cache typed doctor if new
-    if (treatingDoctor.trim() && !doctorCache.includes(treatingDoctor.trim().toUpperCase())) {
-      setDoctorCache([...doctorCache, treatingDoctor.trim().toUpperCase()]);
+    // Cache local states
+    if (treatingDoctor.trim() && !doctorCache.includes(treatingDoctor.trim())) {
+      setDoctorCache([...doctorCache, treatingDoctor.trim()]);
     }
-
-    // Cache typed address if new
-    if (permanentAddress.trim() && !addressCache.includes(permanentAddress.trim().toLowerCase())) {
-      setAddressCache([...addressCache, permanentAddress.trim().toLowerCase()]);
+    if (permanentAddress.trim() && !addressCache.includes(permanentAddress.trim())) {
+      setAddressCache([...addressCache, permanentAddress.trim()]);
     }
-
-    // Cache typed services if new
+    if (referringDoctor.trim() && !referringDoctorCache.includes(referringDoctor.trim())) {
+      setReferringDoctorCache([...referringDoctorCache, referringDoctor.trim()]);
+    }
+    if (country.trim() && !countryCache.includes(country.trim())) {
+      setCountryCache([...countryCache, country.trim()]);
+    }
+    if (state.trim() && !stateCache.includes(state.trim())) {
+      setStateCache([...stateCache, state.trim()]);
+    }
     servicesRows.forEach((row) => {
       if (row.name.trim() && !serviceCache.find((s) => s.name.toLowerCase() === row.name.toLowerCase())) {
-        setServiceCache((prev) => [...prev, { name: row.name.trim(), price: row.fee }]);
+        setServiceCache((prev) => [...prev, { name: row.name.trim(), price: row.fee, type: row.type || "service" }]);
       }
     });
 
     try {
+      // Async database increments
+      if (treatingDoctor.trim()) incrementOption(160, treatingDoctor);
+      if (permanentAddress.trim()) incrementOption(161, permanentAddress);
+      if (referringDoctor.trim()) incrementOption(163, referringDoctor);
+      if (country.trim()) incrementOption(165, country);
+      if (state.trim()) incrementOption(166, state);
+      servicesRows.forEach((row) => {
+        if (row.name.trim()) {
+          incrementOption(164, row.name, { type: row.type || "service", price: row.fee });
+        }
+      });
+
       const isUpdate = !!selectedBookingPatient;
       let targetUhid = "";
 
@@ -2092,6 +2236,7 @@ function DashboardContent() {
                         type="number"
                         min="0"
                         value={patient.billAmount}
+                        onWheel={(e) => e.currentTarget.blur()}
                         onChange={(e) => handleBillAmountChange(patient.id, Number(e.target.value))}
                         className="w-10 text-[10px] font-bold text-center focus:outline-none bg-transparent"
                       />
@@ -2479,26 +2624,58 @@ function DashboardContent() {
                     />
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
                     <label className="text-[10px] font-bold text-[#4A5568]">Country</label>
                     <input
                       type="text"
                       value={country}
                       onChange={(e) => setCountry(e.target.value)}
+                      onFocus={() => setCountryFocused(true)}
+                      onBlur={() => setTimeout(() => setCountryFocused(false), 200)}
                       placeholder="India"
                       className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none focus:border-primary"
                     />
+
+                    {countryFocused && matchingCountries.length > 0 && (
+                      <div className="absolute left-0 top-full mt-1 z-35 w-full bg-white border border-[#CBD5E0] rounded-md shadow-lg max-h-32 overflow-y-auto p-1 space-y-0.5">
+                        {matchingCountries.map((c) => (
+                          <div
+                            key={c}
+                            onClick={() => setCountry(c)}
+                            className="p-1.5 text-[11px] hover:bg-primary/5 rounded cursor-pointer text-left font-semibold text-foreground transition-colors"
+                          >
+                            {c}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
                     <label className="text-[10px] font-bold text-[#4A5568]">State (Optional)</label>
                     <input
                       type="text"
                       value={state}
                       onChange={(e) => setState(e.target.value)}
+                      onFocus={() => setStateFocused(true)}
+                      onBlur={() => setTimeout(() => setStateFocused(false), 200)}
                       placeholder="Maharashtra"
                       className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none focus:border-primary"
                     />
+
+                    {stateFocused && matchingStates.length > 0 && (
+                      <div className="absolute left-0 top-full mt-1 z-35 w-full bg-white border border-[#CBD5E0] rounded-md shadow-lg max-h-32 overflow-y-auto p-1 space-y-0.5">
+                        {matchingStates.map((s) => (
+                          <div
+                            key={s}
+                            onClick={() => setState(s)}
+                            className="p-1.5 text-[11px] hover:bg-primary/5 rounded cursor-pointer text-left font-semibold text-foreground transition-colors"
+                          >
+                            {s}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2526,11 +2703,11 @@ function DashboardContent() {
                     <select
                       value={clinicName}
                       onChange={(e) => setClinicName(e.target.value)}
-                      className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none"
+                      className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none cursor-pointer"
                     >
-                      <option value="DLPC - Dadar">DLPC - Dadar</option>
-                      <option value="DLPC - East">DLPC - East</option>
-                      <option value="DLPC - West">DLPC - West</option>
+                      {clinicCache.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -2567,7 +2744,7 @@ function DashboardContent() {
                     <select
                       value={visitCategory}
                       onChange={(e) => setVisitCategory(e.target.value)}
-                      className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none"
+                      className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none cursor-pointer"
                     >
                       <option value="First consultation">First consultation</option>
                       <option value="Follow-up consultation">Follow-up consultation</option>
@@ -2575,15 +2752,31 @@ function DashboardContent() {
                     </select>
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
                     <label className="text-[10px] font-bold text-[#4A5568]">Referring Doctor</label>
                     <input
                       type="text"
                       value={referringDoctor}
                       onChange={(e) => setReferringDoctor(e.target.value)}
+                      onFocus={() => setReferringDoctorFocused(true)}
+                      onBlur={() => setTimeout(() => setReferringDoctorFocused(false), 200)}
                       placeholder="e.g. Dadar East"
-                      className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none"
+                      className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none focus:border-primary placeholder:text-gray-300"
                     />
+
+                    {referringDoctorFocused && matchingReferringDoctors.length > 0 && (
+                      <div className="absolute left-0 top-full mt-1 z-35 w-full bg-white border border-[#CBD5E0] rounded-md shadow-lg max-h-32 overflow-y-auto p-1 space-y-0.5">
+                        {matchingReferringDoctors.map((doc) => (
+                          <div
+                            key={doc}
+                            onClick={() => setReferringDoctor(doc)}
+                            className="p-1.5 text-[11px] hover:bg-primary/5 rounded cursor-pointer text-left font-semibold text-foreground transition-colors"
+                          >
+                            {doc}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2614,7 +2807,7 @@ function DashboardContent() {
                               updateServiceRow(row.id, typedName, row.fee);
                               const matched = serviceCache.find((s) => s.name.toLowerCase() === typedName.toLowerCase());
                               if (matched) {
-                                updateServiceRow(row.id, matched.name, matched.price);
+                                updateServiceRow(row.id, matched.name, matched.price, matched.type);
                               }
                             }}
                             onFocus={() => setServiceRowFocused(row.id)}
@@ -2628,16 +2821,48 @@ function DashboardContent() {
                               {serviceCache.map((s) => (
                                 <div
                                   key={s.name}
-                                  onClick={() => updateServiceRow(row.id, s.name, s.price)}
+                                  onClick={() => updateServiceRow(row.id, s.name, s.price, s.type)}
                                   className="p-1.5 text-[10px] hover:bg-primary/5 rounded cursor-pointer text-left font-semibold text-foreground transition-all"
                                 >
-                                  {s.name} (₹{s.price})
+                                  {s.name} ({s.type === 'product' ? 'Product' : 'Service'}) (₹{s.price})
                                 </div>
                               ))}
                             </div>
                           )}
                         </div>
 
+                        <div className="w-20 space-y-0.5">
+                          <label className="text-[8px] font-bold text-[#718096] uppercase">Type</label>
+                          <select
+                            value={row.type || "service"}
+                            onChange={(e) => {
+                              const newType = e.target.value as "service" | "product";
+                              updateServiceRow(row.id, row.name, row.fee, newType, newType === "service" ? 1 : (row.qty || 1));
+                            }}
+                            className="w-full h-7 px-1.5 border border-[#CBD5E0] rounded text-[11px] bg-white focus:outline-none cursor-pointer"
+                          >
+                            <option value="service">Service</option>
+                            <option value="product">Product</option>
+                          </select>
+                        </div>
+
+                        {row.type === "product" ? (
+                          <div className="w-16 space-y-0.5 animate-in fade-in duration-100">
+                            <label className="text-[8px] font-bold text-[#718096] uppercase">Qty</label>
+                            <input
+                              type="number"
+                              required
+                              min="1"
+                              value={row.qty || 1}
+                              onWheel={(e) => e.currentTarget.blur()}
+                              onChange={(e) => updateServiceRow(row.id, row.name, row.fee, row.type, Number(e.target.value))}
+                              className="w-full h-7 px-2 border border-[#CBD5E0] rounded text-[11px] bg-white focus:outline-none text-center font-bold"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-16"></div>
+                        )}
+ 
                         <div className="w-24 space-y-0.5">
                           <label className="text-[8px] font-bold text-[#718096] uppercase">Fee (₹) *</label>
                           <input
@@ -2645,12 +2870,13 @@ function DashboardContent() {
                             required
                             min="0"
                             value={row.fee}
+                            onWheel={(e) => e.currentTarget.blur()}
                             onChange={(e) => updateServiceRow(row.id, row.name, Number(e.target.value))}
                             placeholder="2000"
                             className="w-full h-7 px-2 border border-[#CBD5E0] rounded text-[11px] bg-white focus:outline-none text-right font-bold"
                           />
                         </div>
-
+ 
                         <button
                           type="button"
                           onClick={() => removeServiceRow(row.id)}
@@ -2669,6 +2895,7 @@ function DashboardContent() {
                         type="number"
                         min="0"
                         value={discountAmount}
+                        onWheel={(e) => e.currentTarget.blur()}
                         onChange={(e) => setDiscountAmount(Number(e.target.value))}
                         className="w-full h-7 px-2 border border-[#CBD5E0] rounded text-[11px] bg-white text-right focus:outline-none"
                       />
@@ -2723,6 +2950,7 @@ function DashboardContent() {
                             required
                             min="0"
                             value={pRow.amount}
+                            onWheel={(e) => e.currentTarget.blur()}
                             onChange={(e) => updatePaymentRow(pRow.id, pRow.mode, Number(e.target.value))}
                             className="w-full h-7 px-2 border border-[#CBD5E0] rounded text-[11px] bg-white focus:outline-none text-right font-bold"
                           />
