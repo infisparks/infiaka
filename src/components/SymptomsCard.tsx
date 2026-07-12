@@ -187,6 +187,7 @@ function AutoInput({
   options,
   placeholder,
   clearable,
+  onBlur,
 }: {
   label: string;
   value: string;
@@ -194,9 +195,11 @@ function AutoInput({
   options: string[];
   placeholder?: string;
   clearable?: boolean;
+  onBlur?: (v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(-1);
+  const localDropdownClicked = useRef(false);
 
   const filtered = options.filter(
     (o) => !value || o.toLowerCase().includes(value.toLowerCase())
@@ -209,11 +212,15 @@ function AutoInput({
     else if (e.key === "Enter") {
       e.preventDefault();
       if (hi >= 0 && filtered[hi]) {
+        localDropdownClicked.current = true;
         onChange(filtered[hi]);
+        if (onBlur) onBlur(filtered[hi]);
         setHi(-1);
         setOpen(false);
       } else if (value.trim()) {
+        localDropdownClicked.current = true;
         onChange(value.trim());
+        if (onBlur) onBlur(value.trim());
         setHi(-1);
         setOpen(false);
       }
@@ -230,7 +237,18 @@ function AutoInput({
           value={value}
           onChange={(e) => { onChange(e.target.value); setHi(-1); setOpen(true); }}
           onFocus={() => { setOpen(true); setHi(-1); }}
-          onBlur={() => setTimeout(() => { setOpen(false); setHi(-1); }, 160)}
+          onBlur={(e) => {
+            const val = e.target.value;
+            setTimeout(() => {
+              if (localDropdownClicked.current) {
+                localDropdownClicked.current = false;
+                return;
+              }
+              if (onBlur) onBlur(val);
+              setOpen(false);
+              setHi(-1);
+            }, 180);
+          }}
           onKeyDown={handleKey}
           placeholder={placeholder ?? label}
           className="w-full h-9 px-3 pr-8 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-white focus:outline-none font-semibold text-[#334155] placeholder:text-[#C0CADC] transition-all"
@@ -248,7 +266,13 @@ function AutoInput({
           <div className="absolute left-0 top-full mt-1 z-[60] w-full bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-44 overflow-y-auto">
             {filtered.map((opt, i) => (
               <div key={opt}
-                onMouseDown={() => { onChange(opt); setOpen(false); setHi(-1); }}
+                onMouseDown={() => {
+                  localDropdownClicked.current = true;
+                  onChange(opt);
+                  if (onBlur) onBlur(opt);
+                  setOpen(false);
+                  setHi(-1);
+                }}
                 className={`px-3 py-2 text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
                   ${i === hi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F8FAFC] text-[#334155]"}`}
               >{opt}</div>
@@ -256,7 +280,9 @@ function AutoInput({
             {value.trim() && !options.some(o => o.toLowerCase() === value.trim().toLowerCase()) && (
               <div
                 onMouseDown={() => {
+                  localDropdownClicked.current = true;
                   onChange(value.trim());
+                  if (onBlur) onBlur(value.trim());
                   setOpen(false);
                   setHi(-1);
                 }}
@@ -788,8 +814,8 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
               <AutoInput
                 label="Clinical course"
                 value={mCourse}
-                onChange={async (v) => {
-                  setMCourse(v);
+                onChange={setMCourse}
+                onBlur={async (v) => {
                   if (v && v.trim()) {
                     await incrementOption(6, v.trim());
                     refreshAllOptions();
