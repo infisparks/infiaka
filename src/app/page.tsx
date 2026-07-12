@@ -198,30 +198,65 @@ function DashboardContent() {
   const searchParams = useSearchParams();
 
   const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [selectedDate, setSelectedDate] = useState("Tdy, 11 Jul");
 
-  const loadPatientsFromDb = async () => {
+  const loadPatientsFromDb = async (dateLabel: string = "Tdy, 11 Jul") => {
     try {
-      const { data: patientsData, error: pError } = await supabase
-        .from("patient_detail")
-        .select("*")
-        .order("patient_id", { ascending: false });
+      // 1. Determine target date string (e.g. '2026-07-11')
+      let targetDate = "2026-07-11";
+      if (dateLabel === "Yesterday") {
+        targetDate = "2026-07-10";
+      } else {
+        const match = dateLabel.match(/(\d+)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
+        if (match) {
+          const day = match[1].padStart(2, "0");
+          const monthStr = match[2];
+          const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+          const monthIdx = months.findIndex(m => m.toLowerCase() === monthStr.toLowerCase());
+          if (monthIdx !== -1) {
+            const month = String(monthIdx + 1).padStart(2, "0");
+            targetDate = `2026-${month}-${day}`;
+          }
+        }
+      }
 
-      if (pError) throw pError;
+      // 2. Fetch registrations for that target date range
+      const startRange = `${targetDate}T00:00:00.000Z`;
+      const endRange = `${targetDate}T23:59:59.999Z`;
 
       const { data: regData, error: rError } = await supabase
         .from("aka_opd_registration")
         .select("*")
+        .gte("appointment_date_time", startRange)
+        .lte("appointment_date_time", endRange)
         .order("registration_id", { ascending: false });
 
       if (rError) throw rError;
 
-      const mapped: Patient[] = (patientsData || []).map((p, idx) => {
-        const latestReg = (regData || []).find(r => r.patient_uhid === p.uhid);
-        const billAmt = latestReg?.services 
-          ? latestReg.services.reduce((acc: number, s: any) => acc + (Number(s.fee) || 0), 0)
+      if (!regData || regData.length === 0) {
+        setPatients([]);
+        return;
+      }
+
+      // 3. Fetch patient_details matching these patient_uhid values
+      const uniqueUhids = Array.from(new Set(regData.map(r => r.patient_uhid)));
+      const { data: patientsData, error: pError } = await supabase
+        .from("patient_detail")
+        .select("*")
+        .in("uhid", uniqueUhids);
+
+      if (pError) throw pError;
+
+      // 4. Map registrations to Patient view representation
+      const mapped: Patient[] = regData.map((reg, idx) => {
+        const p = (patientsData || []).find(pat => pat.uhid === reg.patient_uhid);
+        if (!p) return null;
+
+        const billAmt = reg.services 
+          ? reg.services.reduce((acc: number, s: any) => acc + (Number(s.fee) || 0), 0)
           : 0;
-        const pMethod = latestReg?.payments && latestReg.payments[0]?.mode 
-          ? latestReg.payments[0].mode 
+        const pMethod = reg.payments && reg.payments[0]?.mode 
+          ? reg.payments[0].mode 
           : "Cash";
 
         return {
@@ -246,19 +281,19 @@ function DashboardContent() {
           customTags: [],
           isCompleted: false,
           isOngoing: true,
-          arrivalTime: latestReg?.created_at 
-            ? new Date(latestReg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          arrivalTime: reg.created_at 
+            ? new Date(reg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
             : new Date(p.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           arrivalMinutesAgo: 0,
           vitals: {
-            bp: latestReg?.bp || "120/80",
-            pulse: latestReg?.pulse || "",
-            weight: latestReg?.weight || "",
-            spo2: latestReg?.spo2 || "98",
-            sugar: latestReg?.sugar || "100",
+            bp: reg.bp || "120/80",
+            pulse: reg.pulse || "",
+            weight: reg.weight || "",
+            spo2: reg.spo2 || "98",
+            sugar: reg.sugar || "100",
           }
         };
-      });
+      }).filter(Boolean) as Patient[];
 
       setPatients(mapped);
     } catch (err) {
@@ -288,9 +323,9 @@ function DashboardContent() {
 
   useEffect(() => {
     if (sessionLoaded) {
-      loadPatientsFromDb();
+      loadPatientsFromDb(selectedDate);
     }
-  }, [sessionLoaded]);
+  }, [sessionLoaded, selectedDate]);
 
   const [patients, setPatients] = useState<Patient[]>(initialPatients);
 
@@ -352,7 +387,6 @@ function DashboardContent() {
 
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState<string | null>(null);
   const [newTagText, setNewTagText] = useState("");
-  const [selectedDate, setSelectedDate] = useState("Tdy, 11 Jul");
 
   // --- OPD REGISTRATION PANEL STATES ---
   const [bookingSearch, setBookingSearch] = useState("");
@@ -1040,7 +1074,7 @@ function DashboardContent() {
         });
       if (rError) throw rError;
 
-      await loadPatientsFromDb();
+      await loadPatientsFromDb(selectedDate);
       closeBooking();
     } catch (err) {
       console.error("Failed to save registration:", err);
