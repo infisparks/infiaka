@@ -533,20 +533,32 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
                 </div>
 
                 {/* Col 5: Date */}
-                <div className="relative w-[12%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white overflow-visible px-3">
-                  <span className="text-[11px] font-semibold text-[#334155] pointer-events-none truncate">
-                    {row.date || "Date"}
-                  </span>
+                <div className="relative w-[12%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white overflow-visible">
                   <input
-                    type="date"
-                    value={convertToISODate(row.date)}
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        patch(row.id, { date: formatISODateToDisplay(e.target.value) });
-                      }
-                    }}
-                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                    type="text"
+                    value={row.date}
+                    onChange={(e) => patch(row.id, { date: e.target.value })}
+                    placeholder="Date"
+                    className="w-full h-full border-0 focus:ring-0 pl-3 pr-7 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                   />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center cursor-pointer text-slate-350 hover:text-slate-500 transition-colors">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                      <line x1="16" y1="2" x2="16" y2="6"/>
+                      <line x1="8" y1="2" x2="8" y2="6"/>
+                      <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    <input
+                      type="date"
+                      value={convertToISODate(row.date)}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          patch(row.id, { date: formatISODateToDisplay(e.target.value) });
+                        }
+                      }}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                  </div>
                 </div>
 
                 {/* Col 6: Additional Notes */}
