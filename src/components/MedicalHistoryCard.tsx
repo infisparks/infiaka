@@ -5,6 +5,10 @@ import { ExistingCondition } from "./ExistingConditionsDrawer";
 import { SurgicalProcedure } from "./SurgicalProceduresDrawer";
 import { FamilyHistoryItem } from "./FamilyHistoryDrawer";
 import { DrugAllergy } from "./DrugAllergiesDrawer";
+import { LifestyleHabit } from "./LifestyleHabitsDrawer";
+import { FoodAllergy } from "./FoodAllergyDrawer";
+import { OtherMedHistory } from "./OtherMedHistoryDrawer";
+import { TravelHistoryItem } from "./TravelHistoryDrawer";
 
 interface MedicalHistoryCardProps {
   histNoKnown: boolean;
@@ -38,6 +42,20 @@ interface MedicalHistoryCardProps {
   allergies: DrugAllergy[];
   setAllergies: React.Dispatch<React.SetStateAction<DrugAllergy[]>>;
   onOpenAllergies?: () => void;
+  habits: LifestyleHabit[];
+  setHabits: React.Dispatch<React.SetStateAction<LifestyleHabit[]>>;
+  onOpenHabits?: () => void;
+  foodAllergies: FoodAllergy[];
+  setFoodAllergies: React.Dispatch<React.SetStateAction<FoodAllergy[]>>;
+  onOpenFoodAllergies?: () => void;
+  otherHistory: OtherMedHistory[];
+  setOtherHistory: React.Dispatch<React.SetStateAction<OtherMedHistory[]>>;
+  otherHistoryTitle: string;
+  setOtherHistoryTitle: React.Dispatch<React.SetStateAction<string>>;
+  onOpenOtherHistory?: () => void;
+  travelHistory: TravelHistoryItem[];
+  setTravelHistory: React.Dispatch<React.SetStateAction<TravelHistoryItem[]>>;
+  onOpenTravelHistory?: () => void;
 }
 
 export default function MedicalHistoryCard({
@@ -72,6 +90,20 @@ export default function MedicalHistoryCard({
   allergies,
   setAllergies,
   onOpenAllergies,
+  habits,
+  setHabits,
+  onOpenHabits,
+  foodAllergies,
+  setFoodAllergies,
+  onOpenFoodAllergies,
+  otherHistory,
+  setOtherHistory,
+  otherHistoryTitle,
+  setOtherHistoryTitle,
+  onOpenOtherHistory,
+  travelHistory,
+  setTravelHistory,
+  onOpenTravelHistory,
 }: MedicalHistoryCardProps) {
 
   const toggleMedStatus = (id: string, currentStatus: string) => {
@@ -97,6 +129,21 @@ export default function MedicalHistoryCard({
   const toggleAllergyStatus = (id: string, currentStatus: string) => {
     const newStatus = currentStatus === "Yes (Active)" ? "No (Inactive)" : "Yes (Active)";
     setAllergies((p) => p.map((a) => a.id === id ? { ...a, status: newStatus } : a));
+  };
+
+  const toggleHabitStatus = (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === "Yes (Active)" ? "No (Inactive)" : "Yes (Active)";
+    setHabits((p) => p.map((h) => h.id === id ? { ...h, status: newStatus } : h));
+  };
+
+  const toggleFoodAllergyStatus = (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === "Yes (Active)" ? "No (Inactive)" : "Yes (Active)";
+    setFoodAllergies((p) => p.map((f) => f.id === id ? { ...f, status: newStatus } : f));
+  };
+
+  const toggleTravelStatus = (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === "Yes (Active)" ? "No (Inactive)" : "Yes (Active)";
+    setTravelHistory((p) => p.map((t) => t.id === id ? { ...t, status: newStatus } : t));
   };
 
   return (
@@ -126,128 +173,7 @@ export default function MedicalHistoryCard({
         </div>
       </div>
 
-      {/* Grid of default states */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-12 gap-y-4 pt-1">
-        
-        {/* Diabetes mellitus */}
-        <div className="flex items-center justify-between py-1 border-b border-[#F1F5F9] w-full">
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setHistDiabetes(!histDiabetes)}>
-            <div className={`w-8 h-8 min-w-[32px] min-h-[32px] rounded-full flex items-center justify-center border font-bold text-[11px] select-none transition-colors ${
-              histDiabetes ? "bg-[#f1f5f9] border-[#cbd5e1] text-slate-800" : "bg-[#f8fafc] border-slate-200 text-slate-400"
-            }`}>
-              <div className="flex items-center space-x-1">
-                <span>{histDiabetes ? "Y" : "-"}</span>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" className="w-1.5 h-2.5 fill-slate-500">
-                  <path d="M27.66 224h264.7c24.6 0 36.89-29.78 19.54-47.12l-132.3-136.8c-5.406-5.406-12.47-8.107-19.53-8.107c-7.055 0-14.09 2.701-19.45 8.107L8.119 176.9C-9.229 194.2 3.055 224 27.66 224zM292.3 288H27.66c-24.6 0-36.89 29.77-19.54 47.12l132.5 136.8C145.9 477.3 152.1 480 160 480c7.053 0 14.12-2.703 19.53-8.109l132.3-136.8C329.2 317.8 316.9 288 292.3 288z"></path>
-                </svg>
-              </div>
-            </div>
-            <span className="font-bold text-[11px] text-[#4A5568] break-all">Diabetes mellitus</span>
-          </div>
-          <div>
-            {histDiabetes && (
-              <input
-                type="text"
-                placeholder="Since"
-                value={histDiabetesSince}
-                onChange={(e) => setHistDiabetesSince(e.target.value)}
-                className="w-16 h-7 border border-[#CBD5E0] focus:border-primary rounded text-center text-[10.5px] focus:outline-none bg-white font-semibold text-[#4A5568]"
-                onClick={(e) => e.stopPropagation()}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Hypothyroidism */}
-        <div className="flex items-center justify-between py-1 border-b border-[#F1F5F9] w-full">
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setHistHypothyroid(!histHypothyroid)}>
-            <div className={`w-8 h-8 min-w-[32px] min-h-[32px] rounded-full flex items-center justify-center border font-bold text-[11px] select-none transition-colors ${
-              histHypothyroid ? "bg-[#f1f5f9] border-[#cbd5e1] text-slate-800" : "bg-[#f8fafc] border-slate-200 text-slate-400"
-            }`}>
-              <div className="flex items-center space-x-1">
-                <span>{histHypothyroid ? "Y" : "-"}</span>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" className="w-1.5 h-2.5 fill-slate-500">
-                  <path d="M27.66 224h264.7c24.6 0 36.89-29.78 19.54-47.12l-132.3-136.8c-5.406-5.406-12.47-8.107-19.53-8.107c-7.055 0-14.09 2.701-19.45 8.107L8.119 176.9C-9.229 194.2 3.055 224 27.66 224zM292.3 288H27.66c-24.6 0-36.89 29.77-19.54 47.12l132.5 136.8C145.9 477.3 152.1 480 160 480c7.053 0 14.12-2.703 19.53-8.109l132.3-136.8C329.2 317.8 316.9 288 292.3 288z"></path>
-                </svg>
-              </div>
-            </div>
-            <span className="font-bold text-[11px] text-[#4A5568] break-all">Hypothyroidism</span>
-          </div>
-          <div></div>
-        </div>
-
-        {/* Hypertension */}
-        <div className="flex items-center justify-between py-1 border-b border-[#F1F5F9] w-full">
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setHistHypertension(!histHypertension)}>
-            <div className={`w-8 h-8 min-w-[32px] min-h-[32px] rounded-full flex items-center justify-center border font-bold text-[11px] select-none transition-colors ${
-              histHypertension ? "bg-[#f1f5f9] border-[#cbd5e1] text-slate-800" : "bg-[#f8fafc] border-slate-200 text-slate-400"
-            }`}>
-              <div className="flex items-center space-x-1">
-                <span>{histHypertension ? "Y" : "-"}</span>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" className="w-1.5 h-2.5 fill-slate-500">
-                  <path d="M27.66 224h264.7c24.6 0 36.89-29.78 19.54-47.12l-132.3-136.8c-5.406-5.406-12.47-8.107-19.53-8.107c-7.055 0-14.09 2.701-19.45 8.107L8.119 176.9C-9.229 194.2 3.055 224 27.66 224zM292.3 288H27.66c-24.6 0-36.89 29.77-19.54 47.12l132.5 136.8C145.9 477.3 152.1 480 160 480c7.053 0 14.12-2.703 19.53-8.109l132.3-136.8C329.2 317.8 316.9 288 292.3 288z"></path>
-                </svg>
-              </div>
-            </div>
-            <span className="font-bold text-[11px] text-[#4A5568] break-all">Hypertension</span>
-          </div>
-          <div></div>
-        </div>
-
-        {/* Alcohol */}
-        <div className="flex items-center justify-between py-1 border-b border-[#F1F5F9] w-full">
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setHistAlcohol(!histAlcohol)}>
-            <div className={`w-8 h-8 min-w-[32px] min-h-[32px] rounded-full flex items-center justify-center border font-bold text-[11px] select-none transition-colors ${
-              histAlcohol ? "bg-[#f1f5f9] border-[#cbd5e1] text-slate-800" : "bg-[#f8fafc] border-slate-200 text-slate-400"
-            }`}>
-              <div className="flex items-center space-x-1">
-                <span>{histAlcohol ? "Y" : "-"}</span>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" className="w-1.5 h-2.5 fill-slate-500">
-                  <path d="M27.66 224h264.7c24.6 0 36.89-29.78 19.54-47.12l-132.3-136.8c-5.406-5.406-12.47-8.107-19.53-8.107c-7.055 0-14.09 2.701-19.45 8.107L8.119 176.9C-9.229 194.2 3.055 224 27.66 224zM292.3 288H27.66c-24.6 0-36.89 29.77-19.54 47.12l132.5 136.8C145.9 477.3 152.1 480 160 480c7.053 0 14.12-2.703 19.53-8.109l132.3-136.8C329.2 317.8 316.9 288 292.3 288z"></path>
-                </svg>
-              </div>
-            </div>
-            <span className="font-bold text-[11px] text-[#4A5568] break-all">Alcohol</span>
-          </div>
-          <div></div>
-        </div>
-
-        {/* Tobacco */}
-        <div className="flex items-center justify-between py-1 border-b border-[#F1F5F9] w-full">
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setHistTobacco(!histTobacco)}>
-            <div className={`w-8 h-8 min-w-[32px] min-h-[32px] rounded-full flex items-center justify-center border font-bold text-[11px] select-none transition-colors ${
-              histTobacco ? "bg-[#f1f5f9] border-[#cbd5e1] text-slate-800" : "bg-[#f8fafc] border-slate-200 text-slate-400"
-            }`}>
-              <div className="flex items-center space-x-1">
-                <span>{histTobacco ? "Y" : "-"}</span>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" className="w-1.5 h-2.5 fill-slate-500">
-                  <path d="M27.66 224h264.7c24.6 0 36.89-29.78 19.54-47.12l-132.3-136.8c-5.406-5.406-12.47-8.107-19.53-8.107c-7.055 0-14.09 2.701-19.45 8.107L8.119 176.9C-9.229 194.2 3.055 224 27.66 224zM292.3 288H27.66c-24.6 0-36.89 29.77-19.54 47.12l132.5 136.8C145.9 477.3 152.1 480 160 480c7.053 0 14.12-2.703 19.53-8.109l132.3-136.8C329.2 317.8 316.9 288 292.3 288z"></path>
-                </svg>
-              </div>
-            </div>
-            <span className="font-bold text-[11px] text-[#4A5568] break-all">Tobacco</span>
-          </div>
-          <div></div>
-        </div>
-
-        {/* Smoke */}
-        <div className="flex items-center justify-between py-1 border-b border-[#F1F5F9] w-full">
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setHistSmoke(!histSmoke)}>
-            <div className={`w-8 h-8 min-w-[32px] min-h-[32px] rounded-full flex items-center justify-center border font-bold text-[11px] select-none transition-colors ${
-              histSmoke ? "bg-[#f1f5f9] border-[#cbd5e1] text-slate-800" : "bg-[#f8fafc] border-slate-200 text-slate-400"
-            }`}>
-              <div className="flex items-center space-x-1">
-                <span>{histSmoke ? "Y" : "-"}</span>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512" className="w-1.5 h-2.5 fill-slate-500">
-                  <path d="M27.66 224h264.7c24.6 0 36.89-29.78 19.54-47.12l-132.3-136.8c-5.406-5.406-12.47-8.107-19.53-8.107c-7.055 0-14.09 2.701-19.45 8.107L8.119 176.9C-9.229 194.2 3.055 224 27.66 224zM292.3 288H27.66c-24.6 0-36.89 29.77-19.54 47.12l132.5 136.8C145.9 477.3 152.1 480 160 480c7.053 0 14.12-2.703 19.53-8.109l132.3-136.8C329.2 317.8 316.9 288 292.3 288z"></path>
-                </svg>
-              </div>
-            </div>
-            <span className="font-bold text-[11px] text-[#4A5568] break-all">Smoke</span>
-          </div>
-          <div></div>
-        </div>
-      </div>      {/* Dynamic family history list rows */}
+      {/* Dynamic family history list rows */}
       {familyItems.length > 0 && (
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
           <div className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none">
@@ -533,6 +459,166 @@ export default function MedicalHistoryCard({
         </div>
       )}
 
+      {/* Dynamic lifestyle habits list rows */}
+      {habits.length > 0 && (
+        <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
+          <div className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none">
+            LIFESTYLE HABITS
+          </div>
+          <div className="flex flex-wrap gap-5 flex-1 min-w-0">
+            {habits.map((h) => {
+              const details = [
+                h.since ? `Since: ${h.since}` : "",
+                h.frequency ? `Freq: ${h.frequency}` : ""
+              ].filter(Boolean).join(" | ");
+              const isActive = h.status === "Yes (Active)";
+              const isNo = h.status === "No (Inactive)" || h.status.toLowerCase().startsWith("no");
+              let badgeText = "-";
+              let badgeClass = "bg-slate-50 border-slate-200 text-slate-400";
+              if (isActive) { badgeText = "Y"; badgeClass = "bg-[#E6F4EA] border-[#CEEAD6] text-[#137333]"; }
+              else if (isNo) { badgeText = "N"; badgeClass = "bg-[#FCE8E6] border-[#FAD2CF] text-[#C5221F]"; }
+              return (
+                <div key={h.id} className="flex items-center gap-2">
+                  <div
+                    onClick={() => toggleHabitStatus(h.id, h.status)}
+                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-[10px] select-none transition-colors cursor-pointer ${badgeClass}`}
+                  >
+                    <div className="flex items-center gap-0.5">
+                      <span>{badgeText}</span>
+                      <svg className="w-1.5 h-2 fill-current" viewBox="0 0 320 512">
+                        <path d="M27.66 224h264.7c24.6 0 36.89-29.78 19.54-47.12l-132.3-136.8c-5.406-5.406-12.47-8.107-19.53-8.107c-7.055 0-14.09 2.701-19.45 8.107L8.119 176.9C-9.229 194.2 3.055 224 27.66 224zM292.3 288H27.66c-24.6 0-36.89 29.77-19.54 47.12l132.5 136.8C145.9 477.3 152.1 480 160 480c7.053 0 14.12-2.703 19.53-8.109l132.3-136.8C329.2 317.8 316.9 288 292.3 288z"/>
+                      </svg>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{h.name}</p>
+                    {details && <p className="text-[9.5px] text-[#8A95A5] font-semibold mt-0.5 leading-none">{details}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={onOpenHabits}
+            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-[10px] font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
+          >+ Add</button>
+        </div>
+      )}
+
+      {/* Dynamic food allergy list rows */}
+      {foodAllergies.length > 0 && (
+        <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
+          <div className="bg-rose-50 text-rose-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none border border-rose-100">
+            FOOD/OTHER ALLERGY
+          </div>
+          <div className="flex flex-wrap gap-5 flex-1 min-w-0">
+            {foodAllergies.map((f) => {
+              const isActive = f.status === "Yes (Active)";
+              const isNo = f.status === "No (Inactive)" || f.status.toLowerCase().startsWith("no");
+              let badgeText = "-"; let badgeClass = "bg-slate-50 border-slate-200 text-slate-400";
+              if (isActive) { badgeText = "Y"; badgeClass = "bg-[#E6F4EA] border-[#CEEAD6] text-[#137333]"; }
+              else if (isNo) { badgeText = "N"; badgeClass = "bg-[#FCE8E6] border-[#FAD2CF] text-[#C5221F]"; }
+              return (
+                <div key={f.id} className="flex items-center gap-2">
+                  <div onClick={() => toggleFoodAllergyStatus(f.id, f.status)}
+                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-[10px] select-none transition-colors cursor-pointer ${badgeClass}`}>
+                    <div className="flex items-center gap-0.5">
+                      <span>{badgeText}</span>
+                      <svg className="w-1.5 h-2 fill-current" viewBox="0 0 320 512"><path d="M27.66 224h264.7c24.6 0 36.89-29.78 19.54-47.12l-132.3-136.8c-5.406-5.406-12.47-8.107-19.53-8.107c-7.055 0-14.09 2.701-19.45 8.107L8.119 176.9C-9.229 194.2 3.055 224 27.66 224zM292.3 288H27.66c-24.6 0-36.89 29.77-19.54 47.12l132.5 136.8C145.9 477.3 152.1 480 160 480c7.053 0 14.12-2.703 19.53-8.109l132.3-136.8C329.2 317.8 316.9 288 292.3 288z"/></svg>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{f.name}</p>
+                    {f.since && <p className="text-[9.5px] text-[#8A95A5] font-semibold mt-0.5 leading-none">Since: {f.since}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <button type="button" onClick={onOpenFoodAllergies}
+            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-[10px] font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none">+ Add</button>
+        </div>
+      )}
+
+      {/* Dynamic other medical history list rows */}
+      {otherHistory.length > 0 && (
+        <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
+          <div className="bg-violet-50 text-violet-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none border border-violet-100">
+            {otherHistoryTitle || "OTHER MED. HISTORY"}
+          </div>
+          <div className="flex flex-wrap gap-4 flex-1 min-w-0">
+            {otherHistory.map((o) => (
+              <div key={o.id} className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />
+                <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{o.name}</p>
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={onOpenOtherHistory}
+            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-[10px] font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none">+ Add</button>
+        </div>
+      )}
+
+      {/* Dynamic travel history list rows */}
+      {travelHistory.length > 0 && (
+        <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
+          <div className="bg-[#E0F2FE] text-[#0369A1] px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none border border-[#BAE6FD]">
+            TRAVEL HISTORY
+          </div>
+          <div className="flex flex-wrap gap-5 flex-1 min-w-0">
+            {travelHistory.map((t) => {
+              const isActive = t.status === "Yes (Active)";
+              const isNo = t.status === "No (Inactive)" || t.status.toLowerCase().startsWith("no");
+              let badgeText = "-";
+              let badgeClass = "bg-slate-50 border-slate-200 text-slate-400";
+              if (isActive) {
+                badgeText = "Y";
+                badgeClass = "bg-[#E6F4EA] border-[#CEEAD6] text-[#137333]";
+              } else if (isNo) {
+                badgeText = "N";
+                badgeClass = "bg-[#FCE8E6] border-[#FAD2CF] text-[#C5221F]";
+              }
+              return (
+                <div key={t.id} className="flex items-center gap-2">
+                  <div
+                    onClick={() => toggleTravelStatus(t.id, t.status)}
+                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-[10px] select-none transition-colors cursor-pointer ${badgeClass}`}
+                  >
+                    <div className="flex items-center gap-0.5">
+                      <span>{badgeText}</span>
+                      <svg className="w-1.5 h-2 fill-current" viewBox="0 0 320 512">
+                        <path d="M27.66 224h264.7c24.6 0 36.89-29.78 19.54-47.12l-132.3-136.8c-5.406-5.406-12.47-8.107-19.53-8.107c-7.055 0-14.09 2.701-19.45 8.107L8.119 176.9C-9.229 194.2 3.055 224 27.66 224zM292.3 288H27.66c-24.6 0-36.89 29.77-19.54 47.12l132.5 136.8C145.9 477.3 152.1 480 160 480c7.053 0 14.12-2.703 19.53-8.109l132.3-136.8C329.2 317.8 316.9 288 292.3 288z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{t.destination}</p>
+                    {(t.travelDate || t.notes) && (
+                      <p className="text-[9.5px] text-[#8A95A5] font-semibold mt-0.5 leading-none">
+                        {[
+                          t.travelDate ? `Date: ${t.travelDate}` : "",
+                          t.notes ? `Notes: ${t.notes}` : ""
+                        ]
+                          .filter(Boolean)
+                          .join(" | ")}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={onOpenTravelHistory}
+            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-[10px] font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
+          >
+            + Add
+          </button>
+        </div>
+      )}
+
       {/* History Action pills row */}
       <div className="flex items-center gap-2 flex-wrap pt-3 border-t text-[10.5px]">
         {conditions.length === 0 && (
@@ -544,16 +630,24 @@ export default function MedicalHistoryCard({
         {familyItems.length === 0 && (
           <button type="button" onClick={onOpenFamily} className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Family History</button>
         )}
-        <button type="button" className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Lifestyle Habit</button>
-        <button type="button" className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Food/Other Allergy</button>
+        {habits.length === 0 && (
+          <button type="button" onClick={onOpenHabits} className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Lifestyle Habit</button>
+        )}
+        {foodAllergies.length === 0 && (
+          <button type="button" onClick={onOpenFoodAllergies} className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Food/Other Allergy</button>
+        )}
         {allergies.length === 0 && (
           <button type="button" onClick={onOpenAllergies} className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Drug Allergy</button>
         )}
         {procedures.length === 0 && (
           <button type="button" onClick={onOpenProcedures} className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Past Surgical Procedures</button>
         )}
-        <button type="button" className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Travel History</button>
-        <button type="button" className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Other medical history</button>
+        {travelHistory.length === 0 && (
+          <button type="button" onClick={onOpenTravelHistory} className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Travel History</button>
+        )}
+        {otherHistory.length === 0 && (
+          <button type="button" onClick={onOpenOtherHistory} className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Other medical history</button>
+        )}
       </div>
     </section>
   );

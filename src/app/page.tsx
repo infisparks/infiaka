@@ -18,114 +18,11 @@ import ExistingConditionsDrawer, { ExistingCondition } from "@/components/Existi
 import SurgicalProceduresDrawer, { SurgicalProcedure } from "@/components/SurgicalProceduresDrawer";
 import FamilyHistoryDrawer, { FamilyHistoryItem } from "@/components/FamilyHistoryDrawer";
 import DrugAllergiesDrawer, { DrugAllergy } from "@/components/DrugAllergiesDrawer";
+import LifestyleHabitsDrawer, { LifestyleHabit } from "@/components/LifestyleHabitsDrawer";
+import FoodAllergyDrawer, { FoodAllergy } from "@/components/FoodAllergyDrawer";
+import OtherMedHistoryDrawer, { OtherMedHistory } from "@/components/OtherMedHistoryDrawer";
+import TravelHistoryDrawer, { TravelHistoryItem } from "@/components/TravelHistoryDrawer";
 
-// ==========================================
-// SUPABASE DATABASE SCHEMA DOCUMENTATION
-// ==========================================
-/*
--- 1. Patients Table
-CREATE TABLE public.patients (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    queue_no VARCHAR(10),
-    title VARCHAR(10), -- Mr, Mrs, Ms, Dr
-    full_name VARCHAR(100) NOT NULL,
-    phone_dial_code VARCHAR(10) DEFAULT '+91',
-    phone_number VARCHAR(15) NOT NULL,
-    gender VARCHAR(10) NOT NULL,
-    age INT NOT NULL,
-    age_unit VARCHAR(10) DEFAULT 'Year', -- Year, Month, Day
-    dob DATE NOT NULL,
-    permanent_address TEXT,
-    local_address TEXT,
-    country VARCHAR(100) DEFAULT 'India',
-    state VARCHAR(100),
-    custom_tags TEXT[] DEFAULT '{}',
-    is_completed BOOLEAN DEFAULT FALSE,
-    is_ongoing BOOLEAN DEFAULT FALSE,
-    arrival_time VARCHAR(20),
-    arrival_minutes_ago INT DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 2. Visits Table
-CREATE TABLE public.visits (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    patient_id UUID REFERENCES public.patients(id) ON DELETE CASCADE,
-    appointment_date TIMESTAMP WITH TIME ZONE NOT NULL,
-    clinic_name VARCHAR(100) NOT NULL,
-    treating_doctor VARCHAR(100) NOT NULL,
-    visit_category VARCHAR(100) NOT NULL,
-    referring_doctor VARCHAR(100),
-    discount_amount NUMERIC(10, 2) DEFAULT 0.00,
-    total_fees NUMERIC(10, 2) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 3. Visit Services Table (Many-to-One with Visit)
-CREATE TABLE public.visit_services (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    visit_id UUID REFERENCES public.visits(id) ON DELETE CASCADE,
-    service_name VARCHAR(100) NOT NULL,
-    fee NUMERIC(10, 2) NOT NULL
-);
-
--- 4. Visit Payments Table (Many-to-One with Visit)
-CREATE TABLE public.visit_payments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    visit_id UUID REFERENCES public.visits(id) ON DELETE CASCADE,
-    mode VARCHAR(50) NOT NULL,
-    amount NUMERIC(10, 2) NOT NULL
-);
-
--- 5. Visit Vitals Table (One-to-One with Visit)
-CREATE TABLE public.visit_vitals (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    visit_id UUID REFERENCES public.visits(id) ON DELETE CASCADE,
-    blood_pressure VARCHAR(20),
-    pulse INT,
-    weight NUMERIC(5, 2),
-    spo2 INT,
-    sugar INT,
-    temperature NUMERIC(4, 1),
-    height NUMERIC(5, 1),
-    bmi NUMERIC(4, 1),
-    respiratory_rate INT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 6. Visit Prescriptions Table (Many-to-One with Visit)
-CREATE TABLE public.visit_prescriptions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    visit_id UUID REFERENCES public.visits(id) ON DELETE CASCADE,
-    medicine_name VARCHAR(150) NOT NULL,
-    generic_name VARCHAR(250),
-    dose VARCHAR(50), -- e.g. 2 capsule, 1 tablet
-    frequency VARCHAR(50), -- e.g. 1-1-1
-    timing VARCHAR(50), -- e.g. After Meal
-    duration VARCHAR(50), -- e.g. 10 Days
-    start_from VARCHAR(50),
-    instructions TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 7. Visit Symptoms Table (Many-to-One with Visit)
-CREATE TABLE public.visit_symptoms (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    visit_id UUID REFERENCES public.visits(id) ON DELETE CASCADE,
-    symptom_name VARCHAR(150) NOT NULL, -- e.g. Head Pain
-    duration VARCHAR(50), -- e.g. 1 Hour
-    severity VARCHAR(50) -- e.g. Severe
-);
-
--- 8. Visit Diagnosis Table (Many-to-One with Visit)
-CREATE TABLE public.visit_diagnoses (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    visit_id UUID REFERENCES public.visits(id) ON DELETE CASCADE,
-    diagnosis_name VARCHAR(200) NOT NULL, -- e.g. Period pain
-    since VARCHAR(50),
-    status VARCHAR(50)
-);
-*/
 
 interface Patient {
   id: string;
@@ -482,6 +379,23 @@ function DashboardContent() {
   // Drug Allergies state
   const [allergies, setAllergies] = useState<DrugAllergy[]>([]);
   const [isAllergiesOpen, setIsAllergiesOpen] = useState(false);
+
+  // Lifestyle Habits state
+  const [habits, setHabits] = useState<LifestyleHabit[]>([]);
+  const [isHabitsOpen, setIsHabitsOpen] = useState(false);
+
+  // Food/Other Allergy state
+  const [foodAllergies, setFoodAllergies] = useState<FoodAllergy[]>([]);
+  const [isFoodAllergyOpen, setIsFoodAllergyOpen] = useState(false);
+
+  // Other Medical History state
+  const [otherHistory, setOtherHistory] = useState<OtherMedHistory[]>([]);
+  const [otherHistoryTitle, setOtherHistoryTitle] = useState("");
+  const [isOtherHistoryOpen, setIsOtherHistoryOpen] = useState(false);
+
+  // Travel History state
+  const [travelHistory, setTravelHistory] = useState<TravelHistoryItem[]>([]);
+  const [isTravelOpen, setIsTravelOpen] = useState(false);
 
   // Symptoms state
   // DB Map: public.visit_symptoms
@@ -1213,6 +1127,20 @@ function DashboardContent() {
             allergies={allergies}
             setAllergies={setAllergies}
             onOpenAllergies={() => setIsAllergiesOpen(true)}
+            habits={habits}
+            setHabits={setHabits}
+            onOpenHabits={() => setIsHabitsOpen(true)}
+            foodAllergies={foodAllergies}
+            setFoodAllergies={setFoodAllergies}
+            onOpenFoodAllergies={() => setIsFoodAllergyOpen(true)}
+            otherHistory={otherHistory}
+            setOtherHistory={setOtherHistory}
+            otherHistoryTitle={otherHistoryTitle}
+            setOtherHistoryTitle={setOtherHistoryTitle}
+            onOpenOtherHistory={() => setIsOtherHistoryOpen(true)}
+            travelHistory={travelHistory}
+            setTravelHistory={setTravelHistory}
+            onOpenTravelHistory={() => setIsTravelOpen(true)}
           />
 
           <CurrentMedicationsDrawer
@@ -1248,6 +1176,36 @@ function DashboardContent() {
             onClose={() => setIsAllergiesOpen(false)}
             allergies={allergies}
             setAllergies={setAllergies}
+          />
+
+          <LifestyleHabitsDrawer
+            isOpen={isHabitsOpen}
+            onClose={() => setIsHabitsOpen(false)}
+            habits={habits}
+            setHabits={setHabits}
+          />
+
+          <FoodAllergyDrawer
+            isOpen={isFoodAllergyOpen}
+            onClose={() => setIsFoodAllergyOpen(false)}
+            items={foodAllergies}
+            setItems={setFoodAllergies}
+          />
+
+          <OtherMedHistoryDrawer
+            isOpen={isOtherHistoryOpen}
+            onClose={() => setIsOtherHistoryOpen(false)}
+            items={otherHistory}
+            setItems={setOtherHistory}
+            title={otherHistoryTitle}
+            setTitle={setOtherHistoryTitle}
+          />
+
+          <TravelHistoryDrawer
+            isOpen={isTravelOpen}
+            onClose={() => setIsTravelOpen(false)}
+            items={travelHistory}
+            setItems={setTravelHistory}
           />
 
           <SymptomsCard
