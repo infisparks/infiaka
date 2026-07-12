@@ -65,12 +65,15 @@ interface MedicineItem {
 
 async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
   try {
-    if (!query || !query.trim()) {
-      const { data, error } = await supabase
+    const q = query?.trim() ?? "";
+
+    if (!q) {
+      // No query — return top 10 by name order
+      const { data } = await supabase
         .from("medicine")
         .select("name, salt_composition, short_composition1, type")
+        .order("name", { ascending: true })
         .limit(10);
-      if (error) throw error;
       return (data || []).map((m: any) => ({
         name: m.name ?? "",
         generic: m.salt_composition || m.short_composition1 || "",
@@ -78,17 +81,39 @@ async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
       }));
     }
 
-    const { data, error } = await supabase
+    // Priority 1: medicines whose NAME matches the query
+    const { data: nameData } = await supabase
       .from("medicine")
       .select("name, salt_composition, short_composition1, type")
-      .or(`name.ilike.%${query}%,salt_composition.ilike.%${query}%,short_composition1.ilike.%${query}%`)
-      .limit(20);
-    if (error) throw error;
-    return (data || []).map((m: any) => ({
+      .ilike("name", `%${q}%`)
+      .order("name", { ascending: true })
+      .limit(15);
+
+    // Priority 2: medicines whose COMPOSITION matches (but name doesn't)
+    const { data: compData } = await supabase
+      .from("medicine")
+      .select("name, salt_composition, short_composition1, type")
+      .or(`salt_composition.ilike.%${q}%,short_composition1.ilike.%${q}%`)
+      .not("name", "ilike", `%${q}%`)
+      .order("name", { ascending: true })
+      .limit(10);
+
+    const toItem = (m: any): MedicineItem => ({
       name: m.name ?? "",
       generic: m.salt_composition || m.short_composition1 || "",
       form: m.type?.toLowerCase() || "tablet"
-    }));
+    });
+
+    const nameMatches = (nameData || []).map(toItem);
+    const compMatches = (compData || []).map(toItem);
+
+    // Merge, deduplicate by name
+    const seen = new Set(nameMatches.map(m => m.name));
+    const merged = [
+      ...nameMatches,
+      ...compMatches.filter(m => !seen.has(m.name))
+    ];
+    return merged.slice(0, 20);
   } catch (err) {
     console.error("Error searching medicines:", err);
     return [];
@@ -566,26 +591,41 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                 </div>
 
                 {/* Col 1: Medicine Input */}
-                <div className="w-[27%] shrink-0 border-r border-[#E2E8F0] bg-white px-3 py-1.5 flex flex-col justify-between relative overflow-visible">
-                  <div className="flex items-center justify-between w-full h-7">
-                    <InlineMedicineAutoComplete
-                      value={med.name}
-                      onChange={(v) => patch(med.id, { name: v })}
-                      onSelect={async (m) => {
-                        patch(med.id, { name: m.name, generic: m.generic, form: m.form });
-                      }}
-                      placeholder="Medicine"
-                    />
+                <div className="w-[27%] shrink-0 border-r border-[#E2E8F0] bg-white px-2 py-1 flex flex-col justify-center relative overflow-visible gap-0.5">
+                  {/* Name row: autocomplete + form badge + pencil */}
+                  <div className="flex items-center gap-1 w-full h-6">
+                    <div className="flex-1 min-w-0">
+                      <InlineMedicineAutoComplete
+                        value={med.name}
+                        onChange={(v) => patch(med.id, { name: v })}
+                        onSelect={async (m) => {
+                          patch(med.id, { name: m.name, generic: m.generic, form: m.form });
+                        }}
+                        placeholder="Medicine"
+                      />
+                    </div>
                     {med.form && (
-                      <span className="text-[8.5px] text-[#A0AEC0] border border-slate-200 px-1 py-0.2 rounded font-extrabold select-none bg-slate-50 uppercase leading-none shrink-0 ml-1">
+                      <span className="text-[7.5px] text-[#A0AEC0] border border-slate-200 px-0.5 rounded font-extrabold select-none bg-slate-50 uppercase leading-none shrink-0">
                         {med.form}
+                      </span>
+                    )}
+                    {/* Pencil — always visible, inline right */}
+                    {editingGenericId !== med.id && (
+                      <span
+                        onClick={() => { setEditingGenericId(med.id); setEditingGenericVal(med.generic); }}
+                        className="shrink-0 cursor-pointer text-[#C0CADC] hover:text-indigo-500 transition-colors"
+                        title="Edit generic composition"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-2.5 h-2.5">
+                          <path d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125"/>
+                        </svg>
                       </span>
                     )}
                   </div>
 
-                  {/* Generic name display or inline edit */}
+                  {/* Generic name: show text or inline edit */}
                   {editingGenericId === med.id ? (
-                    <div className="flex items-center gap-1 mt-1">
+                    <div className="flex items-center gap-1">
                       <input
                         autoFocus
                         type="text"
@@ -601,54 +641,28 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                           }
                         }}
                         placeholder="Generic composition"
-                        className="flex-1 min-w-0 border border-indigo-300 rounded px-1.5 py-0.5 text-[10px] font-semibold text-[#334155] outline-none focus:ring-1 focus:ring-indigo-200 bg-white"
+                        className="flex-1 min-w-0 border border-indigo-300 rounded px-1.5 py-0.5 text-[9px] font-semibold text-[#334155] outline-none focus:ring-1 focus:ring-indigo-200 bg-white"
                       />
-                      <button
-                        type="button"
-                        onMouseDown={async () => {
-                          patch(med.id, { generic: editingGenericVal });
-                          await updateMedicineGenericName(med.name, editingGenericVal);
-                          setEditingGenericId(null);
-                        }}
-                        className="shrink-0 text-indigo-600 hover:text-indigo-800 transition-colors"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
+                      <button type="button" onMouseDown={async () => {
+                        patch(med.id, { generic: editingGenericVal });
+                        await updateMedicineGenericName(med.name, editingGenericVal);
+                        setEditingGenericId(null);
+                      }} className="shrink-0 text-indigo-600 hover:text-indigo-800">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-2.5 h-2.5">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
                         </svg>
                       </button>
-                      <button
-                        type="button"
-                        onMouseDown={() => setEditingGenericId(null)}
-                        className="shrink-0 text-slate-400 hover:text-slate-600 transition-colors"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
+                      <button type="button" onMouseDown={() => setEditingGenericId(null)} className="shrink-0 text-slate-400 hover:text-slate-600">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-2.5 h-2.5">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
                         </svg>
                       </button>
                     </div>
-                  ) : (
-                    <>
-                      {med.generic && (
-                        <div className="text-[8px] text-[#A0AEC0] font-semibold uppercase leading-tight select-all truncate max-w-[95%] mt-0.5">
-                          {med.generic}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1 w-full text-[#C0CADC] pt-0.5">
-                        <span
-                          onClick={() => { setEditingGenericId(med.id); setEditingGenericVal(med.generic); }}
-                          className="cursor-pointer hover:text-indigo-500 transition-colors leading-none"
-                          title="Edit generic composition"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
-                            <path d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125"/>
-                          </svg>
-                        </span>
-                        {!med.generic && (
-                          <span className="text-[8px] text-[#C0CADC] italic">add generic</span>
-                        )}
-                      </div>
-                    </>
-                  )}
+                  ) : med.generic ? (
+                    <div className="text-[8px] text-[#A0AEC0] font-semibold uppercase leading-none truncate max-w-full">
+                      {med.generic}
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Col 2: Dose */}
