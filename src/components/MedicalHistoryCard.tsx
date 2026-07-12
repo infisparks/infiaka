@@ -176,7 +176,10 @@ export default function MedicalHistoryCard({
       {/* Dynamic family history list rows */}
       {familyItems.length > 0 && (
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
-          <div className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none">
+          <div
+            onClick={onOpenFamily}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
+          >
             FAMILY HISTORY
           </div>
           
@@ -211,7 +214,7 @@ export default function MedicalHistoryCard({
                       </svg>
                     </div>
                   </div>
-                  <div>
+                  <div onClick={onOpenFamily} className="cursor-pointer hover:opacity-85">
                     <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{item.name}</p>
                     {details && <p className="text-[9.5px] text-[#8A95A5] font-semibold mt-0.5 leading-none">{details}</p>}
                   </div>
@@ -233,7 +236,10 @@ export default function MedicalHistoryCard({
       {/* Dynamic existing conditions list rows */}
       {conditions.length > 0 && (
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
-          <div className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none">
+          <div
+            onClick={onOpenConditions}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
+          >
             EXISTING CONDITIONS
           </div>
           
@@ -268,7 +274,7 @@ export default function MedicalHistoryCard({
                       </svg>
                     </div>
                   </div>
-                  <div>
+                  <div onClick={onOpenConditions} className="cursor-pointer hover:opacity-85">
                     <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{cond.name}</p>
                     {details && <p className="text-[9.5px] text-[#8A95A5] font-semibold mt-0.5 leading-none">{details}</p>}
                   </div>
@@ -288,7 +294,10 @@ export default function MedicalHistoryCard({
       )}      {/* Dynamic drug allergies list rows */}
       {allergies.length > 0 && (
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
-          <div className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none">
+          <div
+            onClick={onOpenAllergies}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
+          >
             DRUG ALLERGY
           </div>
           
@@ -323,7 +332,7 @@ export default function MedicalHistoryCard({
                       </svg>
                     </div>
                   </div>
-                  <div>
+                  <div onClick={onOpenAllergies} className="cursor-pointer hover:opacity-85">
                     <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{item.name}</p>
                     {details && <p className="text-[9.5px] text-[#8A95A5] font-semibold mt-0.5 leading-none">{details}</p>}
                   </div>
@@ -345,7 +354,10 @@ export default function MedicalHistoryCard({
       {/* Dynamic surgical procedures list rows */}
       {procedures.length > 0 && (
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
-          <div className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none">
+          <div
+            onClick={onOpenProcedures}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
+          >
             PAST SURGICAL PROCEDURES
           </div>
           
@@ -380,7 +392,7 @@ export default function MedicalHistoryCard({
                       </svg>
                     </div>
                   </div>
-                  <div>
+                  <div onClick={onOpenProcedures} className="cursor-pointer hover:opacity-85">
                     <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{proc.name}</p>
                     {details && <p className="text-[9.5px] text-[#8A95A5] font-semibold mt-0.5 leading-none">{details}</p>}
                   </div>
@@ -402,7 +414,10 @@ export default function MedicalHistoryCard({
       {/* Dynamic current medications list rows (matching screenshot layout) */}
       {currentMeds.length > 0 && (
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
-          <div className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none">
+          <div
+            onClick={onOpenCurrentMeds}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
+          >
             CURRENT MEDICATIONS
           </div>
           
@@ -440,7 +455,7 @@ export default function MedicalHistoryCard({
                       </svg>
                     </div>
                   </div>
-                  <div>
+                  <div onClick={onOpenCurrentMeds} className="cursor-pointer hover:opacity-85">
                     <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{med.name}</p>
                     {details && <p className="text-[9.5px] text-[#8A95A5] font-semibold mt-0.5 leading-none">{details}</p>}
                   </div>
@@ -462,7 +477,10 @@ export default function MedicalHistoryCard({
       {/* Dynamic lifestyle habits list rows */}
       {habits.length > 0 && (
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
-          <div className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none">
+          <div
+            onClick={onOpenHabits}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
+          >
             LIFESTYLE HABITS
           </div>
           <div className="flex flex-wrap gap-5 flex-1 min-w-0">
@@ -490,7 +508,7 @@ export default function MedicalHistoryCard({
                       </svg>
                     </div>
                   </div>
-                  <div>
+                  <div onClick={onOpenHabits} className="cursor-pointer hover:opacity-85">
                     <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{h.name}</p>
                     {details && <p className="text-[9.5px] text-[#8A95A5] font-semibold mt-0.5 leading-none">{details}</p>}
                   </div>
@@ -509,7 +527,10 @@ export default function MedicalHistoryCard({
       {/* Dynamic food allergy list rows */}
       {foodAllergies.length > 0 && (
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
-          <div className="bg-rose-50 text-rose-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none border border-rose-100">
+          <div
+            onClick={onOpenFoodAllergies}
+            className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none border border-rose-100 cursor-pointer transition-colors"
+          >
             FOOD/OTHER ALLERGY
           </div>
           <div className="flex flex-wrap gap-5 flex-1 min-w-0">
@@ -528,7 +549,7 @@ export default function MedicalHistoryCard({
                       <svg className="w-1.5 h-2 fill-current" viewBox="0 0 320 512"><path d="M27.66 224h264.7c24.6 0 36.89-29.78 19.54-47.12l-132.3-136.8c-5.406-5.406-12.47-8.107-19.53-8.107c-7.055 0-14.09 2.701-19.45 8.107L8.119 176.9C-9.229 194.2 3.055 224 27.66 224zM292.3 288H27.66c-24.6 0-36.89 29.77-19.54 47.12l132.5 136.8C145.9 477.3 152.1 480 160 480c7.053 0 14.12-2.703 19.53-8.109l132.3-136.8C329.2 317.8 316.9 288 292.3 288z"/></svg>
                     </div>
                   </div>
-                  <div>
+                  <div onClick={onOpenFoodAllergies} className="cursor-pointer hover:opacity-85">
                     <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{f.name}</p>
                     {f.since && <p className="text-[9.5px] text-[#8A95A5] font-semibold mt-0.5 leading-none">Since: {f.since}</p>}
                   </div>
@@ -544,10 +565,13 @@ export default function MedicalHistoryCard({
       {/* Dynamic other medical history list rows */}
       {otherHistory.length > 0 && (
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
-          <div className="bg-violet-50 text-violet-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none border border-violet-100">
+          <div
+            onClick={onOpenOtherHistory}
+            className="bg-violet-50 hover:bg-violet-100 text-violet-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none border border-violet-100 cursor-pointer transition-colors"
+          >
             {otherHistoryTitle || "OTHER MED. HISTORY"}
           </div>
-          <div className="flex flex-wrap gap-4 flex-1 min-w-0">
+          <div onClick={onOpenOtherHistory} className="flex flex-wrap gap-4 flex-1 min-w-0 cursor-pointer hover:opacity-85">
             {otherHistory.map((o) => (
               <div key={o.id} className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />
@@ -563,7 +587,10 @@ export default function MedicalHistoryCard({
       {/* Dynamic travel history list rows */}
       {travelHistory.length > 0 && (
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
-          <div className="bg-[#E0F2FE] text-[#0369A1] px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none border border-[#BAE6FD]">
+          <div
+            onClick={onOpenTravelHistory}
+            className="bg-[#E0F2FE] hover:bg-[#D0E7FC] text-[#0369A1] px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none border border-[#BAE6FD] cursor-pointer transition-colors"
+          >
             TRAVEL HISTORY
           </div>
           <div className="flex flex-wrap gap-5 flex-1 min-w-0">
@@ -592,7 +619,7 @@ export default function MedicalHistoryCard({
                       </svg>
                     </div>
                   </div>
-                  <div>
+                  <div onClick={onOpenTravelHistory} className="cursor-pointer hover:opacity-85">
                     <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{t.destination}</p>
                     {(t.travelDate || t.notes) && (
                       <p className="text-[9.5px] text-[#8A95A5] font-semibold mt-0.5 leading-none">
