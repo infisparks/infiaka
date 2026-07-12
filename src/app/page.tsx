@@ -199,6 +199,73 @@ function DashboardContent() {
 
   const [sessionLoaded, setSessionLoaded] = useState(false);
 
+  const loadPatientsFromDb = async () => {
+    try {
+      const { data: patientsData, error: pError } = await supabase
+        .from("patient_detail")
+        .select("*")
+        .order("patient_id", { ascending: false });
+
+      if (pError) throw pError;
+
+      const { data: regData, error: rError } = await supabase
+        .from("aka_opd_registration")
+        .select("*")
+        .order("registration_id", { ascending: false });
+
+      if (rError) throw rError;
+
+      const mapped: Patient[] = (patientsData || []).map((p, idx) => {
+        const latestReg = (regData || []).find(r => r.patient_uhid === p.uhid);
+        const billAmt = latestReg?.services 
+          ? latestReg.services.reduce((acc: number, s: any) => acc + (Number(s.fee) || 0), 0)
+          : 0;
+        const pMethod = latestReg?.payments && latestReg.payments[0]?.mode 
+          ? latestReg.payments[0].mode 
+          : "Cash";
+
+        return {
+          id: p.uhid,
+          queueNo: String(idx + 1).padStart(2, "0"),
+          title: p.title || "Mr",
+          name: p.name,
+          phoneDialCode: "+91",
+          phone: String(p.number || ""),
+          gender: p.gender || "Male",
+          age: p.age || 25,
+          ageUnit: p.age_unit || "Year",
+          dob: p.dob || "",
+          permanentAddress: p.address || "",
+          localAddress: p.local_address || "",
+          country: p.country || "India",
+          state: p.state || "Maharashtra",
+          statusTags: ["Ongoing"],
+          billAmount: billAmt,
+          paymentMethod: pMethod,
+          isAbhaCreated: false,
+          customTags: [],
+          isCompleted: false,
+          isOngoing: true,
+          arrivalTime: latestReg?.created_at 
+            ? new Date(latestReg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : new Date(p.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          arrivalMinutesAgo: 0,
+          vitals: {
+            bp: latestReg?.bp || "120/80",
+            pulse: latestReg?.pulse || "",
+            weight: latestReg?.weight || "",
+            spo2: latestReg?.spo2 || "98",
+            sugar: latestReg?.sugar || "100",
+          }
+        };
+      });
+
+      setPatients(mapped);
+    } catch (err) {
+      console.error("Failed to load patients:", err);
+    }
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
@@ -218,6 +285,12 @@ function DashboardContent() {
 
     return () => subscription.unsubscribe();
   }, [router]);
+
+  useEffect(() => {
+    if (sessionLoaded) {
+      loadPatientsFromDb();
+    }
+  }, [sessionLoaded]);
 
   const [patients, setPatients] = useState<Patient[]>(initialPatients);
 
@@ -877,7 +950,7 @@ function DashboardContent() {
   };
 
   // Master Form submit handler saving registration details
-  const handleRegisterAndBook = (e: React.FormEvent) => {
+  const handleRegisterAndBook = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName || !phone) return;
 
@@ -898,49 +971,80 @@ function DashboardContent() {
       }
     });
 
-    const isUpdate = !!selectedBookingPatient;
-    const nextQueueNo = String(patients.length + 1).padStart(2, "0");
+    try {
+      const isUpdate = !!selectedBookingPatient;
+      let targetUhid = "";
 
-    const finalPatient: Patient = {
-      id: isUpdate ? selectedBookingPatient!.id : Date.now().toString(),
-      queueNo: isUpdate ? selectedBookingPatient!.queueNo || nextQueueNo : nextQueueNo,
-      title,
-      name: fullName,
-      phoneDialCode,
-      phone,
-      gender,
-      age: Number(age) || 25,
-      ageUnit,
-      dob,
-      permanentAddress,
-      localAddress,
-      country,
-      state,
-      statusTags: isUpdate ? selectedBookingPatient!.statusTags : ["Ongoing", "New Patient"],
-      billAmount: totalServiceFees,
-      paymentMethod: paymentsRows[0]?.mode || "Cash",
-      isAbhaCreated: isUpdate ? selectedBookingPatient!.isAbhaCreated : false,
-      customTags: isUpdate ? selectedBookingPatient!.customTags : [],
-      isCompleted: false,
-      isOngoing: true,
-      arrivalTime: isUpdate ? (selectedBookingPatient!.arrivalTime || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })) : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      arrivalMinutesAgo: isUpdate ? (selectedBookingPatient!.arrivalMinutesAgo ?? 0) : 0,
-      vitals: {
-        bp: initialBp,
-        pulse: initialPulse,
-        weight: initialWeight,
-        spo2: initialSpo2,
-        sugar: initialSugar,
+      if (isUpdate) {
+        targetUhid = selectedBookingPatient!.id;
+        const { error: pError } = await supabase
+          .from("patient_detail")
+          .update({
+            name: fullName,
+            number: Number(phone) || null,
+            age: Number(age) || null,
+            gender: gender,
+            address: permanentAddress,
+            age_unit: ageUnit,
+            dob: dob || null,
+            title: title,
+            state: state,
+            local_address: localAddress,
+            country: country,
+            updated_at: new Date().toISOString()
+          })
+          .eq("uhid", targetUhid);
+        if (pError) throw pError;
+      } else {
+        const tempUhid = "TEMP-" + Date.now();
+        const { data: newP, error: pError } = await supabase
+          .from("patient_detail")
+          .insert({
+            name: fullName,
+            number: Number(phone) || null,
+            age: Number(age) || null,
+            gender: gender,
+            address: permanentAddress,
+            age_unit: ageUnit,
+            dob: dob || null,
+            title: title,
+            state: state,
+            local_address: localAddress,
+            country: country,
+            uhid: tempUhid
+          })
+          .select()
+          .single();
+        if (pError) throw pError;
+        targetUhid = newP.uhid;
       }
-    };
 
-    if (isUpdate) {
-      setPatients((prev) => prev.map((p) => (p.id === selectedBookingPatient!.id ? finalPatient : p)));
-    } else {
-      setPatients((prev) => [...prev, finalPatient]);
+      // Insert registration details
+      const { error: rError } = await supabase
+        .from("aka_opd_registration")
+        .insert({
+          patient_uhid: targetUhid,
+          appointment_date_time: appointmentDateTime || null,
+          clinic_name: clinicName,
+          treating_doctor: treatingDoctor,
+          visit_category: visitCategory,
+          referring_doctor: referringDoctor,
+          discount_amount: discountAmount || 0,
+          services: servicesRows,
+          payments: paymentsRows,
+          bp: initialBp,
+          pulse: initialPulse,
+          weight: initialWeight,
+          spo2: initialSpo2,
+          sugar: initialSugar
+        });
+      if (rError) throw rError;
+
+      await loadPatientsFromDb();
+      closeBooking();
+    } catch (err) {
+      console.error("Failed to save registration:", err);
     }
-
-    closeBooking();
   };
 
   // --- PRESCRIPTION INTERACTIVE ACTIONS LOGIC ---
