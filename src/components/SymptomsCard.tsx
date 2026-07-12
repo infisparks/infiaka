@@ -289,22 +289,21 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
     setSymptomOptions(await fetchOptions(1));
   };
 
-  const patch = async (id: string, diff: Partial<Symptom>) => {
+  const patch = (id: string, diff: Partial<Symptom>) => {
     setSymptoms((p) => p.map((s) => (s.id === id ? { ...s, ...diff } : s)));
-    
-    // If inline properties are changed, save their selections to Supabase
-    if (diff.name) {
-      await incrementOption(1, diff.name);
-      setSymptomOptions(await fetchOptions(1));
-    }
-    if (diff.duration) {
-      await incrementOption(2, diff.duration);
-      setDurationOptions(await fetchOptions(2));
-    }
-    if (diff.severity) {
-      await incrementOption(3, diff.severity);
-      setSeverityOptions(await fetchOptions(3));
-    }
+  };
+
+  const handleInputBlur = async (categoryId: number, value: string) => {
+    if (!value || !value.trim()) return;
+    await incrementOption(categoryId, value.trim());
+    refreshAllOptions();
+  };
+
+  const catIdOf = (field: string): number => {
+    if (field === "name") return 1;
+    if (field === "duration") return 2;
+    if (field === "severity") return 3;
+    return 1;
   };
 
   const remove = (id: string) => setSymptoms((p) => p.filter((s) => s.id !== id));
@@ -367,7 +366,14 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
       <div className="absolute left-0 top-full mt-0.5 z-40 w-full min-w-[120px] bg-white border border-[#E2E8F0] rounded-lg shadow-xl overflow-hidden max-h-44 overflow-y-auto">
         {list.map((opt, i) => (
           <div key={opt}
-            onMouseDown={() => { patch(id, { [field]: opt }); setFocusId(null); setFocusField(null); setRowHi(-1); }}
+            onMouseDown={async () => {
+              patch(id, { [field]: opt });
+              setFocusId(null);
+              setFocusField(null);
+              setRowHi(-1);
+              await incrementOption(catIdOf(field), opt);
+              refreshAllOptions();
+            }}
             className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
               ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
           >{opt}</div>
@@ -382,7 +388,14 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
     else if (e.key === "ArrowUp") { e.preventDefault(); setRowHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {
       e.preventDefault();
-      if (rowHi >= 0 && list[rowHi]) { patch(id, { [field]: list[rowHi] }); setFocusId(null); setFocusField(null); setRowHi(-1); }
+      if (rowHi >= 0 && list[rowHi]) {
+        const chosen = list[rowHi];
+        patch(id, { [field]: chosen });
+        setFocusId(null);
+        setFocusField(null);
+        setRowHi(-1);
+        incrementOption(catIdOf(field), chosen).then(() => refreshAllOptions());
+      }
     }
     else if (e.key === "Escape") { setFocusId(null); setFocusField(null); setRowHi(-1); }
   };
@@ -467,7 +480,11 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                   <input type="text" value={sym.name}
                     onChange={(e) => patch(sym.id, { name: e.target.value })}
                     onFocus={() => { setFocusId(sym.id); setFocusField("name"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
+                    onBlur={(e) => {
+                      const v = e.target.value;
+                      handleInputBlur(1, v);
+                      setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160);
+                    }}
                     onKeyDown={(e) => handleRowKey(e, sym.id, "name", symptomOptions, sym.name)}
                     placeholder="Symptom name"
                     className="w-full h-7 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] px-2 font-semibold text-[#1e293b] bg-white focus:outline-none placeholder:text-[#CBD5E0] transition-all"
@@ -480,7 +497,11 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                   <input type="text" value={sym.duration}
                     onChange={(e) => patch(sym.id, { duration: e.target.value })}
                     onFocus={() => { setFocusId(sym.id); setFocusField("duration"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
+                    onBlur={(e) => {
+                      const v = e.target.value;
+                      handleInputBlur(2, v);
+                      setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160);
+                    }}
                     onKeyDown={(e) => handleRowKey(e, sym.id, "duration", durationOptions, sym.duration)}
                     placeholder="Duration"
                     className="w-full h-7 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] px-2 font-semibold text-[#334155] bg-white focus:outline-none placeholder:text-[#CBD5E0] transition-all"
@@ -493,7 +514,11 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                   <input type="text" value={sym.severity}
                     onChange={(e) => patch(sym.id, { severity: e.target.value })}
                     onFocus={() => { setFocusId(sym.id); setFocusField("severity"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
+                    onBlur={(e) => {
+                      const v = e.target.value;
+                      handleInputBlur(3, v);
+                      setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160);
+                    }}
                     onKeyDown={(e) => handleRowKey(e, sym.id, "severity", severityOptions, sym.severity)}
                     placeholder="Severity"
                     className="w-full h-7 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] px-2 font-semibold text-[#334155] bg-white focus:outline-none placeholder:text-[#CBD5E0] transition-all"
