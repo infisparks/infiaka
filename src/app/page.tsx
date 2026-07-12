@@ -576,7 +576,7 @@ function DashboardContent() {
   const [treatingDoctor, setTreatingDoctor] = useState("DR. LAXMAN SALVE");
   const [visitCategory, setVisitCategory] = useState("First consultation");
   const [referringDoctor, setReferringDoctor] = useState("Dadar East");
-  const [discountAmount, setDiscountAmount] = useState(0);
+  const [discountAmount, setDiscountAmount] = useState<number | "">("");
 
   const [servicesRows, setServicesRows] = useState<Array<{ id: string; name: string; fee: number; qty?: number; type?: 'service' | 'product' }>>([
     { id: "1", name: "First consultation", fee: 2000, qty: 1, type: "service" }
@@ -1219,15 +1219,18 @@ function DashboardContent() {
   }, [paymentsRows]);
 
   const remainingAmount = useMemo(() => {
-    return totalServiceFees - discountAmount - totalPaid;
+    return totalServiceFees - (Number(discountAmount) || 0) - totalPaid;
   }, [totalServiceFees, discountAmount, totalPaid]);
 
   // Auto-fill primary payment amount on dynamic services total update
   useEffect(() => {
-    if (paymentsRows.length === 1 && paymentsRows[0].amount === 0) {
-      setPaymentsRows([{ ...paymentsRows[0], amount: Math.max(0, totalServiceFees - discountAmount) }]);
+    if (paymentsRows.length === 1) {
+      const expectedAmount = Math.max(0, totalServiceFees - (Number(discountAmount) || 0));
+      if (paymentsRows[0].amount !== expectedAmount) {
+        setPaymentsRows([{ ...paymentsRows[0], amount: expectedAmount }]);
+      }
     }
-  }, [totalServiceFees, discountAmount]);
+  }, [totalServiceFees, discountAmount, paymentsRows.length]);
 
   // Handlers for managing the patients in the main queue list
   const handleToggleCompleted = (patientId: string) => {
@@ -3319,14 +3322,14 @@ function DashboardContent() {
                         min="0"
                         value={discountAmount}
                         onWheel={(e) => e.currentTarget.blur()}
-                        onChange={(e) => setDiscountAmount(Number(e.target.value))}
+                        onChange={(e) => setDiscountAmount(e.target.value === "" ? "" : Number(e.target.value))}
                         className="w-full h-7 px-2 border border-[#CBD5E0] rounded text-[11px] bg-white text-right focus:outline-none"
                       />
                     </div>
                     <div className="space-y-0.5">
                       <label className="text-[9px] font-bold text-text-secondary uppercase">Total Fees (₹)</label>
                       <div className="w-full h-7 px-2 border border-[#E2E8F0] rounded text-[11px] bg-slate-100 flex items-center justify-end font-extrabold text-foreground select-text">
-                        ₹ {Math.max(0, totalServiceFees - discountAmount)}
+                        ₹ {Math.max(0, totalServiceFees - (Number(discountAmount) || 0))}
                       </div>
                     </div>
                   </div>
@@ -3398,7 +3401,7 @@ function DashboardContent() {
                   </div>
                   <div className="flex justify-between items-center text-text-secondary">
                     <span>Discount</span>
-                    <span className="font-bold text-foreground">₹{discountAmount.toFixed(2)}</span>
+                    <span className="font-bold text-foreground">₹{(Number(discountAmount) || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center text-text-secondary">
                     <span>Amount Paid</span>
