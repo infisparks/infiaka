@@ -144,7 +144,7 @@ function ChipTagField({
           className="flex-1 bg-transparent min-w-[100px] text-[11px] font-medium text-[#1e293b] focus:outline-none placeholder:text-[#C0CADC]"
         />
       </div>
-      {open && filtered.length > 0 && (
+      {open && (filtered.length > 0 || (search.trim() && !options.some(o => o.toLowerCase() === search.trim().toLowerCase()))) && (
         <div className="absolute left-0 top-full mt-1 z-[60] w-full bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-48 overflow-y-auto">
           {filtered.map((opt, i) => (
             <div key={opt}
@@ -456,6 +456,14 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
         setFocusField(null);
         setRowHi(-1);
         incrementOption(catIdOf(field), chosen).then(() => refreshAllOptions());
+      } else if (val.trim()) {
+        const custom = val.trim();
+        dropdownClicked.current = true;
+        patch(id, { [field]: custom });
+        setFocusId(null);
+        setFocusField(null);
+        setRowHi(-1);
+        incrementOption(catIdOf(field), custom).then(() => refreshAllOptions());
       }
     }
     else if (e.key === "Escape") { setFocusId(null); setFocusField(null); setRowHi(-1); }
