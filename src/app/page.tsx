@@ -27,6 +27,47 @@ import ProceduresCard, { ProcedureItem } from "@/components/ProceduresCard";
 import ReferToDoctorCard, { ReferralItem } from "@/components/ReferToDoctorCard";
 
 
+const getKolkataDateString = (offset = 0): string => {
+  const date = new Date();
+  if (offset !== 0) {
+    date.setDate(date.getDate() + offset);
+  }
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  return formatter.format(date);
+};
+
+const getTodayLabel = (): string => {
+  const date = new Date();
+  const day = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', day: 'numeric' }).format(date);
+  const month = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', month: 'short' }).format(date);
+  return `Tdy, ${day} ${month}`;
+};
+
+const getInitialAppointmentDateTime = (): string => {
+  const date = new Date();
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(date);
+  const yyyy = parts.find(p => p.type === 'year')?.value || '2026';
+  const mm = parts.find(p => p.type === 'month')?.value || '07';
+  const dd = parts.find(p => p.type === 'day')?.value || '12';
+  const hh = parts.find(p => p.type === 'hour')?.value || '12';
+  const min = parts.find(p => p.type === 'minute')?.value || '00';
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+};
+
 interface Patient {
   id: string;
   queueNo: string;
@@ -198,14 +239,16 @@ function DashboardContent() {
   const searchParams = useSearchParams();
 
   const [sessionLoaded, setSessionLoaded] = useState(false);
-  const [selectedDate, setSelectedDate] = useState("Tdy, 11 Jul");
+  const [selectedDate, setSelectedDate] = useState(() => getTodayLabel());
 
-  const loadPatientsFromDb = async (dateLabel: string = "Tdy, 11 Jul") => {
+  const loadPatientsFromDb = async (dateLabel: string = "Tdy, 12 Jul") => {
     try {
-      // 1. Determine target date string (e.g. '2026-07-11')
-      let targetDate = "2026-07-11";
+      // 1. Determine target date string (e.g. '2026-07-12')
+      let targetDate = getKolkataDateString(0);
       if (dateLabel === "Yesterday") {
-        targetDate = "2026-07-10";
+        targetDate = getKolkataDateString(-1);
+      } else if (dateLabel.startsWith("Tdy")) {
+        targetDate = getKolkataDateString(0);
       } else {
         const match = dateLabel.match(/(\d+)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
         if (match) {
@@ -215,14 +258,15 @@ function DashboardContent() {
           const monthIdx = months.findIndex(m => m.toLowerCase() === monthStr.toLowerCase());
           if (monthIdx !== -1) {
             const month = String(monthIdx + 1).padStart(2, "0");
-            targetDate = `2026-${month}-${day}`;
+            const currentYear = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', year: 'numeric' }).format(new Date());
+            targetDate = `${currentYear}-${month}-${day}`;
           }
         }
       }
 
-      // 2. Fetch registrations for that target date range
-      const startRange = `${targetDate}T00:00:00.000Z`;
-      const endRange = `${targetDate}T23:59:59.999Z`;
+      // 2. Fetch registrations for that target date range in India timezone (+05:30)
+      const startRange = `${targetDate}T00:00:00+05:30`;
+      const endRange = `${targetDate}T23:59:59+05:30`;
 
       const { data: regData, error: rError } = await supabase
         .from("aka_opd_registration")
@@ -232,6 +276,40 @@ function DashboardContent() {
         .order("registration_id", { ascending: false });
 
       if (rError) throw rError;
+
+      // Fetch all patient details for search autocomplete directory
+      const { data: allPatientsData, error: dirError } = await supabase
+        .from("patient_detail")
+        .select("*");
+      
+      if (!dirError && allPatientsData) {
+        const dir: Patient[] = allPatientsData.map((p) => ({
+          id: p.uhid,
+          queueNo: "",
+          title: p.title || "Mr",
+          name: p.name,
+          phoneDialCode: "+91",
+          phone: String(p.number || ""),
+          gender: p.gender || "Male",
+          age: p.age || 25,
+          ageUnit: p.age_unit || "Year",
+          dob: p.dob || "",
+          permanentAddress: p.address || "",
+          localAddress: p.local_address || "",
+          country: p.country || "India",
+          state: p.state || "Maharashtra",
+          statusTags: [],
+          billAmount: 0,
+          paymentMethod: "Cash",
+          isAbhaCreated: false,
+          customTags: [],
+          isCompleted: false,
+          isOngoing: false,
+          arrivalTime: "",
+          arrivalMinutesAgo: 0,
+        }));
+        setPatientDirectory(dir);
+      }
 
       if (!regData || regData.length === 0) {
         setPatients([]);
@@ -328,6 +406,7 @@ function DashboardContent() {
   }, [sessionLoaded, selectedDate]);
 
   const [patients, setPatients] = useState<Patient[]>(initialPatients);
+  const [patientDirectory, setPatientDirectory] = useState<Patient[]>([]);
 
   // --- VIEW TRANSITION CONTROLLERS (Synced with URL parameter ?rx=PATIENT_ID) ---
   const rxPatientId = searchParams.get("rx");
@@ -407,7 +486,7 @@ function DashboardContent() {
   const [state, setState] = useState("Maharashtra");
 
   // DB Map: public.visits
-  const [appointmentDateTime, setAppointmentDateTime] = useState("2026-07-11T19:48");
+  const [appointmentDateTime, setAppointmentDateTime] = useState(() => getInitialAppointmentDateTime());
   const [clinicName, setClinicName] = useState("DLPC - Dadar");
   const [treatingDoctor, setTreatingDoctor] = useState("DR. LAXMAN SALVE");
   const [visitCategory, setVisitCategory] = useState("First consultation");
@@ -454,10 +533,10 @@ function DashboardContent() {
   const bookingSearchResults = useMemo(() => {
     if (!bookingSearch.trim()) return [];
     const query = bookingSearch.toLowerCase();
-    return patients.filter(
+    return patientDirectory.filter(
       (p) => p.name.toLowerCase().includes(query) || p.phone.includes(query)
     );
-  }, [patients, bookingSearch]);
+  }, [patientDirectory, bookingSearch]);
 
   const [addressFocused, setAddressFocused] = useState(false);
   const [doctorFocused, setDoctorFocused] = useState(false);
@@ -1058,7 +1137,7 @@ function DashboardContent() {
         .from("aka_opd_registration")
         .insert({
           patient_uhid: targetUhid,
-          appointment_date_time: appointmentDateTime || null,
+          appointment_date_time: appointmentDateTime ? `${appointmentDateTime}:00+05:30` : null,
           clinic_name: clinicName,
           treating_doctor: treatingDoctor,
           visit_category: visitCategory,
@@ -1652,7 +1731,7 @@ function DashboardContent() {
                 {selectedDate}
               </span>
               <button
-                onClick={() => setSelectedDate("Tdy, 11 Jul")}
+                onClick={() => setSelectedDate(getTodayLabel())}
                 className="p-1 hover:bg-gray-100 rounded text-[#718096]"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -1662,7 +1741,7 @@ function DashboardContent() {
             </div>
 
             <button
-              onClick={() => setSelectedDate("Tdy, 11 Jul")}
+              onClick={() => setSelectedDate(getTodayLabel())}
               className="px-2 py-1 border border-[#E5E7EB] hover:bg-gray-50 rounded-md text-[11px] font-medium text-foreground bg-white"
             >
               Today
