@@ -95,16 +95,65 @@ export default function ExistingConditionsDrawer({
   };
   const onDragEnd = () => { dragIdx.current = null; };
 
+  /* dynamic relative to absolute date calculation */
+  const calculateSinceDate = (val: string): string => {
+    const match = val.trim().match(/^(\d+)\s*(day|week|month|year)s?$/i);
+    if (!match) return val;
+    const amount = parseInt(match[1], 10);
+    const unit = match[2].toLowerCase();
+    const target = new Date();
+    if (unit.startsWith("day")) {
+      target.setDate(target.getDate() - amount);
+    } else if (unit.startsWith("week")) {
+      target.setDate(target.getDate() - amount * 7);
+    } else if (unit.startsWith("month")) {
+      target.setMonth(target.getMonth() - amount);
+    } else if (unit.startsWith("year")) {
+      target.setFullYear(target.getFullYear() - amount);
+    }
+    const day = target.getDate();
+    const fullMonths = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+    return `${day} ${fullMonths[target.getMonth()]} ${target.getFullYear()}`;
+  };
+
+  const getSinceOptions = (val: string): string[] => {
+    const clean = val.trim();
+    if (!clean) {
+      return ["Since childhood", "1 Year", "2 Years", "3 Years", "5 Years", "10 Years"];
+    }
+    const match = clean.match(/^(\d+)/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      const isSingular = num === 1;
+      return [
+        `${num} ${isSingular ? "Day" : "Days"}`,
+        `${num} ${isSingular ? "Week" : "Weeks"}`,
+        `${num} ${isSingular ? "Month" : "Months"}`,
+        `${num} ${isSingular ? "Year" : "Years"}`
+      ];
+    }
+    return ["Since childhood", "1 Year", "2 Years", "3 Years", "5 Years", "10 Years"].filter((o) =>
+      o.toLowerCase().includes(clean.toLowerCase())
+    );
+  };
+
   /* inline suggestions list component */
   const InlineDD = ({ id, field, opts, val }: { id: string; field: string; opts: string[]; val: string }) => {
     if (focusId !== id || focusField !== field) return null;
-    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
+    const actualOpts = field === "since" ? getSinceOptions(val) : opts;
+    const list = actualOpts.filter((o) => field === "since" || !val || o.toLowerCase().includes(val.toLowerCase()));
     if (!list.length) return null;
     return (
       <div className="absolute left-0 top-full mt-0.5 z-40 w-full min-w-[125px] bg-white border border-[#E2E8F0] rounded-lg shadow-xl overflow-hidden max-h-44 overflow-y-auto text-left">
         {list.map((opt, i) => (
           <div key={opt}
-            onMouseDown={() => { patch(id, { [field]: opt }); setFocusId(null); setFocusField(null); setRowHi(-1); }}
+            onMouseDown={() => {
+              const finalVal = field === "since" ? calculateSinceDate(opt) : opt;
+              patch(id, { [field]: finalVal });
+              setFocusId(null);
+              setFocusField(null);
+              setRowHi(-1);
+            }}
             className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
               ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
           >{opt}</div>
@@ -114,12 +163,19 @@ export default function ExistingConditionsDrawer({
   };
 
   const handleRowKey = (e: React.KeyboardEvent, id: string, field: string, opts: string[], val: string) => {
-    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
+    const actualOpts = field === "since" ? getSinceOptions(val) : opts;
+    const list = actualOpts.filter((o) => field === "since" || !val || o.toLowerCase().includes(val.toLowerCase()));
     if (e.key === "ArrowDown") { e.preventDefault(); setRowHi((p) => Math.min(p + 1, list.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setRowHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {
       e.preventDefault();
-      if (rowHi >= 0 && list[rowHi]) { patch(id, { [field]: list[rowHi] }); setFocusId(null); setFocusField(null); setRowHi(-1); }
+      if (rowHi >= 0 && list[rowHi]) {
+        const finalVal = field === "since" ? calculateSinceDate(list[rowHi]) : list[rowHi];
+        patch(id, { [field]: finalVal });
+        setFocusId(null);
+        setFocusField(null);
+        setRowHi(-1);
+      }
     }
     else if (e.key === "Escape") { setFocusId(null); setFocusField(null); setRowHi(-1); }
   };

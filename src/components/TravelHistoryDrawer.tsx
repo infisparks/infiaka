@@ -40,6 +40,45 @@ interface TravelHistoryDrawerProps {
   setItems: React.Dispatch<React.SetStateAction<TravelHistoryItem[]>>;
 }
 
+/* ─── Helpers ────────────────────────────────────────────────────── */
+const convertToISODate = (displayDate: string) => {
+  if (!displayDate) return "";
+  try {
+    const cleaned = displayDate.replace(/'/g, " ");
+    const parts = cleaned.split(/\s+/).filter(Boolean);
+    if (parts.length < 3) return "";
+    const day = parts[0].padStart(2, "0");
+    const monthStr = parts[1];
+    let yearShort = parts[2];
+    if (yearShort.length === 2) {
+      yearShort = "20" + yearShort;
+    }
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthIdx = months.findIndex(m => monthStr.toLowerCase().startsWith(m.toLowerCase()));
+    if (monthIdx === -1) return "";
+    const month = String(monthIdx + 1).padStart(2, "0");
+    return `${yearShort}-${month}-${day}`;
+  } catch (e) {
+    return "";
+  }
+};
+
+const formatISODateToDisplay = (isoDate: string) => {
+  if (!isoDate) return "";
+  try {
+    const parts = isoDate.split("-");
+    if (parts.length < 3) return isoDate;
+    const year = parts[0].slice(2);
+    const monthIdx = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthStr = months[monthIdx] || "Jan";
+    return `${day} ${monthStr} ${year}`;
+  } catch (e) {
+    return isoDate;
+  }
+};
+
 export default function TravelHistoryDrawer({ isOpen, onClose, items, setItems }: TravelHistoryDrawerProps) {
   const [searchVal, setSearchVal] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -88,9 +127,61 @@ export default function TravelHistoryDrawer({ isOpen, onClose, items, setItems }
     dragIdx.current = null;
   };
 
+  /* dynamic relative to absolute date calculation */
+  const calculateSinceDate = (val: string): string => {
+    const match = val.trim().match(/^(\d+)\s*(day|week|month|year)s?$/i);
+    if (!match) return val;
+    const amount = parseInt(match[1], 10);
+    const unit = match[2].toLowerCase();
+    const target = new Date();
+    if (unit.startsWith("day")) {
+      target.setDate(target.getDate() - amount);
+    } else if (unit.startsWith("week")) {
+      target.setDate(target.getDate() - amount * 7);
+    } else if (unit.startsWith("month")) {
+      target.setMonth(target.getMonth() - amount);
+    } else if (unit.startsWith("year")) {
+      target.setFullYear(target.getFullYear() - amount);
+    }
+    const day = target.getDate();
+    const fullMonths = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+    return `${day} ${fullMonths[target.getMonth()]} ${target.getFullYear()}`;
+  };
+
+  const getSinceOptions = (val: string): string[] => {
+    const clean = val.trim();
+    if (!clean) {
+      return ["1 Week", "2 Weeks", "1 Month", "3 Months", "6 Months", "1 Year"];
+    }
+    const match = clean.match(/^(\d+)/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      const isSingular = num === 1;
+      return [
+        `${num} ${isSingular ? "Day" : "Days"}`,
+        `${num} ${isSingular ? "Week" : "Weeks"}`,
+        `${num} ${isSingular ? "Month" : "Months"}`,
+        `${num} ${isSingular ? "Year" : "Years"}`
+      ];
+    }
+    return ["1 Week", "2 Weeks", "1 Month", "3 Months", "6 Months", "1 Year"].filter((o) =>
+      o.toLowerCase().includes(clean.toLowerCase())
+    );
+  };
+
+  const SUGGESTED_SINCE = [
+    "1 Week",
+    "2 Weeks",
+    "1 Month",
+    "3 Months",
+    "6 Months",
+    "1 Year"
+  ];
+
   const InlineDD = ({ id, field, opts, val }: { id: string; field: string; opts: string[]; val: string }) => {
     if (focusId !== id || focusField !== field) return null;
-    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
+    const actualOpts = field === "travelDate" ? getSinceOptions(val) : opts;
+    const list = actualOpts.filter((o) => field === "travelDate" || !val || o.toLowerCase().includes(val.toLowerCase()));
     if (!list.length) return null;
     return (
       <div className="absolute left-0 top-full mt-0.5 z-40 w-full min-w-[140px] bg-white border border-[#E2E8F0] rounded-lg shadow-xl overflow-hidden max-h-44 overflow-y-auto text-left">
@@ -98,7 +189,8 @@ export default function TravelHistoryDrawer({ isOpen, onClose, items, setItems }
           <div
             key={opt}
             onMouseDown={() => {
-              patch(id, { [field]: opt });
+              const finalVal = field === "travelDate" ? calculateSinceDate(opt) : opt;
+              patch(id, { [field]: finalVal });
               setFocusId(null);
               setFocusField(null);
               setRowHi(-1);
@@ -115,19 +207,23 @@ export default function TravelHistoryDrawer({ isOpen, onClose, items, setItems }
   };
 
   const handleRowKey = (e: React.KeyboardEvent, id: string, field: string, opts: string[], val: string) => {
-    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
+    const actualOpts = field === "travelDate" ? getSinceOptions(val) : opts;
+    const list = actualOpts.filter((o) => field === "travelDate" || !val || o.toLowerCase().includes(val.toLowerCase()));
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setRowHi((p) => Math.min(p + 1, list.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setRowHi((p) => Math.max(p - 1, 0));
-    } else if (e.key === "Enter" && rowHi >= 0 && list[rowHi]) {
+    } else if (e.key === "Enter") {
       e.preventDefault();
-      patch(id, { [field]: list[rowHi] });
-      setFocusId(null);
-      setFocusField(null);
-      setRowHi(-1);
+      if (rowHi >= 0 && list[rowHi]) {
+        const finalVal = field === "travelDate" ? calculateSinceDate(list[rowHi]) : list[rowHi];
+        patch(id, { [field]: finalVal });
+        setFocusId(null);
+        setFocusField(null);
+        setRowHi(-1);
+      }
     } else if (e.key === "Escape") {
       setFocusId(null);
       setFocusField(null);
@@ -303,14 +399,47 @@ export default function TravelHistoryDrawer({ isOpen, onClose, items, setItems }
                       />
                       <InlineDD id={item.id} field="destination" opts={SUGGESTED_DESTINATIONS} val={item.destination} />
                     </div>
-                    <div className="relative w-[22%] shrink-0 border-r border-[#E2E8F0] flex items-center">
-                      {/* Date input picker styled nicely */}
+                    {/* Travel Date */}
+                    <div className="relative w-[22%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white overflow-visible">
                       <input
-                        type="date"
+                        type="text"
                         value={item.travelDate}
                         onChange={(e) => patch(item.id, { travelDate: e.target.value })}
-                        className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none"
+                        onFocus={() => {
+                          setFocusId(item.id);
+                          setFocusField("travelDate");
+                          setRowHi(-1);
+                        }}
+                        onBlur={() =>
+                          setTimeout(() => {
+                            setFocusId(null);
+                            setFocusField(null);
+                            setRowHi(-1);
+                          }, 160)
+                        }
+                        onKeyDown={(e) => handleRowKey(e, item.id, "travelDate", SUGGESTED_SINCE, item.travelDate)}
+                        placeholder="Travel Date"
+                        className="w-full h-full border-0 focus:ring-0 pl-3 pr-7 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                       />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center cursor-pointer text-slate-350 hover:text-slate-500 transition-colors z-10">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                          <line x1="16" y1="2" x2="16" y2="6"/>
+                          <line x1="8" y1="2" x2="8" y2="6"/>
+                          <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                        <input
+                          type="date"
+                          value={convertToISODate(item.travelDate)}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              patch(item.id, { travelDate: formatISODateToDisplay(e.target.value) });
+                            }
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                      </div>
+                      <InlineDD id={item.id} field="travelDate" opts={SUGGESTED_SINCE} val={item.travelDate} />
                     </div>
                     <div className="relative w-[22%] shrink-0 border-r border-[#E2E8F0] flex items-center">
                       <input
