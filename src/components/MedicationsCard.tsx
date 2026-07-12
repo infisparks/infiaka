@@ -348,6 +348,10 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
   const [searchHi, setSearchHi]               = useState(-1);
   const [medSuggestions, setMedSuggestions]   = useState<MedicineItem[]>([]);
 
+  /* inline generic name edit */
+  const [editingGenericId, setEditingGenericId] = useState<string | null>(null);
+  const [editingGenericVal, setEditingGenericVal] = useState("");
+
   useEffect(() => {
     let active = true;
     const fetchMeds = async () => {
@@ -546,7 +550,7 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
               onDragEnd={(e) => { onDragEnd(); e.currentTarget.setAttribute("draggable", "false"); }}
               className="group flex flex-col w-full text-left"
             >
-              <div className="flex items-stretch border border-[#E2E8F0] rounded-lg bg-white overflow-visible min-h-[58px]">
+              <div className="flex items-stretch border border-[#E2E8F0] rounded-lg bg-white overflow-visible min-h-[44px]">
                 
                 {/* drag handle */}
                 <div
@@ -578,41 +582,73 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                       </span>
                     )}
                   </div>
-                  {med.generic && (
-                    <div className="text-[8px] text-[#A0AEC0] font-semibold uppercase leading-tight select-all truncate max-w-[95%]">
-                      {med.generic}
+
+                  {/* Generic name display or inline edit */}
+                  {editingGenericId === med.id ? (
+                    <div className="flex items-center gap-1 mt-1">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={editingGenericVal}
+                        onChange={(e) => setEditingGenericVal(e.target.value)}
+                        onKeyDown={async (e) => {
+                          if (e.key === "Enter") {
+                            patch(med.id, { generic: editingGenericVal });
+                            await updateMedicineGenericName(med.name, editingGenericVal);
+                            setEditingGenericId(null);
+                          } else if (e.key === "Escape") {
+                            setEditingGenericId(null);
+                          }
+                        }}
+                        placeholder="Generic composition"
+                        className="flex-1 min-w-0 border border-indigo-300 rounded px-1.5 py-0.5 text-[10px] font-semibold text-[#334155] outline-none focus:ring-1 focus:ring-indigo-200 bg-white"
+                      />
+                      <button
+                        type="button"
+                        onMouseDown={async () => {
+                          patch(med.id, { generic: editingGenericVal });
+                          await updateMedicineGenericName(med.name, editingGenericVal);
+                          setEditingGenericId(null);
+                        }}
+                        className="shrink-0 text-indigo-600 hover:text-indigo-800 transition-colors"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onMouseDown={() => setEditingGenericId(null)}
+                        className="shrink-0 text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                      </button>
                     </div>
+                  ) : (
+                    <>
+                      {med.generic && (
+                        <div className="text-[8px] text-[#A0AEC0] font-semibold uppercase leading-tight select-all truncate max-w-[95%] mt-0.5">
+                          {med.generic}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1 w-full text-[#C0CADC] pt-0.5">
+                        <span
+                          onClick={() => { setEditingGenericId(med.id); setEditingGenericVal(med.generic); }}
+                          className="cursor-pointer hover:text-indigo-500 transition-colors leading-none"
+                          title="Edit generic composition"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
+                            <path d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125"/>
+                          </svg>
+                        </span>
+                        {!med.generic && (
+                          <span className="text-[8px] text-[#C0CADC] italic">add generic</span>
+                        )}
+                      </div>
+                    </>
                   )}
-                  <div className="flex items-center justify-between w-full text-[#A0AEC0] pt-1">
-                    <span 
-                      onClick={async () => {
-                        const newGen = prompt("Edit Generic Composition for " + med.name, med.generic);
-                        if (newGen !== null) {
-                          patch(med.id, { generic: newGen });
-                          await updateMedicineGenericName(med.name, newGen);
-                        }
-                      }}
-                      className="cursor-pointer hover:text-[#4A5568] transition-colors leading-none"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
-                        <path d="M12 4.5v15m7.5-7.5h-15"/>
-                      </svg>
-                    </span>
-                    <span 
-                      onClick={async () => {
-                        const newGen = prompt("Edit Generic Composition for " + med.name, med.generic);
-                        if (newGen !== null) {
-                          patch(med.id, { generic: newGen });
-                          await updateMedicineGenericName(med.name, newGen);
-                        }
-                      }}
-                      className="cursor-pointer hover:text-[#4A5568] transition-colors leading-none"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
-                        <path d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125"/>
-                      </svg>
-                    </span>
-                  </div>
                 </div>
 
                 {/* Col 2: Dose */}

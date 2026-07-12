@@ -131,16 +131,19 @@ body {
 .primereact-autocomplete-inline,
 .primereact-autocomplete-inline .p-autocomplete {
   width: 100% !important;
-  height: 100% !important;
+  height: 28px !important;
+  max-height: 28px !important;
   display: flex !important;
   align-items: center !important;
 }
 
 .primereact-autocomplete-inline input.p-autocomplete-input {
-  height: 100% !important;
+  height: 28px !important;
+  max-height: 28px !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
   min-height: unset !important;
   box-shadow: none !important;
+  font-size: 11px !important;
 }
 
