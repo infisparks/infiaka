@@ -47,3 +47,82 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #9CA3AF;
 }
+
+/* ─── PrimeReact Autocomplete Executive Styling Overrides ─── */
+.p-autocomplete-panel {
+  background: #ffffff !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  padding: 4px 0 !important;
+  z-index: 9999 !important;
+}
+
+.p-autocomplete-items {
+  padding: 0 !important;
+  margin: 0 !important;
+  list-style: none !important;
+}
+
+.p-autocomplete-item {
+  padding: 6px 12px !important;
+  color: #334155 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: background-color 0.15s ease !important;
+}
+
+.p-autocomplete-item:hover,
+.p-autocomplete-item.p-highlight {
+  background-color: #EFF6FF !important;
+  color: #1D4ED8 !important;
+}
+
+/* Custom styles for PrimeReact Chip Tags inside inputs */
+.p-autocomplete-multiple-container {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  padding: 4px !important;
+  border: 0 !important;
+  background: transparent !important;
+  width: 100% !important;
+}
+
+.p-autocomplete-token {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  background-color: #EFF6FF !important;
+  color: #1D4ED8 !important;
+  border: 1px solid #BFDBFE !important;
+  padding: 2px 8px !important;
+  border-radius: 6px !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+}
+
+.p-autocomplete-token-icon {
+  font-size: 9px !important;
+  color: #60A5FA !important;
+  cursor: pointer !important;
+  transition: color 0.15s ease !important;
+  margin-left: 4px !important;
+}
+
+.p-autocomplete-token-icon:hover {
+  color: #EF4444 !important;
+}
+
+.p-autocomplete-input-token {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.p-autocomplete-input-token input {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #1E293B !important;
+  padding: 4px !important;
+}

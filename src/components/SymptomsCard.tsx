@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { AutoComplete } from "primereact/autocomplete";
 
 /* ─── Helpers ─────────────────────────────────────────────────── */
 const severityColor = (s: string) => {
@@ -92,89 +93,67 @@ function ChipTagField({
   selected: string[];
   onToggle: (v: string) => void;
 }) {
-  const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(false);
-  const [hi, setHi] = useState(-1);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
-  const filtered = options.filter(
-    (o) => !search || o.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!open) { setOpen(true); return; }
-    if (e.key === "ArrowDown") { e.preventDefault(); setHi((p) => Math.min(p + 1, filtered.length - 1)); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); setHi((p) => Math.max(p - 1, 0)); }
-    else if (e.key === "Enter") {
-      e.preventDefault();
-      if (hi >= 0 && filtered[hi]) {
-        onToggle(filtered[hi]);
-        setSearch("");
-        setHi(-1);
-      } else if (search.trim()) {
-        onToggle(search.trim());
-        setSearch("");
-        setHi(-1);
-      }
+  const search = (event: { query: string }) => {
+    const query = event.query.trim();
+    let results = options.filter((o) =>
+      o.toLowerCase().includes(query.toLowerCase())
+    );
+    if (query && !options.some((o) => o.toLowerCase() === query.toLowerCase())) {
+      results = [...results, `+ Create "${query}"`];
     }
-    else if (e.key === "Escape") { setOpen(false); setHi(-1); }
+    setSuggestions(results);
+  };
+
+  const handleChange = (e: { value: string[] }) => {
+    if (!e.value) return;
+    const lastItem = e.value[e.value.length - 1];
+    if (lastItem && lastItem.startsWith('+ Create "')) {
+      const match = lastItem.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : lastItem;
+      if (!selected.includes(custom)) {
+        onToggle(custom);
+      }
+    } else {
+      const added = e.value.find((x) => !selected.includes(x));
+      const removed = selected.find((x) => !e.value.includes(x));
+      if (added) onToggle(added);
+      if (removed) onToggle(removed);
+    }
+  };
+
+  const itemTemplate = (item: string) => {
+    if (item.startsWith('+ Create "')) {
+      const match = item.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : item;
+      return (
+        <span className="text-blue-600 font-bold flex items-center gap-1">
+          <span>+ Create</span>
+          <span className="italic">"{custom}"</span>
+        </span>
+      );
+    }
+    return <span>{item}</span>;
   };
 
   return (
-    <div className="space-y-1 relative">
+    <div className="space-y-1 relative primereact-autocomplete-custom">
       <label className="block text-[11px] font-semibold text-[#64748B]">{label}</label>
-      <div
-        className="border border-[#E2E8F0] focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100 rounded-lg px-2 py-1.5 flex flex-wrap gap-1.5 bg-white min-h-[36px] transition-all cursor-text"
-        onClick={() => { setOpen(true); }}
-      >
-        {selected.map((v) => (
-          <span key={v} className="inline-flex items-center gap-1 bg-[#EFF6FF] text-blue-700 border border-blue-200 text-[10px] font-semibold px-2 py-0.5 rounded-md">
-            {v}
-            <button type="button" onMouseDown={(e) => { e.stopPropagation(); onToggle(v); }}
-              className="text-blue-400 hover:text-red-500 font-bold leading-none text-[12px]">×</button>
-          </span>
-        ))}
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setHi(-1); setOpen(true); }}
-          onFocus={() => { setOpen(true); setHi(-1); }}
-          onBlur={() => setTimeout(() => { setOpen(false); setHi(-1); }, 160)}
-          onKeyDown={handleKey}
+      <div className="border border-[#E2E8F0] focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100 rounded-lg bg-white min-h-[36px] transition-all cursor-text flex items-center">
+        <AutoComplete
+          value={selected}
+          suggestions={suggestions}
+          completeMethod={search}
+          onChange={handleChange}
+          multiple
+          itemTemplate={itemTemplate}
           placeholder={selected.length === 0 ? label : ""}
-          className="flex-1 bg-transparent min-w-[100px] text-[11px] font-medium text-[#1e293b] focus:outline-none placeholder:text-[#C0CADC]"
+          inputClassName="w-full text-[11px] font-semibold text-[#1e293b] focus:outline-none placeholder:text-[#C0CADC] bg-transparent border-0 shadow-none p-1.5 focus:ring-0"
+          className="w-full"
+          panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
         />
       </div>
-      {open && (filtered.length > 0 || (search.trim() && !options.some(o => o.toLowerCase() === search.trim().toLowerCase()))) && (
-        <div className="absolute left-0 top-full mt-1 z-[60] w-full bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-48 overflow-y-auto">
-          {filtered.map((opt, i) => (
-            <div key={opt}
-              onMouseDown={() => { onToggle(opt); setSearch(""); setHi(-1); }}
-              className={`px-3 py-2 text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 flex items-center justify-between transition-colors
-                ${i === hi ? "bg-blue-50 text-blue-700" : selected.includes(opt) ? "bg-purple-50 text-purple-700" : "hover:bg-[#F8FAFC] text-[#334155]"}`}
-            >
-              {opt}
-              {selected.includes(opt) && (
-                <svg className="w-3.5 h-3.5 fill-current shrink-0 text-blue-600" viewBox="0 0 20 20">
-                  <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-                </svg>
-              )}
-            </div>
-          ))}
-          {search.trim() && !options.some(o => o.toLowerCase() === search.trim().toLowerCase()) && (
-            <div
-              onMouseDown={() => {
-                onToggle(search.trim());
-                setSearch("");
-                setHi(-1);
-              }}
-              className="px-3 py-2 text-[11px] font-bold text-blue-600 hover:bg-blue-50 border-t border-[#F8FAFC] cursor-pointer flex items-center gap-1.5"
-            >
-              <span>+ Create</span>
-              <span className="italic">"{search.trim()}"</span>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -197,105 +176,180 @@ function AutoInput({
   clearable?: boolean;
   onBlur?: (v: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [hi, setHi] = useState(-1);
-  const localDropdownClicked = useRef(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const dropdownClicked = useRef(false);
 
-  const filtered = options.filter((o) => {
-    if (!value || options.some(opt => opt === value)) return true;
-    return o.toLowerCase().includes(value.toLowerCase());
-  });
-
-  const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!open) { setOpen(true); return; }
-    if (e.key === "ArrowDown") { e.preventDefault(); setHi((p) => Math.min(p + 1, filtered.length - 1)); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); setHi((p) => Math.max(p - 1, 0)); }
-    else if (e.key === "Enter") {
-      e.preventDefault();
-      if (hi >= 0 && filtered[hi]) {
-        localDropdownClicked.current = true;
-        onChange(filtered[hi]);
-        if (onBlur) onBlur(filtered[hi]);
-        setHi(-1);
-        setOpen(false);
-      } else if (value.trim()) {
-        localDropdownClicked.current = true;
-        onChange(value.trim());
-        if (onBlur) onBlur(value.trim());
-        setHi(-1);
-        setOpen(false);
-      }
+  const search = (event: { query: string }) => {
+    const query = event.query.trim();
+    let results = options.filter((o) =>
+      o.toLowerCase().includes(query.toLowerCase())
+    );
+    if (!query || options.some(opt => opt === query)) {
+      results = options;
     }
-    else if (e.key === "Escape") { setOpen(false); setHi(-1); }
+    if (query && !options.some((o) => o.toLowerCase() === query.toLowerCase())) {
+      results = [...results, `+ Create "${query}"`];
+    }
+    setSuggestions(results);
+  };
+
+  const handleSelect = (e: { value: string }) => {
+    const val = e.value;
+    dropdownClicked.current = true;
+    if (val.startsWith('+ Create "')) {
+      const match = val.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : val;
+      onChange(custom);
+      if (onBlur) onBlur(custom);
+    } else {
+      onChange(val);
+      if (onBlur) onBlur(val);
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const val = e.target.value.trim();
+    setTimeout(() => {
+      if (dropdownClicked.current) {
+        dropdownClicked.current = false;
+        return;
+      }
+      onChange(val);
+      if (onBlur) onBlur(val);
+    }, 180);
+  };
+
+  const itemTemplate = (item: string) => {
+    if (item.startsWith('+ Create "')) {
+      const match = item.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : item;
+      return (
+        <span className="text-blue-600 font-bold flex items-center gap-1 text-[11px]">
+          <span>+ Create</span>
+          <span className="italic">"{custom}"</span>
+        </span>
+      );
+    }
+    return <span className="text-[11px] font-semibold text-[#334155]">{item}</span>;
   };
 
   return (
-    <div className="space-y-1 relative">
+    <div className="space-y-1 relative primereact-autocomplete-custom">
       <label className="block text-[11px] font-semibold text-[#64748B]">{label}</label>
       <div className="relative">
-        <input
-          type="text"
+        <AutoComplete
           value={value}
-          onChange={(e) => { onChange(e.target.value); setHi(-1); setOpen(true); }}
-          onFocus={() => { setOpen(true); setHi(-1); }}
-          onBlur={(e) => {
-            const val = e.target.value;
-            setTimeout(() => {
-              if (localDropdownClicked.current) {
-                localDropdownClicked.current = false;
-                return;
-              }
-              if (onBlur) onBlur(val);
-              setOpen(false);
-              setHi(-1);
-            }, 180);
-          }}
-          onKeyDown={handleKey}
+          suggestions={suggestions}
+          completeMethod={search}
+          onChange={(e) => onChange(e.value)}
+          onSelect={handleSelect}
+          onBlur={handleBlur}
+          itemTemplate={itemTemplate}
           placeholder={placeholder ?? label}
-          className="w-full h-9 px-3 pr-8 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-white focus:outline-none font-semibold text-[#334155] placeholder:text-[#C0CADC] transition-all"
+          inputClassName="w-full h-9 px-3 pr-8 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-white focus:outline-none font-semibold text-[#334155] placeholder:text-[#C0CADC] transition-all"
+          className="w-full"
+          panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
         />
         {clearable && value && (
           <button type="button" onMouseDown={() => onChange("")}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#475569]">
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#475569] z-10">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="10"/>
               <path strokeLinecap="round" d="M15 9l-6 6M9 9l6 6"/>
             </svg>
           </button>
         )}
-        {open && (filtered.length > 0 || (value.trim() && !options.some(o => o.toLowerCase() === value.trim().toLowerCase()))) && (
-          <div className="absolute left-0 top-full mt-1 z-[60] w-full bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-44 overflow-y-auto">
-            {filtered.map((opt, i) => (
-              <div key={opt}
-                onMouseDown={() => {
-                  localDropdownClicked.current = true;
-                  onChange(opt);
-                  if (onBlur) onBlur(opt);
-                  setOpen(false);
-                  setHi(-1);
-                }}
-                className={`px-3 py-2 text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
-                  ${i === hi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F8FAFC] text-[#334155]"}`}
-              >{opt}</div>
-            ))}
-            {value.trim() && !options.some(o => o.toLowerCase() === value.trim().toLowerCase()) && (
-              <div
-                onMouseDown={() => {
-                  localDropdownClicked.current = true;
-                  onChange(value.trim());
-                  if (onBlur) onBlur(value.trim());
-                  setOpen(false);
-                  setHi(-1);
-                }}
-                className="px-3 py-2 text-[11px] font-bold text-blue-600 hover:bg-blue-50 border-t border-[#F8FAFC] cursor-pointer flex items-center gap-1.5"
-              >
-                <span>+ Create</span>
-                <span className="italic">"{value.trim()}"</span>
-              </div>
-            )}
-          </div>
-        )}
       </div>
+    </div>
+  );
+}
+
+/* ─── Reusable autocomplete inline input ───────────────────────── */
+function InlineAutoComplete({
+  value,
+  onChange,
+  onBlur,
+  options,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onBlur: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+}) {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const dropdownClicked = useRef(false);
+
+  const search = (event: { query: string }) => {
+    const query = event.query.trim();
+    let results = options.filter((o) =>
+      o.toLowerCase().includes(query.toLowerCase())
+    );
+    if (!query || options.some(opt => opt === query)) {
+      results = options;
+    }
+    if (query && !options.some((o) => o.toLowerCase() === query.toLowerCase())) {
+      results = [...results, `+ Create "${query}"`];
+    }
+    setSuggestions(results);
+  };
+
+  const handleSelect = (e: { value: string }) => {
+    const val = e.value;
+    dropdownClicked.current = true;
+    if (val.startsWith('+ Create "')) {
+      const match = val.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : val;
+      onChange(custom);
+      onBlur(custom);
+    } else {
+      onChange(val);
+      onBlur(val);
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const val = e.target.value.trim();
+    setTimeout(() => {
+      if (dropdownClicked.current) {
+        dropdownClicked.current = false;
+        return;
+      }
+      onChange(val);
+      onBlur(val);
+    }, 180);
+  };
+
+  const itemTemplate = (item: string) => {
+    if (item.startsWith('+ Create "')) {
+      const match = item.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : item;
+      return (
+        <span className="text-blue-600 font-bold flex items-center gap-1 text-[11px]">
+          <span>+ Create</span>
+          <span className="italic">"{custom}"</span>
+        </span>
+      );
+    }
+    return <span className="text-[11px] font-semibold text-[#334155]">{item}</span>;
+  };
+
+  return (
+    <div className="w-full relative primereact-autocomplete-custom">
+      <AutoComplete
+        value={value}
+        suggestions={suggestions}
+        completeMethod={search}
+        onChange={(e) => onChange(e.value)}
+        onSelect={handleSelect}
+        onBlur={handleBlur}
+        itemTemplate={itemTemplate}
+        placeholder={placeholder}
+        inputClassName="w-full h-7 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] px-2 font-semibold text-[#334155] bg-white focus:outline-none placeholder:text-[#CBD5E0] transition-all"
+        className="w-full"
+        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+      />
     </div>
   );
 }
@@ -333,10 +387,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchHi, setSearchHi] = useState(-1);
 
-  /* inline row highlight */
-  const [focusId, setFocusId] = useState<string | null>(null);
-  const [focusField, setFocusField] = useState<string | null>(null);
-  const [rowHi, setRowHi] = useState(-1);  // highlight index for inline DD
+
 
   /* drag */
   const dragIdx = useRef<number | null>(null);
@@ -425,84 +476,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
 
   const activeSym = symptoms.find((s) => s.id === modalId);
 
-  /* ─── inline dropdown w/ keyboard nav ─── */
-  const InlineDD = ({ id, field, opts, val }: { id: string; field: string; opts: string[]; val: string }) => {
-    if (focusId !== id || focusField !== field) return null;
-    
-    // Show all options if val matches the saved database value in state (not edited yet)
-    const activeSymptom = symptoms.find(s => s.id === id);
-    const originalVal = activeSymptom ? (activeSymptom[field as keyof Symptom] as string) : "";
-    const list = opts.filter((o) => {
-      if (!val || val === originalVal) return true;
-      return o.toLowerCase().includes(val.toLowerCase());
-    });
-    
-    const hasCustomVal = val.trim() && !opts.some(o => o.toLowerCase() === val.trim().toLowerCase());
-    if (list.length === 0 && !hasCustomVal) return null;
-    return (
-      <div className="absolute left-0 top-full mt-0.5 z-40 w-full min-w-[120px] bg-white border border-[#E2E8F0] rounded-lg shadow-xl overflow-hidden max-h-44 overflow-y-auto">
-        {list.map((opt, i) => (
-          <div key={opt}
-            onMouseDown={async () => {
-              dropdownClicked.current = true;
-              patch(id, { [field]: opt });
-              setFocusId(null);
-              setFocusField(null);
-              setRowHi(-1);
-              await incrementOption(catIdOf(field), opt);
-              refreshAllOptions();
-            }}
-            className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
-              ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
-          >{opt}</div>
-        ))}
-        {hasCustomVal && (
-          <div
-            onMouseDown={async () => {
-              dropdownClicked.current = true;
-              patch(id, { [field]: val.trim() });
-              setFocusId(null);
-              setFocusField(null);
-              setRowHi(-1);
-              await incrementOption(catIdOf(field), val.trim());
-              refreshAllOptions();
-            }}
-            className="px-3 py-2 text-[11px] font-bold text-blue-600 hover:bg-blue-50 border-t border-[#F8FAFC] cursor-pointer flex items-center gap-1.5"
-          >
-            <span>+ Create</span>
-            <span className="italic">"{val.trim()}"</span>
-          </div>
-        )}
-      </div>
-    );
-  };
 
-  const handleRowKey = (e: React.KeyboardEvent, id: string, field: string, opts: string[], val: string) => {
-    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
-    if (e.key === "ArrowDown") { e.preventDefault(); setRowHi((p) => Math.min(p + 1, list.length - 1)); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); setRowHi((p) => Math.max(p - 1, 0)); }
-    else if (e.key === "Enter") {
-      e.preventDefault();
-      if (rowHi >= 0 && list[rowHi]) {
-        const chosen = list[rowHi];
-        dropdownClicked.current = true;
-        patch(id, { [field]: chosen });
-        setFocusId(null);
-        setFocusField(null);
-        setRowHi(-1);
-        incrementOption(catIdOf(field), chosen).then(() => refreshAllOptions());
-      } else if (val.trim()) {
-        const custom = val.trim();
-        dropdownClicked.current = true;
-        patch(id, { [field]: custom });
-        setFocusId(null);
-        setFocusField(null);
-        setRowHi(-1);
-        incrementOption(catIdOf(field), custom).then(() => refreshAllOptions());
-      }
-    }
-    else if (e.key === "Escape") { setFocusId(null); setFocusField(null); setRowHi(-1); }
-  };
 
   /* search bar keyboard nav */
   const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -581,80 +555,35 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
 
                 {/* name */}
                 <div className="relative w-[26%] shrink-0">
-                  <input type="text" value={sym.name}
-                    onChange={(e) => patch(sym.id, { name: e.target.value })}
-                    onFocus={() => { setFocusId(sym.id); setFocusField("name"); setRowHi(-1); }}
-                    onBlur={(e) => {
-                      const v = e.target.value;
-                      handleInputBlur(1, v);
-                      setTimeout(() => {
-                        setFocusField((curr) => {
-                          if (curr === "name") {
-                            setFocusId(null);
-                            setRowHi(-1);
-                            return null;
-                          }
-                          return curr;
-                        });
-                      }, 160);
-                    }}
-                    onKeyDown={(e) => handleRowKey(e, sym.id, "name", symptomOptions, sym.name)}
+                  <InlineAutoComplete
+                    value={sym.name}
+                    onChange={(v) => patch(sym.id, { name: v })}
+                    onBlur={(v) => handleInputBlur(1, v)}
+                    options={symptomOptions}
                     placeholder="Symptom name"
-                    className="w-full h-7 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] px-2 font-semibold text-[#1e293b] bg-white focus:outline-none placeholder:text-[#CBD5E0] transition-all"
                   />
-                  <InlineDD id={sym.id} field="name" opts={symptomOptions} val={sym.name} />
                 </div>
 
                 {/* duration */}
                 <div className="relative flex-1">
-                  <input type="text" value={sym.duration}
-                    onChange={(e) => patch(sym.id, { duration: e.target.value })}
-                    onFocus={() => { setFocusId(sym.id); setFocusField("duration"); setRowHi(-1); }}
-                    onBlur={(e) => {
-                      const v = e.target.value;
-                      handleInputBlur(2, v);
-                      setTimeout(() => {
-                        setFocusField((curr) => {
-                          if (curr === "duration") {
-                            setFocusId(null);
-                            setRowHi(-1);
-                            return null;
-                          }
-                          return curr;
-                        });
-                      }, 160);
-                    }}
-                    onKeyDown={(e) => handleRowKey(e, sym.id, "duration", durationOptions, sym.duration)}
+                  <InlineAutoComplete
+                    value={sym.duration}
+                    onChange={(v) => patch(sym.id, { duration: v })}
+                    onBlur={(v) => handleInputBlur(2, v)}
+                    options={durationOptions}
                     placeholder="Duration"
-                    className="w-full h-7 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] px-2 font-semibold text-[#334155] bg-white focus:outline-none placeholder:text-[#CBD5E0] transition-all"
                   />
-                  <InlineDD id={sym.id} field="duration" opts={durationOptions} val={sym.duration} />
                 </div>
 
                 {/* severity */}
                 <div className="relative flex-1">
-                  <input type="text" value={sym.severity}
-                    onChange={(e) => patch(sym.id, { severity: e.target.value })}
-                    onFocus={() => { setFocusId(sym.id); setFocusField("severity"); setRowHi(-1); }}
-                    onBlur={(e) => {
-                      const v = e.target.value;
-                      handleInputBlur(3, v);
-                      setTimeout(() => {
-                        setFocusField((curr) => {
-                          if (curr === "severity") {
-                            setFocusId(null);
-                            setRowHi(-1);
-                            return null;
-                          }
-                          return curr;
-                        });
-                      }, 160);
-                    }}
-                    onKeyDown={(e) => handleRowKey(e, sym.id, "severity", severityOptions, sym.severity)}
+                  <InlineAutoComplete
+                    value={sym.severity}
+                    onChange={(v) => patch(sym.id, { severity: v })}
+                    onBlur={(v) => handleInputBlur(3, v)}
+                    options={severityOptions}
                     placeholder="Severity"
-                    className="w-full h-7 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] px-2 font-semibold text-[#334155] bg-white focus:outline-none placeholder:text-[#CBD5E0] transition-all"
                   />
-                  <InlineDD id={sym.id} field="severity" opts={severityOptions} val={sym.severity} />
                 </div>
 
                 {/* saved details */}
