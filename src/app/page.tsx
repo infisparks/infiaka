@@ -498,11 +498,13 @@ function DashboardContent() {
   };
 
   // URL State Synchronizer for Right Sidebar (Add OPD Registration)
-  const isBookOpen = searchParams.get("book") === "true";
+  const bookParam = searchParams.get("book");
+  const isBookOpen = !!bookParam;
 
-  const openBooking = () => {
+  const openBooking = (patientId?: string | React.MouseEvent) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("book", "true");
+    const val = typeof patientId === "string" ? patientId : "true";
+    params.set("book", val);
     router.replace(`${pathname}?${params.toString()}`);
   };
 
@@ -884,6 +886,16 @@ function DashboardContent() {
     }
   }, [selectedBookingPatient]);
 
+  // Keep Edit Patient loaded in drawer if page is refreshed while editing (ID is in book param)
+  useEffect(() => {
+    if (bookParam && bookParam !== "true" && patientDirectory.length > 0) {
+      const matched = patientDirectory.find((p) => String(p.id) === bookParam);
+      if (matched && (!selectedBookingPatient || selectedBookingPatient.id !== matched.id)) {
+        setSelectedBookingPatient(matched);
+      }
+    }
+  }, [bookParam, patientDirectory, selectedBookingPatient]);
+
   // Load patient context into Prescription Pad on view transition
   useEffect(() => {
     if (currentRxPatient) {
@@ -1194,6 +1206,7 @@ function DashboardContent() {
         updateServiceRow(rowId, val, rowFee);
       }
     }
+    setServiceRowFocused(null);
   };
 
   // Services dynamic totals calculations
@@ -1344,6 +1357,12 @@ function DashboardContent() {
     setPaymentsRows(
       paymentsRows.map((row) => (row.id === id ? { ...row, mode, amount } : row))
     );
+  };
+
+  const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key === "Enter" && e.target instanceof HTMLInputElement && e.target.type !== "submit" && e.target.type !== "textarea") {
+      e.preventDefault();
+    }
   };
 
   // Master Form submit handler saving registration details
@@ -1588,7 +1607,14 @@ function DashboardContent() {
 
             {/* Micro action shortcuts */}
             <div className="flex items-center gap-1 border-l pl-2 border-[#E2E8F0] select-text">
-              <button className="p-1 hover:bg-[#F1F5F9] rounded text-[#718096]" title="Edit Details">
+              <button
+                onClick={() => {
+                  setSelectedBookingPatient(currentRxPatient);
+                  openBooking(currentRxPatient.id);
+                }}
+                className="p-1 hover:bg-[#F1F5F9] rounded text-[#718096]"
+                title="Edit Details"
+              >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
@@ -2398,7 +2424,7 @@ function DashboardContent() {
                     <button
                       onClick={() => {
                         setSelectedBookingPatient(patient);
-                        openBooking();
+                        openBooking(patient.id);
                       }}
                       className="w-6 h-6 border border-[#CBD5E0] hover:bg-gray-50 rounded flex items-center justify-center shrink-0 text-primary"
                       title="Edit Patient Info"
@@ -2499,7 +2525,7 @@ function DashboardContent() {
             </button>
           </div>
 
-          <form onSubmit={handleRegisterAndBook} className="flex-1 flex flex-col overflow-hidden">
+          <form onSubmit={handleRegisterAndBook} onKeyDown={handleFormKeyDown} className="flex-1 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto p-4 space-y-5">
               
               {!selectedBookingPatient && (
@@ -2716,6 +2742,7 @@ function DashboardContent() {
                           }
                           setPermanentAddress(finalVal);
                           setLocalAddress(finalVal);
+                          setAddressFocused(false);
                         })
                       }
                       onFocus={() => {
@@ -2753,6 +2780,7 @@ function DashboardContent() {
                                 }
                                 setPermanentAddress(finalVal);
                                 setLocalAddress(finalVal);
+                                setAddressFocused(false);
                               }}
                               className={`p-1.5 text-[11px] rounded cursor-pointer text-left font-semibold transition-colors
                                 ${isHighlighted ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground"}`}
@@ -2802,6 +2830,7 @@ function DashboardContent() {
                             incrementOption(165, finalVal);
                           }
                           setCountry(finalVal);
+                          setCountryFocused(false);
                         })
                       }
                       onFocus={() => {
@@ -2838,6 +2867,7 @@ function DashboardContent() {
                                   incrementOption(165, displayVal);
                                 }
                                 setCountry(finalVal);
+                                setCountryFocused(false);
                               }}
                               className={`p-1.5 text-[11px] rounded cursor-pointer text-left font-semibold transition-colors
                                 ${isHighlighted ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground"}`}
@@ -2876,6 +2906,7 @@ function DashboardContent() {
                             incrementOption(166, finalVal);
                           }
                           setState(finalVal);
+                          setStateFocused(false);
                         })
                       }
                       onFocus={() => {
@@ -2912,6 +2943,7 @@ function DashboardContent() {
                                   incrementOption(166, displayVal);
                                 }
                                 setState(finalVal);
+                                setStateFocused(false);
                               }}
                               className={`p-1.5 text-[11px] rounded cursor-pointer text-left font-semibold transition-colors
                                 ${isHighlighted ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground"}`}
@@ -2984,6 +3016,7 @@ function DashboardContent() {
                             incrementOption(160, finalVal);
                           }
                           setTreatingDoctor(finalVal);
+                          setDoctorFocused(false);
                         })
                       }
                       onFocus={() => {
@@ -3020,6 +3053,7 @@ function DashboardContent() {
                                   incrementOption(160, displayVal);
                                 }
                                 setTreatingDoctor(finalVal);
+                                setDoctorFocused(false);
                               }}
                               className={`p-1.5 text-[11px] rounded cursor-pointer text-left font-semibold transition-colors
                                 ${isHighlighted ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground"}`}
@@ -3071,6 +3105,7 @@ function DashboardContent() {
                             incrementOption(163, finalVal);
                           }
                           setReferringDoctor(finalVal);
+                          setReferringDoctorFocused(false);
                         })
                       }
                       onFocus={() => {
@@ -3107,6 +3142,7 @@ function DashboardContent() {
                                   incrementOption(163, displayVal);
                                 }
                                 setReferringDoctor(finalVal);
+                                setReferringDoctorFocused(false);
                               }}
                               className={`p-1.5 text-[11px] rounded cursor-pointer text-left font-semibold transition-colors
                                 ${isHighlighted ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground"}`}
