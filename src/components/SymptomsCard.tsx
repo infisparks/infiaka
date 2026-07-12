@@ -201,9 +201,10 @@ function AutoInput({
   const [hi, setHi] = useState(-1);
   const localDropdownClicked = useRef(false);
 
-  const filtered = options.filter(
-    (o) => !value || o.toLowerCase().includes(value.toLowerCase())
-  );
+  const filtered = options.filter((o) => {
+    if (!value || options.some(opt => opt === value)) return true;
+    return o.toLowerCase().includes(value.toLowerCase());
+  });
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!open) { setOpen(true); return; }
@@ -427,7 +428,15 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
   /* ─── inline dropdown w/ keyboard nav ─── */
   const InlineDD = ({ id, field, opts, val }: { id: string; field: string; opts: string[]; val: string }) => {
     if (focusId !== id || focusField !== field) return null;
-    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
+    
+    // Show all options if val matches the saved database value in state (not edited yet)
+    const activeSymptom = symptoms.find(s => s.id === id);
+    const originalVal = activeSymptom ? (activeSymptom[field as keyof Symptom] as string) : "";
+    const list = opts.filter((o) => {
+      if (!val || val === originalVal) return true;
+      return o.toLowerCase().includes(val.toLowerCase());
+    });
+    
     const hasCustomVal = val.trim() && !opts.some(o => o.toLowerCase() === val.trim().toLowerCase());
     if (list.length === 0 && !hasCustomVal) return null;
     return (
