@@ -175,7 +175,7 @@ async function updateMedicineGenericName(name: string, generic: string) {
   }
 }
 
-/* ─── Types ──────────────────────────────────────────────────────── */
+/* ─── Types ─────────────────────────────────────────────────── */
 interface Medication {
   id: string;
   name: string;
@@ -194,19 +194,23 @@ interface MedicationsCardProps {
   setMedications: React.Dispatch<React.SetStateAction<Medication[]>>;
 }
 
-/* ─── Reusable autocomplete inline input ───────────────────────── */
+
 function InlineAutoComplete({
   value,
   onChange,
   onBlur,
   options,
   placeholder,
+  onAfterSelect,
+  onInputRef,
 }: {
   value: string;
   onChange: (v: string) => void;
   onBlur: (v: string) => void;
   options: string[];
   placeholder?: string;
+  onAfterSelect?: () => void;
+  onInputRef?: (el: HTMLInputElement | null) => void;
 }) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const dropdownClicked = useRef(false);
@@ -220,7 +224,7 @@ function InlineAutoComplete({
       results = options;
     }
     if (query && !options.some((o) => o.toLowerCase() === query.toLowerCase())) {
-      results = [...results, `+ Create "${query}"`];
+      results = [...results, `+ Create "${query}"` ];
     }
     setSuggestions(results);
   };
@@ -237,6 +241,8 @@ function InlineAutoComplete({
       onChange(val);
       onBlur(val);
     }
+    // Auto-focus next field after selection
+    setTimeout(() => onAfterSelect?.(), 60);
   };
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -276,6 +282,7 @@ function InlineAutoComplete({
         onBlur={handleBlur}
         itemTemplate={itemTemplate}
         placeholder={placeholder}
+        inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
         inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-350"
         className="w-full h-full"
         panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
@@ -284,30 +291,42 @@ function InlineAutoComplete({
   );
 }
 
+
 /* ─── Reusable autocomplete inline input for medicine search ───── */
 function InlineMedicineAutoComplete({
   value,
   onChange,
   onSelect,
   placeholder,
+  onAfterSelect,
+  onInputRef,
 }: {
   value: string;
   onChange: (v: string) => void;
   onSelect: (med: MedicineItem) => void;
   placeholder?: string;
+  onAfterSelect?: () => void;
+  onInputRef?: (el: HTMLInputElement | null) => void;
 }) {
   const [suggestions, setSuggestions] = useState<MedicineItem[]>([]);
   const dropdownClicked = useRef(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  const search = async (event: { query: string }) => {
+  /* Debounce DB queries — avoids hitting Supabase on every keystroke */
+  const search = (event: { query: string }) => {
+    clearTimeout(searchTimer.current);
     const query = event.query.trim();
-    const results = await searchMedicinesFromDb(query);
-    setSuggestions(results);
+    searchTimer.current = setTimeout(async () => {
+      const results = await searchMedicinesFromDb(query);
+      setSuggestions(results);
+    }, 280);
   };
 
   const handleSelect = (e: { value: MedicineItem }) => {
     dropdownClicked.current = true;
     onSelect(e.value);
+    // Auto-focus dose field after medicine is selected
+    setTimeout(() => onAfterSelect?.(), 80);
   };
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -348,6 +367,7 @@ function InlineMedicineAutoComplete({
         onBlur={handleBlur}
         itemTemplate={itemTemplate}
         placeholder={placeholder}
+        inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
         inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none p-0 placeholder:text-slate-350"
         className="w-full h-full"
         panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
@@ -394,20 +414,35 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
 
   useEffect(() => {
     let active = true;
-    const fetchMeds = async () => {
+    // Debounce: wait 300ms after user stops typing before querying
+    const timer = setTimeout(async () => {
       const results = await searchMedicinesFromDb(medInput);
-      if (active) {
-        setMedSuggestions(results);
-      }
-    };
-    fetchMeds();
+      if (active) setMedSuggestions(results);
+    }, 300);
     return () => {
       active = false;
+      clearTimeout(timer);
     };
   }, [medInput]);
 
   /* drag */
   const dragIdx = useRef<number | null>(null);
+
+  /* ─── Auto-focus: field input refs per medication row ─── */
+  type FieldKey = 'dose' | 'freq' | 'timing' | 'duration' | 'instr';
+  const fieldInputRefs = useRef<Record<string, Partial<Record<FieldKey, HTMLInputElement | null>>>>({});
+
+  const focusField = (medId: string, field: FieldKey) => {
+    setTimeout(() => {
+      if (!fieldInputRefs.current[medId]) return;
+      fieldInputRefs.current[medId][field]?.focus();
+    }, 80);
+  };
+
+  const setFieldRef = (medId: string, field: FieldKey) => (el: HTMLInputElement | null) => {
+    if (!fieldInputRefs.current[medId]) fieldInputRefs.current[medId] = {};
+    fieldInputRefs.current[medId][field] = el;
+  };
 
   /* ─── helpers ─── */
   const addMedicine = async (med: { name: string; generic: string; form?: string }) => {
@@ -616,6 +651,7 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                         onSelect={async (m) => {
                           patch(med.id, { name: m.name, generic: m.generic, form: m.form });
                         }}
+                        onAfterSelect={() => focusField(med.id, 'dose')}
                         placeholder="Medicine"
                       />
                     </div>
@@ -680,6 +716,8 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                   ) : null}
                 </div>
 
+                {/* Col 1 medicine name with pencil (unchanged above) */}
+
                 {/* Col 2: Dose */}
                 <div className="relative w-[10%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                   <InlineAutoComplete
@@ -688,6 +726,8 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                     onBlur={(v) => handleInputBlur(20, v)}
                     options={doseOptions}
                     placeholder="Dose"
+                    onInputRef={setFieldRef(med.id, 'dose')}
+                    onAfterSelect={() => focusField(med.id, 'freq')}
                   />
                 </div>
 
@@ -699,6 +739,8 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                     onBlur={(v) => handleInputBlur(21, v)}
                     options={freqOptions}
                     placeholder="Frequency"
+                    onInputRef={setFieldRef(med.id, 'freq')}
+                    onAfterSelect={() => focusField(med.id, 'timing')}
                   />
                 </div>
 
@@ -710,6 +752,8 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                     onBlur={(v) => handleInputBlur(22, v)}
                     options={timingOptions}
                     placeholder="Timing"
+                    onInputRef={setFieldRef(med.id, 'timing')}
+                    onAfterSelect={() => focusField(med.id, 'duration')}
                   />
                 </div>
 
@@ -721,6 +765,8 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                     onBlur={(v) => handleInputBlur(23, v)}
                     options={durationOptions}
                     placeholder="Duration"
+                    onInputRef={setFieldRef(med.id, 'duration')}
+                    onAfterSelect={() => focusField(med.id, 'instr')}
                   />
                 </div>
 
@@ -743,6 +789,7 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                     onBlur={(v) => handleInputBlur(25, v)}
                     options={instrOptions}
                     placeholder="Instructions"
+                    onInputRef={setFieldRef(med.id, 'instr')}
                   />
                 </div>
 
