@@ -104,7 +104,18 @@ function ChipTagField({
     if (!open) { setOpen(true); return; }
     if (e.key === "ArrowDown") { e.preventDefault(); setHi((p) => Math.min(p + 1, filtered.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setHi((p) => Math.max(p - 1, 0)); }
-    else if (e.key === "Enter") { e.preventDefault(); if (hi >= 0 && filtered[hi]) { onToggle(filtered[hi]); setSearch(""); setHi(-1); } }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (hi >= 0 && filtered[hi]) {
+        onToggle(filtered[hi]);
+        setSearch("");
+        setHi(-1);
+      } else if (search.trim()) {
+        onToggle(search.trim());
+        setSearch("");
+        setHi(-1);
+      }
+    }
     else if (e.key === "Escape") { setOpen(false); setHi(-1); }
   };
 
@@ -182,7 +193,18 @@ function AutoInput({
     if (!open) { setOpen(true); return; }
     if (e.key === "ArrowDown") { e.preventDefault(); setHi((p) => Math.min(p + 1, filtered.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setHi((p) => Math.max(p - 1, 0)); }
-    else if (e.key === "Enter") { e.preventDefault(); if (hi >= 0 && filtered[hi]) { onChange(filtered[hi]); setHi(-1); setOpen(false); } }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (hi >= 0 && filtered[hi]) {
+        onChange(filtered[hi]);
+        setHi(-1);
+        setOpen(false);
+      } else if (value.trim()) {
+        onChange(value.trim());
+        setHi(-1);
+        setOpen(false);
+      }
+    }
     else if (e.key === "Escape") { setOpen(false); setHi(-1); }
   };
 
@@ -289,14 +311,22 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
     setSymptomOptions(await fetchOptions(1));
   };
 
+  const dropdownClicked = useRef(false);
+
   const patch = (id: string, diff: Partial<Symptom>) => {
     setSymptoms((p) => p.map((s) => (s.id === id ? { ...s, ...diff } : s)));
   };
 
   const handleInputBlur = async (categoryId: number, value: string) => {
     if (!value || !value.trim()) return;
-    await incrementOption(categoryId, value.trim());
-    refreshAllOptions();
+    setTimeout(async () => {
+      if (dropdownClicked.current) {
+        dropdownClicked.current = false;
+        return;
+      }
+      await incrementOption(categoryId, value.trim());
+      refreshAllOptions();
+    }, 180);
   };
 
   const catIdOf = (field: string): number => {
@@ -328,7 +358,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
     setMNote(sym.note ?? "");
   };
 
-  const saveModal = async () => {
+  const saveModal = () => {
     if (!modalId) return;
     patch(modalId, {
       severity: mSeverity,
@@ -338,21 +368,6 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
       note: mNote,
     });
     setModalId(null);
-
-    // Save and increment all selections modified inside the modal
-    if (mSeverity) await incrementOption(3, mSeverity);
-    
-    for (const site of mHeadache) {
-      await incrementOption(4, site);
-    }
-    for (const type of mPainTypes) {
-      await incrementOption(5, type);
-    }
-    if (mCourse) await incrementOption(6, mCourse);
-    if (mNote.trim()) await incrementOption(7, mNote);
-
-    // Refresh option lists
-    refreshAllOptions();
   };
 
   const activeSym = symptoms.find((s) => s.id === modalId);
@@ -367,6 +382,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
         {list.map((opt, i) => (
           <div key={opt}
             onMouseDown={async () => {
+              dropdownClicked.current = true;
               patch(id, { [field]: opt });
               setFocusId(null);
               setFocusField(null);
@@ -390,6 +406,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
       e.preventDefault();
       if (rowHi >= 0 && list[rowHi]) {
         const chosen = list[rowHi];
+        dropdownClicked.current = true;
         patch(id, { [field]: chosen });
         setFocusId(null);
         setFocusField(null);
@@ -646,13 +663,25 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                 <div className="relative">
                   <input type="text" value={mSeverity}
                     onChange={(e) => setMSeverity(e.target.value)}
+                    onBlur={async (e) => {
+                      const v = e.target.value.trim();
+                      if (v) {
+                        await incrementOption(3, v);
+                        refreshAllOptions();
+                      }
+                    }}
                     placeholder="Severity"
                     className="w-full h-9 px-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-white focus:outline-none font-semibold text-[#334155] placeholder:text-[#C0CADC] transition-all"
                   />
                 </div>
                 <div className="flex gap-1.5 flex-wrap pt-0.5">
                   {severityOptions.map((s) => (
-                    <button key={s} type="button" onMouseDown={() => setMSeverity(s)}
+                    <button key={s} type="button"
+                      onMouseDown={async () => {
+                        setMSeverity(s);
+                        await incrementOption(3, s);
+                        refreshAllOptions();
+                      }}
                       className={`text-[9.5px] font-bold px-2.5 py-0.5 rounded-full border transition-all ${
                         mSeverity === s ? severityColor(s) : "bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0] hover:border-[#CBD5E0]"
                       }`}
@@ -666,7 +695,14 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                 label="Select Headache site"
                 options={headacheOptions}
                 selected={mHeadache}
-                onToggle={(v) => setMHeadache((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v])}
+                onToggle={async (v) => {
+                  const isAdding = !mHeadache.includes(v);
+                  setMHeadache((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v]);
+                  if (isAdding) {
+                    await incrementOption(4, v);
+                    refreshAllOptions();
+                  }
+                }}
               />
 
               {/* Select Type of pain */}
@@ -674,14 +710,27 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                 label="Select Type of pain"
                 options={painOptions}
                 selected={mPainTypes}
-                onToggle={(v) => setMPainTypes((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v])}
+                onToggle={async (v) => {
+                  const isAdding = !mPainTypes.includes(v);
+                  setMPainTypes((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v]);
+                  if (isAdding) {
+                    await incrementOption(5, v);
+                    refreshAllOptions();
+                  }
+                }}
               />
 
               {/* Clinical course */}
               <AutoInput
                 label="Clinical course"
                 value={mCourse}
-                onChange={setMCourse}
+                onChange={async (v) => {
+                  setMCourse(v);
+                  if (v && v.trim()) {
+                    await incrementOption(6, v.trim());
+                    refreshAllOptions();
+                  }
+                }}
                 options={courseOptions}
                 placeholder="Clinical course"
                 clearable
@@ -701,7 +750,15 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                     <div className="flex-1" />
                     <button type="button" className="text-[10px] text-[#CBD5E0] hover:text-[#94A3B8] px-1">⤢</button>
                   </div>
-                  <textarea rows={3} value={mNote} onChange={(e) => setMNote(e.target.value)}
+                  <textarea rows={3} value={mNote}
+                    onChange={(e) => setMNote(e.target.value)}
+                    onBlur={async (e) => {
+                      const v = e.target.value.trim();
+                      if (v) {
+                        await incrementOption(7, v);
+                        refreshAllOptions();
+                      }
+                    }}
                     placeholder="Add clinical notes, findings or observations…"
                     className="w-full px-3 py-2 text-[11px] focus:outline-none bg-white font-medium text-[#475569] resize-none placeholder:text-[#CBD5E0]"
                   />
