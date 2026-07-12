@@ -160,6 +160,19 @@ function ChipTagField({
               )}
             </div>
           ))}
+          {search.trim() && !options.some(o => o.toLowerCase() === search.trim().toLowerCase()) && (
+            <div
+              onMouseDown={() => {
+                onToggle(search.trim());
+                setSearch("");
+                setHi(-1);
+              }}
+              className="px-3 py-2 text-[11px] font-bold text-blue-600 hover:bg-blue-50 border-t border-[#F8FAFC] cursor-pointer flex items-center gap-1.5"
+            >
+              <span>+ Create</span>
+              <span className="italic">"{search.trim()}"</span>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -231,7 +244,7 @@ function AutoInput({
             </svg>
           </button>
         )}
-        {open && filtered.length > 0 && (
+        {open && (filtered.length > 0 || (value.trim() && !options.some(o => o.toLowerCase() === value.trim().toLowerCase()))) && (
           <div className="absolute left-0 top-full mt-1 z-[60] w-full bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-44 overflow-y-auto">
             {filtered.map((opt, i) => (
               <div key={opt}
@@ -240,6 +253,19 @@ function AutoInput({
                   ${i === hi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F8FAFC] text-[#334155]"}`}
               >{opt}</div>
             ))}
+            {value.trim() && !options.some(o => o.toLowerCase() === value.trim().toLowerCase()) && (
+              <div
+                onMouseDown={() => {
+                  onChange(value.trim());
+                  setOpen(false);
+                  setHi(-1);
+                }}
+                className="px-3 py-2 text-[11px] font-bold text-blue-600 hover:bg-blue-50 border-t border-[#F8FAFC] cursor-pointer flex items-center gap-1.5"
+              >
+                <span>+ Create</span>
+                <span className="italic">"{value.trim()}"</span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -376,7 +402,8 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
   const InlineDD = ({ id, field, opts, val }: { id: string; field: string; opts: string[]; val: string }) => {
     if (focusId !== id || focusField !== field) return null;
     const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
-    if (!list.length) return null;
+    const hasCustomVal = val.trim() && !opts.some(o => o.toLowerCase() === val.trim().toLowerCase());
+    if (list.length === 0 && !hasCustomVal) return null;
     return (
       <div className="absolute left-0 top-full mt-0.5 z-40 w-full min-w-[120px] bg-white border border-[#E2E8F0] rounded-lg shadow-xl overflow-hidden max-h-44 overflow-y-auto">
         {list.map((opt, i) => (
@@ -394,6 +421,23 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
               ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
           >{opt}</div>
         ))}
+        {hasCustomVal && (
+          <div
+            onMouseDown={async () => {
+              dropdownClicked.current = true;
+              patch(id, { [field]: val.trim() });
+              setFocusId(null);
+              setFocusField(null);
+              setRowHi(-1);
+              await incrementOption(catIdOf(field), val.trim());
+              refreshAllOptions();
+            }}
+            className="px-3 py-2 text-[11px] font-bold text-blue-600 hover:bg-blue-50 border-t border-[#F8FAFC] cursor-pointer flex items-center gap-1.5"
+          >
+            <span>+ Create</span>
+            <span className="italic">"{val.trim()}"</span>
+          </div>
+        )}
       </div>
     );
   };
@@ -607,7 +651,8 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
 
         {searchOpen && (() => {
           const list = symptomOptions.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
-          if (!list.length) return null;
+          const hasCustomVal = searchVal.trim() && !symptomOptions.some(o => o.toLowerCase() === searchVal.trim().toLowerCase());
+          if (list.length === 0 && !hasCustomVal) return null;
           return (
             <div className="absolute left-3 right-3 top-full mt-0.5 z-40 bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
               {list.map((opt, i) => (
@@ -621,6 +666,17 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                   <span className="text-[11.5px] font-semibold text-[#1E293B]">{opt}</span>
                 </div>
               ))}
+              {hasCustomVal && (
+                <div
+                  onMouseDown={() => addSymptom(searchVal)}
+                  className="px-3 py-2.5 text-[11.5px] font-bold text-blue-600 hover:bg-blue-50 border-t border-[#F8FAFC] cursor-pointer flex items-center gap-2.5"
+                >
+                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-extrabold text-blue-700 shrink-0 leading-none">
+                    +
+                  </div>
+                  <span>Create "{searchVal.trim()}"</span>
+                </div>
+              )}
             </div>
           );
         })()}
