@@ -96,10 +96,12 @@ async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
 }
 
 async function insertMedicineIntoDb(name: string, generic: string = "", type: string = "tablet"): Promise<MedicineItem> {
+  const customId = Date.now() + Math.floor(Math.random() * 10000000);
   try {
     const { data, error } = await supabase
       .from("medicine")
       .insert({
+        id: customId,
         name,
         salt_composition: generic,
         short_composition1: generic,
