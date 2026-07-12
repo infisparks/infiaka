@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, Suspense, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 import VitalsCard from "@/components/VitalsCard";
 import MedicalHistoryCard from "@/components/MedicalHistoryCard";
@@ -195,6 +196,28 @@ function DashboardContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.push("/login");
+      } else {
+        setSessionLoaded(true);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        router.push("/login");
+      } else {
+        setSessionLoaded(true);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   const [patients, setPatients] = useState<Patient[]>(initialPatients);
 
@@ -1340,6 +1363,17 @@ function DashboardContent() {
     );
   };
 
+  if (!sessionLoaded) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#F5F6F8] font-sans select-none">
+        <div className="text-center space-y-2">
+          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Verifying Session...</p>
+        </div>
+      </div>
+    );
+  }
+
   // --- DASHBOARD SKELETON RENDER ---
   if (activeView === "prescription" && currentRxPatient) {
     return renderPrescriptionPad();
@@ -1438,6 +1472,19 @@ function DashboardContent() {
             alt="Doctor profile"
             className="w-7 h-7 rounded-full object-cover border border-[#CBD5E0] cursor-pointer"
           />
+
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              router.push("/login");
+            }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors"
+            title="Sign Out"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
         </div>
       </aside>
 
