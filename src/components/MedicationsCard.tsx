@@ -67,57 +67,72 @@ async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
   try {
     const q = query?.trim() ?? "";
 
-    if (!q) {
-      // No query — return top 10 by name order
-      const { data } = await supabase
-        .from("medicine")
-        .select("name, salt_composition, short_composition1, type")
-        .order("name", { ascending: true })
-        .limit(10);
-      return (data || []).map((m: any) => ({
-        name: m.name ?? "",
-        generic: m.salt_composition || m.short_composition1 || "",
-        form: m.type?.toLowerCase() || "tablet"
-      }));
-    }
-
-    // Priority 1: medicines whose NAME matches the query
-    const { data: nameData } = await supabase
-      .from("medicine")
-      .select("name, salt_composition, short_composition1, type")
-      .ilike("name", `%${q}%`)
-      .order("name", { ascending: true })
-      .limit(15);
-
-    // Priority 2: medicines whose COMPOSITION matches (but name doesn't)
-    const { data: compData } = await supabase
-      .from("medicine")
-      .select("name, salt_composition, short_composition1, type")
-      .or(`salt_composition.ilike.%${q}%,short_composition1.ilike.%${q}%`)
-      .not("name", "ilike", `%${q}%`)
-      .order("name", { ascending: true })
-      .limit(10);
-
     const toItem = (m: any): MedicineItem => ({
       name: m.name ?? "",
       generic: m.salt_composition || m.short_composition1 || "",
       form: m.type?.toLowerCase() || "tablet"
     });
 
-    const nameMatches = (nameData || []).map(toItem);
-    const compMatches = (compData || []).map(toItem);
+    // Empty query — show first 10 alphabetically
+    if (!q) {
+      const { data } = await supabase
+        .from("medicine")
+        .select("name, salt_composition, short_composition1, type")
+        .order("name", { ascending: true })
+        .limit(10);
+      return (data || []).map(toItem);
+    }
 
-    // Merge, deduplicate by name
-    const seen = new Set(nameMatches.map(m => m.name));
-    const merged = [
-      ...nameMatches,
-      ...compMatches.filter(m => !seen.has(m.name))
-    ];
-    return merged.slice(0, 20);
+    // Tier 1: Name STARTS WITH query — uses btree index, very fast on 250k rows
+    const { data: tier1 } = await supabase
+      .from("medicine")
+      .select("name, salt_composition, short_composition1, type")
+      .ilike("name", `${q}%`)
+      .order("name", { ascending: true })
+      .limit(12);
+
+    const seen = new Set<string>((tier1 || []).map((m: any) => m.name));
+    const results: MedicineItem[] = (tier1 || []).map(toItem);
+
+    // Tier 2: Name CONTAINS query (but doesn't start with — avoids duplicates)
+    if (results.length < 15) {
+      const { data: tier2 } = await supabase
+        .from("medicine")
+        .select("name, salt_composition, short_composition1, type")
+        .ilike("name", `%${q}%`)
+        .not("name", "ilike", `${q}%`)   // exclude starts-with already fetched
+        .order("name", { ascending: true })
+        .limit(10);
+      for (const m of (tier2 || [])) {
+        if (!seen.has(m.name)) {
+          seen.add(m.name);
+          results.push(toItem(m));
+        }
+      }
+    }
+
+    // Tier 3: Composition match only if we have very few name results
+    if (results.length < 8) {
+      const { data: tier3 } = await supabase
+        .from("medicine")
+        .select("name, salt_composition, short_composition1, type")
+        .or(`salt_composition.ilike.${q}%,short_composition1.ilike.${q}%`)
+        .order("name", { ascending: true })
+        .limit(8);
+      for (const m of (tier3 || [])) {
+        if (!seen.has(m.name)) {
+          seen.add(m.name);
+          results.push(toItem(m));
+        }
+      }
+    }
+
+    return results.slice(0, 20);
   } catch (err) {
     console.error("Error searching medicines:", err);
     return [];
   }
+
 }
 
 async function insertMedicineIntoDb(name: string, generic: string = "", type: string = "tablet"): Promise<MedicineItem> {
