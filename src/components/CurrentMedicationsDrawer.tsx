@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
-/* ─── Static suggestion lists ────────────────────────────────────── */
-const SUGGESTED_NAMES = [
+/* ─── Static suggestion defaults (Fallbacks if DB empty) ─────────── */
+const DEFAULT_NAMES = [
   "Para 650Mg Tablet",
   "Amlodipine 5mg Tablet",
   "Metformin 500mg Tablet",
@@ -13,21 +14,53 @@ const SUGGESTED_NAMES = [
   "Montelukast 10mg Tablet"
 ];
 
-const SUGGESTED_SINCE = [
-  "Since childhood",
-  "1 Month",
-  "3 Months",
-  "6 Months",
-  "1 Year",
-  "2 Years",
-  "5 Years"
-];
+const DEFAULT_DOSES = ["1 Tablet", "2 Tablets", "1 Capsule", "2 Capsules", "1 tsp (5ml)", "2 tsp (10ml)"];
+const DEFAULT_FREQS = ["1-1-1", "1-0-1", "1-0-0", "0-1-0", "0-0-1", "Once Daily", "Twice Daily", "Thrice Daily"];
+const DEFAULT_TIMINGS = ["After Meal", "Before Meal", "Empty Stomach", "With Food", "Bedtime"];
+const DEFAULT_STATUSES = ["Yes (Active)", "No (Inactive)", "Suspended", "Completed"];
+const DEFAULT_NOTES = ["Take with warm water", "Avoid alcohol", "Fasting", "Monitor blood pressure"];
 
-const SUGGESTED_DOSES = ["1 Tablet", "2 Tablets", "1 Capsule", "2 Capsules", "1 tsp (5ml)", "2 tsp (10ml)"];
-const SUGGESTED_FREQS = ["1-1-1", "1-0-1", "1-0-0", "0-1-0", "0-0-1", "Once Daily", "Twice Daily", "Thrice Daily"];
-const SUGGESTED_TIMINGS = ["After Meal", "Before Meal", "Empty Stomach", "With Food", "Bedtime"];
-const SUGGESTED_STATUSES = ["Yes (Active)", "No (Inactive)", "Suspended", "Completed"];
-const SUGGESTED_NOTES = ["Take with warm water", "Avoid alcohol", "Fasting", "Monitor blood pressure"];
+/* ─── Supabase helpers ──────────────────────────────────────────── */
+async function fetchOptions(categoryId: number, defaults: string[]): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("value")
+      .eq("category_id", categoryId)
+      .order("usage_count", { ascending: false })
+      .limit(30);
+    if (error) throw error;
+    const list = (data || []).map((d: any) => d.value);
+    return list.length > 0 ? list : defaults;
+  } catch (err) {
+    console.error(`Error fetching category ${categoryId}:`, err);
+    return defaults;
+  }
+}
+
+async function incrementOption(categoryId: number, value: string) {
+  if (!value?.trim()) return;
+  try {
+    const { data: existing } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("id, usage_count")
+      .eq("category_id", categoryId)
+      .ilike("value", value.trim())
+      .maybeSingle();
+    if (existing) {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .update({ usage_count: (existing.usage_count || 0) + 1 })
+        .eq("id", existing.id);
+    } else {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .insert({ category_id: categoryId, value: value.trim(), usage_count: 1 });
+    }
+  } catch (err) {
+    console.error("Error incrementing option:", err);
+  }
+}
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 export interface CurrentMedication {
@@ -57,6 +90,13 @@ export default function CurrentMedicationsDrawer({
   currentMeds,
   setCurrentMeds,
 }: CurrentMedicationsDrawerProps) {
+  const [suggestedNames, setSuggestedNames]             = useState<string[]>(DEFAULT_NAMES);
+  const [suggestedDoses, setSuggestedDoses]             = useState<string[]>(DEFAULT_DOSES);
+  const [suggestedFreqs, setSuggestedFreqs]             = useState<string[]>(DEFAULT_FREQS);
+  const [suggestedTimings, setSuggestedTimings]         = useState<string[]>(DEFAULT_TIMINGS);
+  const [suggestedStatuses, setSuggestedStatuses]       = useState<string[]>(DEFAULT_STATUSES);
+  const [suggestedNotes, setSuggestedNotes]             = useState<string[]>(DEFAULT_NOTES);
+
   /* search bar */
   const [searchVal, setSearchVal]   = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -69,6 +109,60 @@ export default function CurrentMedicationsDrawer({
 
   /* drag */
   const dragIdx = useRef<number | null>(null);
+  const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleInputFocus = (id: string, field: string) => {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+    setFocusId(id);
+    setFocusField(field);
+    setRowHi(-1);
+  };
+
+  const handleInputBlur = (categoryId: number, value: string) => {
+    blurTimeoutRef.current = setTimeout(() => {
+      if (value?.trim()) incrementOption(categoryId, value.trim());
+      setFocusId(null);
+      setFocusField(null);
+      setRowHi(-1);
+    }, 180);
+  };
+
+  const handleSinceBlur = () => {
+    blurTimeoutRef.current = setTimeout(() => {
+      setFocusId(null);
+      setFocusField(null);
+      setRowHi(-1);
+    }, 180);
+  };
+
+  // Load from Supabase on mount
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    const load = async () => {
+      const [names, doses, freqs, timings, statuses, notes] = await Promise.all([
+        fetchOptions(80, DEFAULT_NAMES),
+        fetchOptions(81, DEFAULT_DOSES),
+        fetchOptions(82, DEFAULT_FREQS),
+        fetchOptions(83, DEFAULT_TIMINGS),
+        fetchOptions(84, DEFAULT_STATUSES),
+        fetchOptions(85, DEFAULT_NOTES)
+      ]);
+      if (active) {
+        setSuggestedNames(names);
+        setSuggestedDoses(doses);
+        setSuggestedFreqs(freqs);
+        setSuggestedTimings(timings);
+        setSuggestedStatuses(statuses);
+        setSuggestedNotes(notes);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -86,6 +180,7 @@ export default function CurrentMedicationsDrawer({
       notes: ""
     };
     setCurrentMeds((p) => [...p, newMed]);
+    incrementOption(80, name.trim());
     setSearchVal("");
     setSearchOpen(false);
     setSearchHi(-1);
@@ -150,36 +245,75 @@ export default function CurrentMedicationsDrawer({
   const InlineDD = ({ id, field, opts, val }: { id: string; field: string; opts: string[]; val: string }) => {
     if (focusId !== id || focusField !== field) return null;
     const actualOpts = field === "since" ? getSinceOptions(val) : opts;
-    const list = actualOpts.filter((o) => field === "since" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    let list = actualOpts.filter((o) => field === "since" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    
+    // Add "+ Create" option if not a perfect match in options list (and not since column)
+    if (val && val.trim() && !actualOpts.some(o => o.toLowerCase() === val.trim().toLowerCase()) && field !== "since") {
+      list = [...list, `+ Create "${val.trim()}"`];
+    }
+
     if (!list.length) return null;
     return (
       <div className="absolute left-0 top-full mt-0.5 z-40 w-full min-w-[125px] bg-white border border-[#E2E8F0] rounded-lg shadow-xl overflow-hidden max-h-44 overflow-y-auto text-left">
-        {list.map((opt, i) => (
-          <div key={opt}
-            onMouseDown={() => {
-              const finalVal = field === "since" ? calculateSinceDate(opt) : opt;
-              patch(id, { [field]: finalVal });
-              setFocusId(null);
-              setFocusField(null);
-              setRowHi(-1);
-            }}
-            className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
-              ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
-          >{opt}</div>
-        ))}
+        {list.map((opt, i) => {
+          const isCreate = opt.startsWith('+ Create "');
+          let displayVal = opt;
+          if (isCreate) {
+            const match = opt.match(/\+ Create "(.*)"/);
+            displayVal = match ? match[1] : opt;
+          }
+          return (
+            <div key={opt}
+              onMouseDown={() => {
+                const finalVal = field === "since" ? calculateSinceDate(opt) : displayVal;
+                patch(id, { [field]: finalVal });
+                if (isCreate) {
+                  const catId = field === "name" ? 80 : field === "dose" ? 81 : field === "freq" ? 82 : field === "timing" ? 83 : field === "status" ? 84 : 85;
+                  incrementOption(catId, displayVal);
+                }
+                setFocusId(null);
+                setFocusField(null);
+                setRowHi(-1);
+              }}
+              className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
+                ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
+            >
+              {isCreate ? (
+                <span className="text-blue-600 font-bold">
+                  + Create <span className="italic font-semibold">"{displayVal}"</span>
+                </span>
+              ) : opt}
+            </div>
+          );
+        })}
       </div>
     );
   };
 
   const handleRowKey = (e: React.KeyboardEvent, id: string, field: string, opts: string[], val: string) => {
     const actualOpts = field === "since" ? getSinceOptions(val) : opts;
-    const list = actualOpts.filter((o) => field === "since" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    let list = actualOpts.filter((o) => field === "since" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    
+    if (val && val.trim() && !actualOpts.some(o => o.toLowerCase() === val.trim().toLowerCase()) && field !== "since") {
+      list = [...list, `+ Create "${val.trim()}"`];
+    }
+
     if (e.key === "ArrowDown") { e.preventDefault(); setRowHi((p) => Math.min(p + 1, list.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setRowHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {
       e.preventDefault();
       if (rowHi >= 0 && list[rowHi]) {
-        const finalVal = field === "since" ? calculateSinceDate(list[rowHi]) : list[rowHi];
+        const selectedOpt = list[rowHi];
+        const isCreate = selectedOpt.startsWith('+ Create "');
+        let finalVal = selectedOpt;
+        if (isCreate) {
+          const match = selectedOpt.match(/\+ Create "(.*)"/);
+          finalVal = match ? match[1] : selectedOpt;
+          const catId = field === "name" ? 80 : field === "dose" ? 81 : field === "freq" ? 82 : field === "timing" ? 83 : field === "status" ? 84 : 85;
+          incrementOption(catId, finalVal);
+        } else if (field === "since") {
+          finalVal = calculateSinceDate(selectedOpt);
+        }
         patch(id, { [field]: finalVal });
         setFocusId(null);
         setFocusField(null);
@@ -191,7 +325,7 @@ export default function CurrentMedicationsDrawer({
 
   /* search key events */
   const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const list = SUGGESTED_NAMES.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+    const list = suggestedNames.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
     if (e.key === "ArrowDown") { e.preventDefault(); setSearchHi((p) => Math.min(p + 1, list.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setSearchHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {
@@ -251,7 +385,7 @@ export default function CurrentMedicationsDrawer({
 
             {/* Suggestions Overlay */}
             {searchOpen && (() => {
-              const list = SUGGESTED_NAMES.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+              const list = suggestedNames.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
               if (!list.length) return null;
               return (
                 <div className="absolute left-0 right-0 top-full mt-1.5 z-[60] bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
@@ -319,91 +453,91 @@ export default function CurrentMedicationsDrawer({
                       <div className="relative w-[18%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                         <input type="text" value={med.name}
                           onChange={(e) => patch(med.id, { name: e.target.value })}
-                          onFocus={() => { setFocusId(med.id); setFocusField("name"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                          onKeyDown={(e) => handleRowKey(e, med.id, "name", SUGGESTED_NAMES, med.name)}
+                          onFocus={() => handleInputFocus(med.id, "name")}
+                          onBlur={() => handleInputBlur(80, med.name)}
+                          onKeyDown={(e) => handleRowKey(e, med.id, "name", suggestedNames, med.name)}
                           placeholder="Name"
-                          className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-300"
+                          className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-350"
                         />
-                        <InlineDD id={med.id} field="name" opts={SUGGESTED_NAMES} val={med.name} />
+                        <InlineDD id={med.id} field="name" opts={suggestedNames} val={med.name} />
                       </div>
 
                       {/* since */}
                       <div className="relative w-[12%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                         <input type="text" value={med.since}
                           onChange={(e) => patch(med.id, { since: e.target.value })}
-                          onFocus={() => { setFocusId(med.id); setFocusField("since"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                          onKeyDown={(e) => handleRowKey(e, med.id, "since", SUGGESTED_SINCE, med.since)}
+                          onFocus={() => handleInputFocus(med.id, "since")}
+                          onBlur={handleSinceBlur}
+                          onKeyDown={(e) => handleRowKey(e, med.id, "since", [], med.since)}
                           placeholder="Since"
                           className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                         />
-                        <InlineDD id={med.id} field="since" opts={SUGGESTED_SINCE} val={med.since} />
+                        <InlineDD id={med.id} field="since" opts={[]} val={med.since} />
                       </div>
 
                       {/* dose */}
                       <div className="relative w-[12%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                         <input type="text" value={med.dose}
                           onChange={(e) => patch(med.id, { dose: e.target.value })}
-                          onFocus={() => { setFocusId(med.id); setFocusField("dose"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                          onKeyDown={(e) => handleRowKey(e, med.id, "dose", SUGGESTED_DOSES, med.dose)}
+                          onFocus={() => handleInputFocus(med.id, "dose")}
+                          onBlur={() => handleInputBlur(81, med.dose)}
+                          onKeyDown={(e) => handleRowKey(e, med.id, "dose", suggestedDoses, med.dose)}
                           placeholder="e.g 1 Tablet"
                           className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                         />
-                        <InlineDD id={med.id} field="dose" opts={SUGGESTED_DOSES} val={med.dose} />
+                        <InlineDD id={med.id} field="dose" opts={suggestedDoses} val={med.dose} />
                       </div>
 
                       {/* freq */}
                       <div className="relative w-[12%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                         <input type="text" value={med.freq}
                           onChange={(e) => patch(med.id, { freq: e.target.value })}
-                          onFocus={() => { setFocusId(med.id); setFocusField("freq"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                          onKeyDown={(e) => handleRowKey(e, med.id, "freq", SUGGESTED_FREQS, med.freq)}
+                          onFocus={() => handleInputFocus(med.id, "freq")}
+                          onBlur={() => handleInputBlur(82, med.freq)}
+                          onKeyDown={(e) => handleRowKey(e, med.id, "freq", suggestedFreqs, med.freq)}
                           placeholder="Frequency"
                           className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                         />
-                        <InlineDD id={med.id} field="freq" opts={SUGGESTED_FREQS} val={med.freq} />
+                        <InlineDD id={med.id} field="freq" opts={suggestedFreqs} val={med.freq} />
                       </div>
 
                       {/* timing */}
                       <div className="relative w-[12%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                         <input type="text" value={med.timing}
                           onChange={(e) => patch(med.id, { timing: e.target.value })}
-                          onFocus={() => { setFocusId(med.id); setFocusField("timing"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                          onKeyDown={(e) => handleRowKey(e, med.id, "timing", SUGGESTED_TIMINGS, med.timing)}
+                          onFocus={() => handleInputFocus(med.id, "timing")}
+                          onBlur={() => handleInputBlur(83, med.timing)}
+                          onKeyDown={(e) => handleRowKey(e, med.id, "timing", suggestedTimings, med.timing)}
                           placeholder="Timing"
                           className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                         />
-                        <InlineDD id={med.id} field="timing" opts={SUGGESTED_TIMINGS} val={med.timing} />
+                        <InlineDD id={med.id} field="timing" opts={suggestedTimings} val={med.timing} />
                       </div>
 
                       {/* status */}
                       <div className="relative w-[14%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                         <input type="text" value={med.status}
                           onChange={(e) => patch(med.id, { status: e.target.value })}
-                          onFocus={() => { setFocusId(med.id); setFocusField("status"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                          onKeyDown={(e) => handleRowKey(e, med.id, "status", SUGGESTED_STATUSES, med.status)}
+                          onFocus={() => handleInputFocus(med.id, "status")}
+                          onBlur={() => handleInputBlur(84, med.status)}
+                          onKeyDown={(e) => handleRowKey(e, med.id, "status", suggestedStatuses, med.status)}
                           placeholder="Status"
                           className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-emerald-600 bg-transparent outline-none placeholder:text-slate-350"
                         />
-                        <InlineDD id={med.id} field="status" opts={SUGGESTED_STATUSES} val={med.status} />
+                        <InlineDD id={med.id} field="status" opts={suggestedStatuses} val={med.status} />
                       </div>
 
                       {/* notes */}
                       <div className="relative w-[16%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                         <input type="text" value={med.notes}
                           onChange={(e) => patch(med.id, { notes: e.target.value })}
-                          onFocus={() => { setFocusId(med.id); setFocusField("notes"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                          onKeyDown={(e) => handleRowKey(e, med.id, "notes", SUGGESTED_NOTES, med.notes)}
+                          onFocus={() => handleInputFocus(med.id, "notes")}
+                          onBlur={() => handleInputBlur(85, med.notes)}
+                          onKeyDown={(e) => handleRowKey(e, med.id, "notes", suggestedNotes, med.notes)}
                           placeholder="Add notes here"
                           className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                         />
-                        <InlineDD id={med.id} field="notes" opts={SUGGESTED_NOTES} val={med.notes} />
+                        <InlineDD id={med.id} field="notes" opts={suggestedNotes} val={med.notes} />
                       </div>
 
                       {/* delete action */}

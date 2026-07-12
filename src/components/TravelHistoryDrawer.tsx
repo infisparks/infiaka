@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
-const SUGGESTED_DESTINATIONS = [
+/* ─── Static suggestion defaults (Fallbacks if DB empty) ─────────── */
+const DEFAULT_DESTINATIONS = [
   "United States",
   "United Kingdom",
   "United Arab Emirates",
@@ -16,29 +18,14 @@ const SUGGESTED_DESTINATIONS = [
   "International Travel"
 ];
 
-const SUGGESTED_STATUSES = ["Yes (Active)", "No (Inactive)"];
-const SUGGESTED_NOTES = [
+const DEFAULT_STATUSES = ["Yes (Active)", "No (Inactive)"];
+const DEFAULT_NOTES = [
   "Recent travel",
   "Business trip",
   "Holiday",
   "Within last 14 days",
   "Within last 30 days"
 ];
-
-export interface TravelHistoryItem {
-  id: string;
-  destination: string;
-  travelDate: string;
-  status: string;
-  notes: string;
-}
-
-interface TravelHistoryDrawerProps {
-  isOpen: boolean;
-  onClose: () => void;
-  items: TravelHistoryItem[];
-  setItems: React.Dispatch<React.SetStateAction<TravelHistoryItem[]>>;
-}
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
 const convertToISODate = (displayDate: string) => {
@@ -79,7 +66,72 @@ const formatISODateToDisplay = (isoDate: string) => {
   }
 };
 
+/* ─── Supabase helpers ──────────────────────────────────────────── */
+async function fetchOptions(categoryId: number, defaults: string[]): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("value")
+      .eq("category_id", categoryId)
+      .order("usage_count", { ascending: false })
+      .limit(30);
+    if (error) throw error;
+    const list = (data || []).map((d: any) => d.value);
+    return list.length > 0 ? list : defaults;
+  } catch (err) {
+    console.error(`Error fetching category ${categoryId}:`, err);
+    return defaults;
+  }
+}
+
+async function incrementOption(categoryId: number, value: string) {
+  if (!value?.trim()) return;
+  try {
+    const { data: existing } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("id, usage_count")
+      .eq("category_id", categoryId)
+      .ilike("value", value.trim())
+      .maybeSingle();
+    if (existing) {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .update({ usage_count: (existing.usage_count || 0) + 1 })
+        .eq("id", existing.id);
+    } else {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .insert({ category_id: categoryId, value: value.trim(), usage_count: 1 });
+    }
+  } catch (err) {
+    console.error("Error incrementing option:", err);
+  }
+}
+
+/* ─── Types ──────────────────────────────────────────────────────── */
+export interface TravelHistoryItem {
+  id: string;
+  destination: string;
+  travelDate: string;
+  status: string;
+  notes: string;
+}
+
+interface TravelHistoryDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  items: TravelHistoryItem[];
+  setItems: React.Dispatch<React.SetStateAction<TravelHistoryItem[]>>;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TravelHistoryDrawer Component
+═══════════════════════════════════════════════════════════════════ */
 export default function TravelHistoryDrawer({ isOpen, onClose, items, setItems }: TravelHistoryDrawerProps) {
+  const [suggestedDestinations, setSuggestedDestinations]   = useState<string[]>(DEFAULT_DESTINATIONS);
+  const [suggestedStatuses, setSuggestedStatuses]           = useState<string[]>(DEFAULT_STATUSES);
+  const [suggestedNotes, setSuggestedNotes]                 = useState<string[]>(DEFAULT_NOTES);
+
   const [searchVal, setSearchVal] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchHi, setSearchHi] = useState(-1);
@@ -87,45 +139,75 @@ export default function TravelHistoryDrawer({ isOpen, onClose, items, setItems }
   const [focusField, setFocusField] = useState<string | null>(null);
   const [rowHi, setRowHi] = useState(-1);
   const dragIdx = useRef<number | null>(null);
+  const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleInputFocus = (id: string, field: string) => {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+    setFocusId(id);
+    setFocusField(field);
+    setRowHi(-1);
+  };
+
+  const handleInputBlur = (categoryId: number, value: string) => {
+    blurTimeoutRef.current = setTimeout(() => {
+      if (value?.trim()) incrementOption(categoryId, value.trim());
+      setFocusId(null);
+      setFocusField(null);
+      setRowHi(-1);
+    }, 180);
+  };
+
+  const handleSinceBlur = () => {
+    blurTimeoutRef.current = setTimeout(() => {
+      setFocusId(null);
+      setFocusField(null);
+      setRowHi(-1);
+    }, 180);
+  };
+
+  // Load from Supabase on mount
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    const load = async () => {
+      const [destinations, statuses, notes] = await Promise.all([
+        fetchOptions(140, DEFAULT_DESTINATIONS),
+        fetchOptions(141, DEFAULT_STATUSES),
+        fetchOptions(142, DEFAULT_NOTES)
+      ]);
+      if (active) {
+        setSuggestedDestinations(destinations);
+        setSuggestedStatuses(statuses);
+        setSuggestedNotes(notes);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const addItem = (destination: string) => {
-    if (!destination.trim()) return;
-    setItems((p) => [
-      ...p,
-      {
-        id: Date.now().toString(),
-        destination: destination.trim(),
-        travelDate: "",
-        status: "Yes (Active)",
-        notes: ""
-      }
-    ]);
-    setSearchVal("");
-    setSearchOpen(false);
-    setSearchHi(-1);
+  const addItem = (name: string) => {
+    if (!name.trim()) return;
+    setItems((p) => [...p, { id: Date.now().toString(), destination: name.trim(), travelDate: "", status: "Yes (Active)", notes: "" }]);
+    incrementOption(140, name.trim());
+    setSearchVal(""); setSearchOpen(false); setSearchHi(-1);
   };
 
-  const patch = (id: string, diff: Partial<TravelHistoryItem>) =>
-    setItems((p) => p.map((c) => (c.id === id ? { ...c, ...diff } : c)));
+  const patch = (id: string, diff: Partial<TravelHistoryItem>) => setItems((p) => p.map((c) => c.id === id ? { ...c, ...diff } : c));
   const remove = (id: string) => setItems((p) => p.filter((c) => c.id !== id));
 
-  const onDragStart = (i: number) => {
-    dragIdx.current = i;
-  };
+  const onDragStart = (i: number) => { dragIdx.current = i; };
   const onDragOver = (e: React.DragEvent, i: number) => {
     e.preventDefault();
     if (dragIdx.current === null || dragIdx.current === i) return;
-    const r = [...items];
-    const [m] = r.splice(dragIdx.current, 1);
-    r.splice(i, 0, m);
-    dragIdx.current = i;
-    setItems(r);
+    const r = [...items]; const [m] = r.splice(dragIdx.current, 1); r.splice(i, 0, m);
+    dragIdx.current = i; setItems(r);
   };
-  const onDragEnd = () => {
-    dragIdx.current = null;
-  };
+  const onDragEnd = () => { dragIdx.current = null; };
 
   /* dynamic relative to absolute date calculation */
   const calculateSinceDate = (val: string): string => {
@@ -181,34 +263,61 @@ export default function TravelHistoryDrawer({ isOpen, onClose, items, setItems }
   const InlineDD = ({ id, field, opts, val }: { id: string; field: string; opts: string[]; val: string }) => {
     if (focusId !== id || focusField !== field) return null;
     const actualOpts = field === "travelDate" ? getSinceOptions(val) : opts;
-    const list = actualOpts.filter((o) => field === "travelDate" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    let list = actualOpts.filter((o) => field === "travelDate" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    
+    // Add "+ Create" option if not a perfect match
+    if (val && val.trim() && !actualOpts.some(o => o.toLowerCase() === val.trim().toLowerCase()) && field !== "travelDate") {
+      list = [...list, `+ Create "${val.trim()}"`];
+    }
+
     if (!list.length) return null;
     return (
       <div className="absolute left-0 top-full mt-0.5 z-40 w-full min-w-[140px] bg-white border border-[#E2E8F0] rounded-lg shadow-xl overflow-hidden max-h-44 overflow-y-auto text-left">
-        {list.map((opt, i) => (
-          <div
-            key={opt}
-            onMouseDown={() => {
-              const finalVal = field === "travelDate" ? calculateSinceDate(opt) : opt;
-              patch(id, { [field]: finalVal });
-              setFocusId(null);
-              setFocusField(null);
-              setRowHi(-1);
-            }}
-            className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors ${
-              i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"
-            }`}
-          >
-            {opt}
-          </div>
-        ))}
+        {list.map((opt, i) => {
+          const isCreate = opt.startsWith('+ Create "');
+          let displayVal = opt;
+          if (isCreate) {
+            const match = opt.match(/\+ Create "(.*)"/);
+            displayVal = match ? match[1] : opt;
+          }
+          return (
+            <div
+              key={opt}
+              onMouseDown={() => {
+                const finalVal = field === "travelDate" ? calculateSinceDate(opt) : displayVal;
+                patch(id, { [field]: finalVal });
+                if (isCreate) {
+                  const catId = field === "destination" ? 140 : field === "status" ? 141 : 142;
+                  incrementOption(catId, displayVal);
+                }
+                setFocusId(null);
+                setFocusField(null);
+                setRowHi(-1);
+              }}
+              className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors ${
+                i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"
+              }`}
+            >
+              {isCreate ? (
+                <span className="text-blue-600 font-bold">
+                  + Create <span className="italic font-semibold">"{displayVal}"</span>
+                </span>
+              ) : opt}
+            </div>
+          );
+        })}
       </div>
     );
   };
 
   const handleRowKey = (e: React.KeyboardEvent, id: string, field: string, opts: string[], val: string) => {
     const actualOpts = field === "travelDate" ? getSinceOptions(val) : opts;
-    const list = actualOpts.filter((o) => field === "travelDate" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    let list = actualOpts.filter((o) => field === "travelDate" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    
+    if (val && val.trim() && !actualOpts.some(o => o.toLowerCase() === val.trim().toLowerCase()) && field !== "travelDate") {
+      list = [...list, `+ Create "${val.trim()}"`];
+    }
+
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setRowHi((p) => Math.min(p + 1, list.length - 1));
@@ -218,7 +327,17 @@ export default function TravelHistoryDrawer({ isOpen, onClose, items, setItems }
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (rowHi >= 0 && list[rowHi]) {
-        const finalVal = field === "travelDate" ? calculateSinceDate(list[rowHi]) : list[rowHi];
+        const selectedOpt = list[rowHi];
+        const isCreate = selectedOpt.startsWith('+ Create "');
+        let finalVal = selectedOpt;
+        if (isCreate) {
+          const match = selectedOpt.match(/\+ Create "(.*)"/);
+          finalVal = match ? match[1] : selectedOpt;
+          const catId = field === "destination" ? 140 : field === "status" ? 141 : 142;
+          incrementOption(catId, finalVal);
+        } else if (field === "travelDate") {
+          finalVal = calculateSinceDate(selectedOpt);
+        }
         patch(id, { [field]: finalVal });
         setFocusId(null);
         setFocusField(null);
@@ -232,7 +351,7 @@ export default function TravelHistoryDrawer({ isOpen, onClose, items, setItems }
   };
 
   const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const list = SUGGESTED_DESTINATIONS.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+    const list = suggestedDestinations.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setSearchHi((p) => Math.min(p + 1, list.length - 1));
@@ -252,73 +371,47 @@ export default function TravelHistoryDrawer({ isOpen, onClose, items, setItems }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/35 backdrop-blur-[2px] select-none">
       <div className="w-[88vw] max-w-[850px] h-full bg-white shadow-2xl flex flex-col overflow-hidden border-l border-[#E2E8F0]">
+        
         {/* Header */}
         <div className="px-5 py-4 border-b border-[#F1F5F9] flex items-center justify-between shrink-0 bg-[#FAFBFC]">
           <div className="flex items-center gap-2.5">
-            <div className="rounded-md bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs px-1.5 py-0.5 shadow-sm">✈️</div>
+            <div className="rounded-md bg-rose-100 flex items-center justify-center text-rose-700 text-xs px-1 shadow-sm">📕</div>
             <span className="text-[13px] font-extrabold text-[#1E293B]">Travel History</span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-7 h-7 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] flex items-center justify-center text-[#94A3B8] hover:text-[#475569] transition-all"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+          <button type="button" onClick={onClose} className="w-7 h-7 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] flex items-center justify-center text-[#94A3B8] hover:text-[#475569] transition-all">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
 
         {/* Body */}
         <div className="p-5 flex-1 flex flex-col space-y-4 overflow-y-auto min-h-0">
+          
           {/* Search */}
           <div className="relative">
             <div className="relative flex items-center">
               <svg className="absolute left-3 w-3.5 h-3.5 fill-[#CBD5E0] pointer-events-none" viewBox="0 0 512 512">
-                <path d="M505 442.7L405.3 343c-4.5-4.5-10.6-7-17-7H372c27.6-35.3 44-79.7 44-128C416 93.1 322.9 0 208 0S0 93.1 0 208s93.1 208 208 208c48.3 0 92.7-16.4 128-44v16.3c0 6.4 2.5 12.5 7 17l99.7 99.7c9.4 9.4 24.6 9.4 33.9 0l28.3-28.3c9.4-9.4 9.4-24.6.1-34zM208 336c-70.7 0-128-57.2-128-128 0-70.7 57.2-128 128-128 70.7 0 128 57.2 128 128 0 70.7-57.2 128-128 128z" />
+                <path d="M505 442.7L405.3 343c-4.5-4.5-10.6-7-17-7H372c27.6-35.3 44-79.7 44-128C416 93.1 322.9 0 208 0S0 93.1 0 208s93.1 208 208 208c48.3 0 92.7-16.4 128-44v16.3c0 6.4 2.5 12.5 7 17l99.7 99.7c9.4 9.4 24.6 9.4 33.9 0l28.3-28.3c9.4-9.4 9.4-24.6.1-34zM208 336c-70.7 0-128-57.2-128-128 0-70.7 57.2-128 128-128 70.7 0 128 57.2 128 128 0 70.7-57.2 128-128 128z"/>
               </svg>
-              <input
-                type="text"
-                placeholder="Start typing a parameter..."
-                value={searchVal}
-                onChange={(e) => {
-                  setSearchVal(e.target.value);
-                  setSearchHi(-1);
-                  setSearchOpen(true);
-                }}
-                onFocus={() => {
-                  setSearchOpen(true);
-                  setSearchHi(-1);
-                }}
+              <input type="text" placeholder="Start typing a parameter..." value={searchVal}
+                onChange={(e) => { setSearchVal(e.target.value); setSearchHi(-1); setSearchOpen(true); }}
+                onFocus={() => { setSearchOpen(true); setSearchHi(-1); }}
                 onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
                 onKeyDown={handleSearchKey}
                 className="w-full h-9 pl-9 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-semibold transition-all"
               />
               {searchVal.trim() && (
-                <button
-                  type="button"
-                  onClick={() => addItem(searchVal)}
-                  className="absolute right-3 text-blue-600 hover:text-blue-700 text-[10px] font-bold"
-                >
-                  + Add
-                </button>
+                <button type="button" onClick={() => addItem(searchVal)} className="absolute right-3 text-blue-600 hover:text-blue-700 text-[10px] font-bold">+ Add</button>
               )}
             </div>
             {searchOpen && (() => {
-              const list = SUGGESTED_DESTINATIONS.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+              const list = suggestedDestinations.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
               if (!list.length) return null;
               return (
                 <div className="absolute left-0 right-0 top-full mt-1.5 z-[60] bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
                   {list.map((opt, i) => (
-                    <div
-                      key={opt}
-                      onMouseDown={() => addItem(opt)}
-                      className={`px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 text-[11.5px] font-semibold text-[#1E293B] transition-colors ${
-                        i === searchHi ? "bg-blue-50" : "hover:bg-[#F8FAFC]"
-                      }`}
-                    >
-                      {opt}
-                    </div>
+                    <div key={opt} onMouseDown={() => addItem(opt)}
+                      className={`px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 text-[11.5px] font-semibold text-[#1E293B] transition-colors ${i === searchHi ? "bg-blue-50" : "hover:bg-[#F8FAFC]"}`}
+                    >{opt}</div>
                   ))}
                 </div>
               );
@@ -344,82 +437,48 @@ export default function TravelHistoryDrawer({ isOpen, onClose, items, setItems }
             ) : (
               <div className="p-3.5 space-y-2">
                 {items.map((item, idx) => (
-                  <div
-                    key={item.id}
-                    data-drag-row="true"
-                    draggable="false"
+                  <div key={item.id} data-drag-row="true" draggable="false"
                     onDragStart={() => onDragStart(idx)}
                     onDragOver={(e) => onDragOver(e, idx)}
-                    onDragEnd={(e) => {
-                      onDragEnd();
-                      e.currentTarget.setAttribute("draggable", "false");
-                    }}
+                    onDragEnd={(e) => { onDragEnd(); e.currentTarget.setAttribute("draggable", "false"); }}
                     className="flex items-stretch min-h-[38px] bg-white rounded-lg border border-[#E2E8F0] overflow-visible"
                   >
                     <div
-                      onMouseDown={(e) => {
-                        const el = e.currentTarget.closest("[data-drag-row]");
-                        if (el) el.setAttribute("draggable", "true");
-                      }}
-                      onMouseUp={(e) => {
-                        const el = e.currentTarget.closest("[data-drag-row]");
-                        if (el) el.setAttribute("draggable", "false");
-                      }}
+                      onMouseDown={(e) => { const el = e.currentTarget.closest("[data-drag-row]"); if (el) el.setAttribute("draggable", "true"); }}
+                      onMouseUp={(e) => { const el = e.currentTarget.closest("[data-drag-row]"); if (el) el.setAttribute("draggable", "false"); }}
                       className="flex items-center justify-center w-8 shrink-0 border-r border-[#E2E8F0] bg-slate-50/50 cursor-grab text-slate-400"
                     >
                       <svg viewBox="0 0 10 16" fill="currentColor" className="w-2.5 h-3.5">
-                        <circle cx="2" cy="2" r="1.2" />
-                        <circle cx="8" cy="2" r="1.2" />
-                        <circle cx="2" cy="8" r="1.2" />
-                        <circle cx="8" cy="8" r="1.2" />
-                        <circle cx="2" cy="14" r="1.2" />
-                        <circle cx="8" cy="14" r="1.2" />
+                        <circle cx="2" cy="2" r="1.2"/><circle cx="8" cy="2" r="1.2"/>
+                        <circle cx="2" cy="8" r="1.2"/><circle cx="8" cy="8" r="1.2"/>
+                        <circle cx="2" cy="14" r="1.2"/><circle cx="8" cy="14" r="1.2"/>
                       </svg>
                     </div>
+                    
+                    {/* destination */}
                     <div className="relative w-[30%] shrink-0 border-r border-[#E2E8F0] flex items-center">
-                      <input
-                        type="text"
-                        value={item.destination}
+                      <input type="text" value={item.destination}
                         onChange={(e) => patch(item.id, { destination: e.target.value })}
-                        onFocus={() => {
-                          setFocusId(item.id);
-                          setFocusField("destination");
-                          setRowHi(-1);
-                        }}
-                        onBlur={() =>
-                          setTimeout(() => {
-                            setFocusId(null);
-                            setFocusField(null);
-                            setRowHi(-1);
-                          }, 160)
-                        }
-                        onKeyDown={(e) => handleRowKey(e, item.id, "destination", SUGGESTED_DESTINATIONS, item.destination)}
+                        onFocus={() => handleInputFocus(item.id, "destination")}
+                        onBlur={() => handleInputBlur(140, item.destination)}
+                        onKeyDown={(e) => handleRowKey(e, item.id, "destination", suggestedDestinations, item.destination)}
                         placeholder="Destination"
                         className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-300"
                       />
-                      <InlineDD id={item.id} field="destination" opts={SUGGESTED_DESTINATIONS} val={item.destination} />
+                      <InlineDD id={item.id} field="destination" opts={suggestedDestinations} val={item.destination} />
                     </div>
+
                     {/* Travel Date */}
                     <div className="relative w-[22%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white overflow-visible">
                       <input
                         type="text"
                         value={item.travelDate}
                         onChange={(e) => patch(item.id, { travelDate: e.target.value })}
-                        onFocus={() => {
-                          setFocusId(item.id);
-                          setFocusField("travelDate");
-                          setRowHi(-1);
-                        }}
-                        onBlur={() =>
-                          setTimeout(() => {
-                            setFocusId(null);
-                            setFocusField(null);
-                            setRowHi(-1);
-                          }, 160)
-                        }
+                        onFocus={() => handleInputFocus(item.id, "travelDate")}
+                        onBlur={handleSinceBlur}
                         onKeyDown={(e) => handleRowKey(e, item.id, "travelDate", SUGGESTED_SINCE, item.travelDate)}
                         placeholder="Travel Date"
-                        className="w-full h-full border-0 focus:ring-0 pl-3 pr-7 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
+                        className="w-full h-full border-0 focus:ring-0 pl-3 pr-7 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-355"
                       />
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center cursor-pointer text-slate-350 hover:text-slate-500 transition-colors z-10">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
@@ -441,56 +500,37 @@ export default function TravelHistoryDrawer({ isOpen, onClose, items, setItems }
                       </div>
                       <InlineDD id={item.id} field="travelDate" opts={SUGGESTED_SINCE} val={item.travelDate} />
                     </div>
+
+                    {/* status */}
                     <div className="relative w-[22%] shrink-0 border-r border-[#E2E8F0] flex items-center">
-                      <input
-                        type="text"
-                        value={item.status}
+                      <input type="text" value={item.status}
                         onChange={(e) => patch(item.id, { status: e.target.value })}
-                        onFocus={() => {
-                          setFocusId(item.id);
-                          setFocusField("status");
-                          setRowHi(-1);
-                        }}
-                        onBlur={() =>
-                          setTimeout(() => {
-                            setFocusId(null);
-                            setFocusField(null);
-                            setRowHi(-1);
-                          }, 160)
-                        }
-                        onKeyDown={(e) => handleRowKey(e, item.id, "status", SUGGESTED_STATUSES, item.status)}
+                        onFocus={() => handleInputFocus(item.id, "status")}
+                        onBlur={() => handleInputBlur(141, item.status)}
+                        onKeyDown={(e) => handleRowKey(e, item.id, "status", suggestedStatuses, item.status)}
                         placeholder="Status"
                         className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-emerald-600 bg-transparent outline-none placeholder:text-slate-300"
                       />
-                      <InlineDD id={item.id} field="status" opts={SUGGESTED_STATUSES} val={item.status} />
+                      <InlineDD id={item.id} field="status" opts={suggestedStatuses} val={item.status} />
                     </div>
+
+                    {/* notes */}
                     <div className="relative flex-1 border-r border-[#E2E8F0] flex items-center">
-                      <input
-                        type="text"
-                        value={item.notes}
+                      <input type="text" value={item.notes}
                         onChange={(e) => patch(item.id, { notes: e.target.value })}
-                        onFocus={() => {
-                          setFocusId(item.id);
-                          setFocusField("notes");
-                          setRowHi(-1);
-                        }}
-                        onBlur={() =>
-                          setTimeout(() => {
-                            setFocusId(null);
-                            setFocusField(null);
-                            setRowHi(-1);
-                          }, 160)
-                        }
-                        onKeyDown={(e) => handleRowKey(e, item.id, "notes", SUGGESTED_NOTES, item.notes)}
+                        onFocus={() => handleInputFocus(item.id, "notes")}
+                        onBlur={() => handleInputBlur(142, item.notes)}
+                        onKeyDown={(e) => handleRowKey(e, item.id, "notes", suggestedNotes, item.notes)}
                         placeholder="Add notes here"
                         className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-[#CBD5E0]"
                       />
-                      <InlineDD id={item.id} field="notes" opts={SUGGESTED_NOTES} val={item.notes} />
+                      <InlineDD id={item.id} field="notes" opts={suggestedNotes} val={item.notes} />
                     </div>
+
                     <div className="w-9 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors cursor-pointer">
                       <button type="button" onClick={() => remove(item.id)} className="p-1">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                         </svg>
                       </button>
                     </div>
@@ -503,20 +543,8 @@ export default function TravelHistoryDrawer({ isOpen, onClose, items, setItems }
 
         {/* Footer */}
         <div className="px-5 py-3.5 border-t border-[#F1F5F9] bg-[#FAFBFC] flex items-center justify-end gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[11.5px] font-bold text-[#64748B] rounded-lg transition-all"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-[11.5px] font-extrabold text-white rounded-lg transition-all shadow-md"
-          >
-            Save & Close
-          </button>
+          <button type="button" onClick={onClose} className="px-4 py-2 border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[11.5px] font-bold text-[#64748B] rounded-lg transition-all">Cancel</button>
+          <button type="button" onClick={onClose} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-[11.5px] font-extrabold text-white rounded-lg transition-all shadow-md">Save & Close</button>
         </div>
       </div>
     </div>

@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
-/* ─── Static suggestion lists ────────────────────────────────────── */
-const SUGGESTED_NAMES = [
+/* ─── Static suggestion defaults (Fallbacks if DB empty) ─────────── */
+const DEFAULT_NAMES = [
   "Appendectomy",
   "Cholecystectomy",
   "Hernia Repair",
@@ -13,19 +14,27 @@ const SUGGESTED_NAMES = [
   "Tonsillectomy"
 ];
 
-const SUGGESTED_STATUSES = ["Yes (Active)", "No (Inactive)", "Completed", "Resolved"];
-const SUGGESTED_NOTES = ["No complications", "Recovered", "Scheduled follow-up"];
+const DEFAULT_STATUSES = ["Yes (Active)", "No (Inactive)", "Completed", "Resolved"];
+const DEFAULT_NOTES = ["No complications", "Recovered", "Scheduled follow-up"];
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
 const convertToISODate = (displayDate: string) => {
   if (!displayDate) return "";
   try {
-    const parts = displayDate.split("/");
+    const cleaned = displayDate.replace(/'/g, " ");
+    const parts = cleaned.split(/\s+/).filter(Boolean);
     if (parts.length < 3) return "";
     const day = parts[0].padStart(2, "0");
-    const month = parts[1].padStart(2, "0");
-    const year = parts[2];
-    return `${year}-${month}-${day}`;
+    const monthStr = parts[1];
+    let yearShort = parts[2];
+    if (yearShort.length === 2) {
+      yearShort = "20" + yearShort;
+    }
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthIdx = months.findIndex(m => monthStr.toLowerCase().startsWith(m.toLowerCase()));
+    if (monthIdx === -1) return "";
+    const month = String(monthIdx + 1).padStart(2, "0");
+    return `${yearShort}-${month}-${day}`;
   } catch (e) {
     return "";
   }
@@ -36,14 +45,58 @@ const formatISODateToDisplay = (isoDate: string) => {
   try {
     const parts = isoDate.split("-");
     if (parts.length < 3) return isoDate;
-    const year = parts[0];
-    const month = parts[1].padStart(2, "0");
-    const day = parts[2].padStart(2, "0");
-    return `${day}/${month}/${year}`;
+    const year = parts[0].slice(2);
+    const monthIdx = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthStr = months[monthIdx] || "Jan";
+    return `${day} ${monthStr} ${year}`;
   } catch (e) {
     return isoDate;
   }
 };
+
+/* ─── Supabase helpers ──────────────────────────────────────────── */
+async function fetchOptions(categoryId: number, defaults: string[]): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("value")
+      .eq("category_id", categoryId)
+      .order("usage_count", { ascending: false })
+      .limit(30);
+    if (error) throw error;
+    const list = (data || []).map((d: any) => d.value);
+    return list.length > 0 ? list : defaults;
+  } catch (err) {
+    console.error(`Error fetching category ${categoryId}:`, err);
+    return defaults;
+  }
+}
+
+async function incrementOption(categoryId: number, value: string) {
+  if (!value?.trim()) return;
+  try {
+    const { data: existing } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("id, usage_count")
+      .eq("category_id", categoryId)
+      .ilike("value", value.trim())
+      .maybeSingle();
+    if (existing) {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .update({ usage_count: (existing.usage_count || 0) + 1 })
+        .eq("id", existing.id);
+    } else {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .insert({ category_id: categoryId, value: value.trim(), usage_count: 1 });
+    }
+  } catch (err) {
+    console.error("Error incrementing option:", err);
+  }
+}
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 export interface SurgicalProcedure {
@@ -70,6 +123,10 @@ export default function SurgicalProceduresDrawer({
   procedures,
   setProcedures,
 }: SurgicalProceduresDrawerProps) {
+  const [suggestedNames, setSuggestedNames]         = useState<string[]>(DEFAULT_NAMES);
+  const [suggestedStatuses, setSuggestedStatuses]   = useState<string[]>(DEFAULT_STATUSES);
+  const [suggestedNotes, setSuggestedNotes]         = useState<string[]>(DEFAULT_NOTES);
+
   /* search bar */
   const [searchVal, setSearchVal]   = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -82,21 +139,69 @@ export default function SurgicalProceduresDrawer({
 
   /* drag */
   const dragIdx = useRef<number | null>(null);
+  const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleInputFocus = (id: string, field: string) => {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+    setFocusId(id);
+    setFocusField(field);
+    setRowHi(-1);
+  };
+
+  const handleInputBlur = (categoryId: number, value: string) => {
+    blurTimeoutRef.current = setTimeout(() => {
+      if (value?.trim()) incrementOption(categoryId, value.trim());
+      setFocusId(null);
+      setFocusField(null);
+      setRowHi(-1);
+    }, 180);
+  };
+
+  const handleSinceBlur = () => {
+    blurTimeoutRef.current = setTimeout(() => {
+      setFocusId(null);
+      setFocusField(null);
+      setRowHi(-1);
+    }, 180);
+  };
+
+  // Load from Supabase on mount
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    const load = async () => {
+      const [names, statuses, notes] = await Promise.all([
+        fetchOptions(130, DEFAULT_NAMES),
+        fetchOptions(131, DEFAULT_STATUSES),
+        fetchOptions(132, DEFAULT_NOTES)
+      ]);
+      if (active) {
+        setSuggestedNames(names);
+        setSuggestedStatuses(statuses);
+        setSuggestedNotes(notes);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   /* ─── helpers ─── */
   const addProcedure = (name: string) => {
     if (!name.trim()) return;
-    const todayStr = formatISODateToDisplay(new Date().toISOString().split("T")[0]);
     const newProc = {
       id: Date.now().toString(),
       name: name.trim(),
-      date: todayStr,
+      date: "",
       status: "Yes (Active)",
       notes: ""
     };
     setProcedures((p) => [...p, newProc]);
+    incrementOption(130, name.trim());
     setSearchVal("");
     setSearchOpen(false);
     setSearchHi(-1);
@@ -170,36 +275,75 @@ export default function SurgicalProceduresDrawer({
   const InlineDD = ({ id, field, opts, val }: { id: string; field: string; opts: string[]; val: string }) => {
     if (focusId !== id || focusField !== field) return null;
     const actualOpts = field === "date" ? getSinceOptions(val) : opts;
-    const list = actualOpts.filter((o) => field === "date" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    let list = actualOpts.filter((o) => field === "date" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    
+    // Add "+ Create" option if not a perfect match
+    if (val && val.trim() && !actualOpts.some(o => o.toLowerCase() === val.trim().toLowerCase()) && field !== "date") {
+      list = [...list, `+ Create "${val.trim()}"`];
+    }
+
     if (!list.length) return null;
     return (
       <div className="absolute left-0 top-full mt-0.5 z-40 w-full min-w-[125px] bg-white border border-[#E2E8F0] rounded-lg shadow-xl overflow-hidden max-h-44 overflow-y-auto text-left">
-        {list.map((opt, i) => (
-          <div key={opt}
-            onMouseDown={() => {
-              const finalVal = field === "date" ? calculateSinceDate(opt) : opt;
-              patch(id, { [field]: finalVal });
-              setFocusId(null);
-              setFocusField(null);
-              setRowHi(-1);
-            }}
-            className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
-              ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
-          >{opt}</div>
-        ))}
+        {list.map((opt, i) => {
+          const isCreate = opt.startsWith('+ Create "');
+          let displayVal = opt;
+          if (isCreate) {
+            const match = opt.match(/\+ Create "(.*)"/);
+            displayVal = match ? match[1] : opt;
+          }
+          return (
+            <div key={opt}
+              onMouseDown={() => {
+                const finalVal = field === "date" ? calculateSinceDate(opt) : displayVal;
+                patch(id, { [field]: finalVal });
+                if (isCreate) {
+                  const catId = field === "name" ? 130 : field === "status" ? 131 : 132;
+                  incrementOption(catId, displayVal);
+                }
+                setFocusId(null);
+                setFocusField(null);
+                setRowHi(-1);
+              }}
+              className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
+                ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
+            >
+              {isCreate ? (
+                <span className="text-blue-600 font-bold">
+                  + Create <span className="italic font-semibold">"{displayVal}"</span>
+                </span>
+              ) : opt}
+            </div>
+          );
+        })}
       </div>
     );
   };
 
   const handleRowKey = (e: React.KeyboardEvent, id: string, field: string, opts: string[], val: string) => {
     const actualOpts = field === "date" ? getSinceOptions(val) : opts;
-    const list = actualOpts.filter((o) => field === "date" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    let list = actualOpts.filter((o) => field === "date" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    
+    if (val && val.trim() && !actualOpts.some(o => o.toLowerCase() === val.trim().toLowerCase()) && field !== "date") {
+      list = [...list, `+ Create "${val.trim()}"`];
+    }
+
     if (e.key === "ArrowDown") { e.preventDefault(); setRowHi((p) => Math.min(p + 1, list.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setRowHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {
       e.preventDefault();
       if (rowHi >= 0 && list[rowHi]) {
-        const finalVal = field === "date" ? calculateSinceDate(list[rowHi]) : list[rowHi];
+        const selectedOpt = list[rowHi];
+        const isCreate = selectedOpt.startsWith('+ Create "');
+        let finalVal = selectedOpt;
+        if (isCreate) {
+          const match = selectedOpt.match(/\+ Create "(.*)"/);
+          finalVal = match ? match[1] : selectedOpt;
+          const catId = field === "name" ? 130 : field === "status" ? 131 : 132;
+          incrementOption(catId, finalVal);
+        } else if (field === "date") {
+          finalVal = calculateSinceDate(selectedOpt);
+        }
         patch(id, { [field]: finalVal });
         setFocusId(null);
         setFocusField(null);
@@ -211,7 +355,7 @@ export default function SurgicalProceduresDrawer({
 
   /* search key events */
   const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const list = SUGGESTED_NAMES.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+    const list = suggestedNames.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
     if (e.key === "ArrowDown") { e.preventDefault(); setSearchHi((p) => Math.min(p + 1, list.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setSearchHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {
@@ -234,7 +378,7 @@ export default function SurgicalProceduresDrawer({
             <div className="w-6.5 h-6.5 rounded-md bg-rose-100 flex items-center justify-center text-rose-700 text-xs shadow-sm">
               📕
             </div>
-            <span className="text-[13px] font-extrabold text-[#1E293B]">Past Surgical Procedures</span>
+            <span className="text-[13px] font-extrabold text-[#1E293B]">Surgical History</span>
           </div>
           <button type="button" onClick={onClose}
             className="w-7 h-7 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] flex items-center justify-center text-[#94A3B8] hover:text-[#475569] transition-all">
@@ -271,7 +415,7 @@ export default function SurgicalProceduresDrawer({
 
             {/* Suggestions Overlay */}
             {searchOpen && (() => {
-              const list = SUGGESTED_NAMES.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+              const list = suggestedNames.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
               if (!list.length) return null;
               return (
                 <div className="absolute left-0 right-0 top-full mt-1.5 z-[60] bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
@@ -336,13 +480,13 @@ export default function SurgicalProceduresDrawer({
                       <div className="relative w-[28%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                         <input type="text" value={proc.name}
                           onChange={(e) => patch(proc.id, { name: e.target.value })}
-                          onFocus={() => { setFocusId(proc.id); setFocusField("name"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                          onKeyDown={(e) => handleRowKey(e, proc.id, "name", SUGGESTED_NAMES, proc.name)}
+                          onFocus={() => handleInputFocus(proc.id, "name")}
+                          onBlur={() => handleInputBlur(130, proc.name)}
+                          onKeyDown={(e) => handleRowKey(e, proc.id, "name", suggestedNames, proc.name)}
                           placeholder="Name"
-                          className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-300"
+                          className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-355"
                         />
-                        <InlineDD id={proc.id} field="name" opts={SUGGESTED_NAMES} val={proc.name} />
+                        <InlineDD id={proc.id} field="name" opts={suggestedNames} val={proc.name} />
                       </div>
 
                       {/* Date */}
@@ -351,8 +495,8 @@ export default function SurgicalProceduresDrawer({
                           type="text"
                           value={proc.date}
                           onChange={(e) => patch(proc.id, { date: e.target.value })}
-                          onFocus={() => { setFocusId(proc.id); setFocusField("date"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
+                          onFocus={() => handleInputFocus(proc.id, "date")}
+                          onBlur={handleSinceBlur}
                           onKeyDown={(e) => handleRowKey(e, proc.id, "date", SUGGESTED_SINCE, proc.date)}
                           placeholder="Date"
                           className="w-full h-full border-0 focus:ring-0 pl-3 pr-7 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
@@ -382,26 +526,26 @@ export default function SurgicalProceduresDrawer({
                       <div className="relative w-[22%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                         <input type="text" value={proc.status}
                           onChange={(e) => patch(proc.id, { status: e.target.value })}
-                          onFocus={() => { setFocusId(proc.id); setFocusField("status"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                          onKeyDown={(e) => handleRowKey(e, proc.id, "status", SUGGESTED_STATUSES, proc.status)}
+                          onFocus={() => handleInputFocus(proc.id, "status")}
+                          onBlur={() => handleInputBlur(131, proc.status)}
+                          onKeyDown={(e) => handleRowKey(e, proc.id, "status", suggestedStatuses, proc.status)}
                           placeholder="Status"
                           className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-emerald-600 bg-transparent outline-none placeholder:text-slate-350"
                         />
-                        <InlineDD id={proc.id} field="status" opts={SUGGESTED_STATUSES} val={proc.status} />
+                        <InlineDD id={proc.id} field="status" opts={suggestedStatuses} val={proc.status} />
                       </div>
 
                       {/* notes */}
                       <div className="relative w-[22%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                         <input type="text" value={proc.notes}
                           onChange={(e) => patch(proc.id, { notes: e.target.value })}
-                          onFocus={() => { setFocusId(proc.id); setFocusField("notes"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                          onKeyDown={(e) => handleRowKey(e, proc.id, "notes", SUGGESTED_NOTES, proc.notes)}
+                          onFocus={() => handleInputFocus(proc.id, "notes")}
+                          onBlur={() => handleInputBlur(132, proc.notes)}
+                          onKeyDown={(e) => handleRowKey(e, proc.id, "notes", suggestedNotes, proc.notes)}
                           placeholder="Add notes here"
-                          className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
+                          className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-355"
                         />
-                        <InlineDD id={proc.id} field="notes" opts={SUGGESTED_NOTES} val={proc.notes} />
+                        <InlineDD id={proc.id} field="notes" opts={suggestedNotes} val={proc.notes} />
                       </div>
 
                       {/* delete action */}

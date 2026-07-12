@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
-/* ─── Static suggestion lists ────────────────────────────────────── */
-const SUGGESTED_NAMES = [
+/* ─── Static suggestion defaults (Fallbacks if DB empty) ─────────── */
+const DEFAULT_NAMES = [
   "Tobacco",
   "Smoke",
   "Alcohol",
@@ -12,16 +13,7 @@ const SUGGESTED_NAMES = [
   "Sleep Habit"
 ];
 
-const SUGGESTED_SINCE = [
-  "Since childhood",
-  "1 Year",
-  "2 Years",
-  "3 Years",
-  "5 Years",
-  "10 Years"
-];
-
-const SUGGESTED_FREQUENCY = [
+const DEFAULT_FREQS = [
   "1 time a day",
   "2 times a day",
   "3 times a day",
@@ -30,8 +22,50 @@ const SUGGESTED_FREQUENCY = [
   "Socially"
 ];
 
-const SUGGESTED_STATUSES = ["Yes (Active)", "No (Inactive)"];
-const SUGGESTED_NOTES = ["Trying to quit", "Reduced intake", "Regular habit"];
+const DEFAULT_STATUSES = ["Yes (Active)", "No (Inactive)"];
+const DEFAULT_NOTES = ["Trying to quit", "Reduced intake", "Regular habit"];
+
+/* ─── Supabase helpers ──────────────────────────────────────────── */
+async function fetchOptions(categoryId: number, defaults: string[]): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("value")
+      .eq("category_id", categoryId)
+      .order("usage_count", { ascending: false })
+      .limit(30);
+    if (error) throw error;
+    const list = (data || []).map((d: any) => d.value);
+    return list.length > 0 ? list : defaults;
+  } catch (err) {
+    console.error(`Error fetching category ${categoryId}:`, err);
+    return defaults;
+  }
+}
+
+async function incrementOption(categoryId: number, value: string) {
+  if (!value?.trim()) return;
+  try {
+    const { data: existing } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("id, usage_count")
+      .eq("category_id", categoryId)
+      .ilike("value", value.trim())
+      .maybeSingle();
+    if (existing) {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .update({ usage_count: (existing.usage_count || 0) + 1 })
+        .eq("id", existing.id);
+    } else {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .insert({ category_id: categoryId, value: value.trim(), usage_count: 1 });
+    }
+  } catch (err) {
+    console.error("Error incrementing option:", err);
+  }
+}
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 export interface LifestyleHabit {
@@ -59,6 +93,11 @@ export default function LifestyleHabitsDrawer({
   habits,
   setHabits,
 }: LifestyleHabitsDrawerProps) {
+  const [suggestedNames, setSuggestedNames]         = useState<string[]>(DEFAULT_NAMES);
+  const [suggestedFreqs, setSuggestedFreqs]         = useState<string[]>(DEFAULT_FREQS);
+  const [suggestedStatuses, setSuggestedStatuses]   = useState<string[]>(DEFAULT_STATUSES);
+  const [suggestedNotes, setSuggestedNotes]         = useState<string[]>(DEFAULT_NOTES);
+
   /* search bar */
   const [searchVal, setSearchVal]   = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -71,6 +110,56 @@ export default function LifestyleHabitsDrawer({
 
   /* drag */
   const dragIdx = useRef<number | null>(null);
+  const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleInputFocus = (id: string, field: string) => {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+    setFocusId(id);
+    setFocusField(field);
+    setRowHi(-1);
+  };
+
+  const handleInputBlur = (categoryId: number, value: string) => {
+    blurTimeoutRef.current = setTimeout(() => {
+      if (value?.trim()) incrementOption(categoryId, value.trim());
+      setFocusId(null);
+      setFocusField(null);
+      setRowHi(-1);
+    }, 180);
+  };
+
+  const handleSinceBlur = () => {
+    blurTimeoutRef.current = setTimeout(() => {
+      setFocusId(null);
+      setFocusField(null);
+      setRowHi(-1);
+    }, 180);
+  };
+
+  // Load from Supabase on mount
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    const load = async () => {
+      const [names, freqs, statuses, notes] = await Promise.all([
+        fetchOptions(100, DEFAULT_NAMES),
+        fetchOptions(101, DEFAULT_FREQS),
+        fetchOptions(102, DEFAULT_STATUSES),
+        fetchOptions(103, DEFAULT_NOTES)
+      ]);
+      if (active) {
+        setSuggestedNames(names);
+        setSuggestedFreqs(freqs);
+        setSuggestedStatuses(statuses);
+        setSuggestedNotes(notes);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -86,6 +175,7 @@ export default function LifestyleHabitsDrawer({
       notes: ""
     };
     setHabits((p) => [...p, newHabit]);
+    incrementOption(100, name.trim());
     setSearchVal("");
     setSearchOpen(false);
     setSearchHi(-1);
@@ -150,36 +240,75 @@ export default function LifestyleHabitsDrawer({
   const InlineDD = ({ id, field, opts, val }: { id: string; field: string; opts: string[]; val: string }) => {
     if (focusId !== id || focusField !== field) return null;
     const actualOpts = field === "since" ? getSinceOptions(val) : opts;
-    const list = actualOpts.filter((o) => field === "since" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    let list = actualOpts.filter((o) => field === "since" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    
+    // Add "+ Create" option if not a perfect match
+    if (val && val.trim() && !actualOpts.some(o => o.toLowerCase() === val.trim().toLowerCase()) && field !== "since") {
+      list = [...list, `+ Create "${val.trim()}"`];
+    }
+
     if (!list.length) return null;
     return (
       <div className="absolute left-0 top-full mt-0.5 z-40 w-full min-w-[125px] bg-white border border-[#E2E8F0] rounded-lg shadow-xl overflow-hidden max-h-44 overflow-y-auto text-left">
-        {list.map((opt, i) => (
-          <div key={opt}
-            onMouseDown={() => {
-              const finalVal = field === "since" ? calculateSinceDate(opt) : opt;
-              patch(id, { [field]: finalVal });
-              setFocusId(null);
-              setFocusField(null);
-              setRowHi(-1);
-            }}
-            className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
-              ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
-          >{opt}</div>
-        ))}
+        {list.map((opt, i) => {
+          const isCreate = opt.startsWith('+ Create "');
+          let displayVal = opt;
+          if (isCreate) {
+            const match = opt.match(/\+ Create "(.*)"/);
+            displayVal = match ? match[1] : opt;
+          }
+          return (
+            <div key={opt}
+              onMouseDown={() => {
+                const finalVal = field === "since" ? calculateSinceDate(opt) : displayVal;
+                patch(id, { [field]: finalVal });
+                if (isCreate) {
+                  const catId = field === "name" ? 100 : field === "frequency" ? 101 : field === "status" ? 102 : 103;
+                  incrementOption(catId, displayVal);
+                }
+                setFocusId(null);
+                setFocusField(null);
+                setRowHi(-1);
+              }}
+              className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
+                ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
+            >
+              {isCreate ? (
+                <span className="text-blue-600 font-bold">
+                  + Create <span className="italic font-semibold">"{displayVal}"</span>
+                </span>
+              ) : opt}
+            </div>
+          );
+        })}
       </div>
     );
   };
 
   const handleRowKey = (e: React.KeyboardEvent, id: string, field: string, opts: string[], val: string) => {
     const actualOpts = field === "since" ? getSinceOptions(val) : opts;
-    const list = actualOpts.filter((o) => field === "since" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    let list = actualOpts.filter((o) => field === "since" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    
+    if (val && val.trim() && !actualOpts.some(o => o.toLowerCase() === val.trim().toLowerCase()) && field !== "since") {
+      list = [...list, `+ Create "${val.trim()}"`];
+    }
+
     if (e.key === "ArrowDown") { e.preventDefault(); setRowHi((p) => Math.min(p + 1, list.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setRowHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {
       e.preventDefault();
       if (rowHi >= 0 && list[rowHi]) {
-        const finalVal = field === "since" ? calculateSinceDate(list[rowHi]) : list[rowHi];
+        const selectedOpt = list[rowHi];
+        const isCreate = selectedOpt.startsWith('+ Create "');
+        let finalVal = selectedOpt;
+        if (isCreate) {
+          const match = selectedOpt.match(/\+ Create "(.*)"/);
+          finalVal = match ? match[1] : selectedOpt;
+          const catId = field === "name" ? 100 : field === "frequency" ? 101 : field === "status" ? 102 : 103;
+          incrementOption(catId, finalVal);
+        } else if (field === "since") {
+          finalVal = calculateSinceDate(selectedOpt);
+        }
         patch(id, { [field]: finalVal });
         setFocusId(null);
         setFocusField(null);
@@ -191,7 +320,7 @@ export default function LifestyleHabitsDrawer({
 
   /* search key events */
   const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const list = SUGGESTED_NAMES.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+    const list = suggestedNames.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
     if (e.key === "ArrowDown") { e.preventDefault(); setSearchHi((p) => Math.min(p + 1, list.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setSearchHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {
@@ -251,7 +380,7 @@ export default function LifestyleHabitsDrawer({
 
             {/* Suggestions Overlay */}
             {searchOpen && (() => {
-              const list = SUGGESTED_NAMES.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+              const list = suggestedNames.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
               if (!list.length) return null;
               return (
                 <div className="absolute left-0 right-0 top-full mt-1.5 z-[60] bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
@@ -317,66 +446,66 @@ export default function LifestyleHabitsDrawer({
                       <div className="relative w-[24%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                         <input type="text" value={item.name}
                           onChange={(e) => patch(item.id, { name: e.target.value })}
-                          onFocus={() => { setFocusId(item.id); setFocusField("name"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                          onKeyDown={(e) => handleRowKey(e, item.id, "name", SUGGESTED_NAMES, item.name)}
+                          onFocus={() => handleInputFocus(item.id, "name")}
+                          onBlur={() => handleInputBlur(100, item.name)}
+                          onKeyDown={(e) => handleRowKey(e, item.id, "name", suggestedNames, item.name)}
                           placeholder="Name"
                           className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-350"
                         />
-                        <InlineDD id={item.id} field="name" opts={SUGGESTED_NAMES} val={item.name} />
+                        <InlineDD id={item.id} field="name" opts={suggestedNames} val={item.name} />
                       </div>
 
                       {/* since */}
                       <div className="relative w-[18%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                         <input type="text" value={item.since}
                           onChange={(e) => patch(item.id, { since: e.target.value })}
-                          onFocus={() => { setFocusId(item.id); setFocusField("since"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                          onKeyDown={(e) => handleRowKey(e, item.id, "since", SUGGESTED_SINCE, item.since)}
+                          onFocus={() => handleInputFocus(item.id, "since")}
+                          onBlur={handleSinceBlur}
+                          onKeyDown={(e) => handleRowKey(e, item.id, "since", [], item.since)}
                           placeholder="Since"
                           className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                         />
-                        <InlineDD id={item.id} field="since" opts={SUGGESTED_SINCE} val={item.since} />
+                        <InlineDD id={item.id} field="since" opts={[]} val={item.since} />
                       </div>
 
                       {/* frequency */}
                       <div className="relative w-[18%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                         <input type="text" value={item.frequency}
                           onChange={(e) => patch(item.id, { frequency: e.target.value })}
-                          onFocus={() => { setFocusId(item.id); setFocusField("frequency"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                          onKeyDown={(e) => handleRowKey(e, item.id, "frequency", SUGGESTED_FREQUENCY, item.frequency)}
+                          onFocus={() => handleInputFocus(item.id, "frequency")}
+                          onBlur={() => handleInputBlur(101, item.frequency)}
+                          onKeyDown={(e) => handleRowKey(e, item.id, "frequency", suggestedFreqs, item.frequency)}
                           placeholder="times a day"
                           className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                         />
-                        <InlineDD id={item.id} field="frequency" opts={SUGGESTED_FREQUENCY} val={item.frequency} />
+                        <InlineDD id={item.id} field="frequency" opts={suggestedFreqs} val={item.frequency} />
                       </div>
 
                       {/* status */}
                       <div className="relative w-[18%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                         <input type="text" value={item.status}
                           onChange={(e) => patch(item.id, { status: e.target.value })}
-                          onFocus={() => { setFocusId(item.id); setFocusField("status"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                          onKeyDown={(e) => handleRowKey(e, item.id, "status", SUGGESTED_STATUSES, item.status)}
+                          onFocus={() => handleInputFocus(item.id, "status")}
+                          onBlur={() => handleInputBlur(102, item.status)}
+                          onKeyDown={(e) => handleRowKey(e, item.id, "status", suggestedStatuses, item.status)}
                           placeholder="Status"
-                          className={`w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold bg-transparent outline-none placeholder:text-slate-350
+                          className={`w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold bg-transparent outline-none placeholder:text-slate-355
                             ${item.status === "Yes (Active)" ? "text-emerald-600" : "text-[#C5221F]"}`}
                         />
-                        <InlineDD id={item.id} field="status" opts={SUGGESTED_STATUSES} val={item.status} />
+                        <InlineDD id={item.id} field="status" opts={suggestedStatuses} val={item.status} />
                       </div>
 
                       {/* notes */}
                       <div className="relative w-[18%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                         <input type="text" value={item.notes}
                           onChange={(e) => patch(item.id, { notes: e.target.value })}
-                          onFocus={() => { setFocusId(item.id); setFocusField("notes"); setRowHi(-1); }}
-                          onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                          onKeyDown={(e) => handleRowKey(e, item.id, "notes", SUGGESTED_NOTES, item.notes)}
+                          onFocus={() => handleInputFocus(item.id, "notes")}
+                          onBlur={() => handleInputBlur(103, item.notes)}
+                          onKeyDown={(e) => handleRowKey(e, item.id, "notes", suggestedNotes, item.notes)}
                           placeholder="Add notes here"
                           className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                         />
-                        <InlineDD id={item.id} field="notes" opts={SUGGESTED_NOTES} val={item.notes} />
+                        <InlineDD id={item.id} field="notes" opts={suggestedNotes} val={item.notes} />
                       </div>
 
                       {/* delete action */}
