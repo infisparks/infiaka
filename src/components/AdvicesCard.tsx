@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 
 interface AdvicesCardProps {
   advicesInput: string;
@@ -17,50 +17,143 @@ export default function AdvicesCard({
   advRest,
   setAdvRest,
   advWater,
-  setAdvWater,
+  setAdvWater
 }: AdvicesCardProps) {
-  return (
-    <section className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-4 shadow-sm w-full">
-      <span className="text-[10px] font-bold text-[#4A5568] uppercase flex items-center gap-1.5 select-none border-b pb-1.5">
-        Advices
-      </span>
+  // Local list of templates, allowing the doctor to dynamically add new ones ("create master")
+  const [customTemplates, setCustomTemplates] = useState<string[]>([]);
+  const [typedTemplate, setTypedTemplate] = useState("");
 
-      <div className="space-y-2">
+  const handleSaveToMaster = () => {
+    const text = advicesInput.trim();
+    if (!text) return;
+    // Check if it's already in the default or custom templates to avoid duplicates
+    const defaultTemplates = ["Please take some rest.", "Drink plenty of water."];
+    if (!defaultTemplates.includes(text) && !customTemplates.includes(text)) {
+      setCustomTemplates((prev) => [...prev, text]);
+      alert("Added to master templates list!");
+    }
+  };
+
+  // Toggle checklist template click helper
+  const handleToggleTemplate = (templateText: string, isChecked: boolean) => {
+    let currentInput = advicesInput.trim();
+    if (isChecked) {
+      // Add text if not already present
+      if (!currentInput.includes(templateText)) {
+        setAdvicesInput(currentInput ? `${currentInput}\n${templateText}` : templateText);
+      }
+    } else {
+      // Remove text
+      const regex = new RegExp(`(^|\\n)${templateText.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&")}(\\n|$)`, "g");
+      const cleaned = currentInput.replace(regex, "\n").trim();
+      setAdvicesInput(cleaned);
+    }
+  };
+
+  return (
+    <section className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-4 shadow-sm w-full select-none text-left">
+      {/* Header */}
+      <div className="flex justify-between items-center border-b pb-2 select-none">
+        <span className="text-[11px] font-extrabold text-[#1E293B] uppercase flex items-center gap-1.5">
+          <svg className="w-4 h-4 text-slate-500 fill-slate-500/10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+          Advices
+        </span>
+        <div className="flex items-center gap-2">
+          {/* Floppy save to master templates */}
+          <button
+            type="button"
+            onClick={handleSaveToMaster}
+            className="p-1 hover:bg-[#F1F5F9] rounded text-slate-500 hover:text-indigo-600 transition-colors"
+            title="Create Master (Save current advice text to templates list)"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V8l-4-4H8zm2 0v5h4V4H10zm-1 9h6v6H9v-6z" />
+            </svg>
+          </button>
+          {/* Quick template button */}
+          <button
+            type="button"
+            className="flex items-center gap-1 px-1.5 py-0.5 hover:bg-[#F1F5F9] rounded text-slate-500 hover:text-indigo-600 text-[10px] font-bold transition-colors"
+            title="Advices Templates Quick-List"
+          >
+            <span>T</span>
+            <span className="text-[8px] font-bold lowercase">adv</span>
+          </button>
+          {/* Full screen */}
+          <button
+            type="button"
+            className="p-1 hover:bg-[#F1F5F9] rounded text-slate-500 hover:text-indigo-600 transition-colors"
+            title="Full Screen View"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
         {/* Formatting bar mockup */}
-        <div className="flex gap-1.5 text-[10px] font-bold text-[#718096] border-b pb-1 mb-1.5 select-none">
-          <button type="button" className="px-1.5 py-0.5 hover:bg-slate-100 rounded">B</button>
-          <button type="button" className="px-1.5 py-0.5 hover:bg-slate-100 rounded italic">I</button>
-          <button type="button" className="px-1.5 py-0.5 hover:bg-slate-100 rounded">Bullet List</button>
+        <div className="flex gap-2 text-[10px] font-extrabold text-[#718096] border-b pb-1 select-none items-center">
+          <button type="button" className="px-1.5 py-0.5 hover:bg-[#F1F5F9] rounded">B</button>
+          <button type="button" className="px-1.5 py-0.5 hover:bg-[#F1F5F9] rounded italic">I</button>
+          <button type="button" className="px-1.5 py-0.5 hover:bg-[#F1F5F9] rounded">
+            <svg className="w-3.5 h-3.5 inline-block text-slate-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
         </div>
 
+        {/* Text Area */}
         <textarea
-          rows={2}
+          rows={3}
           value={advicesInput}
           onChange={(e) => setAdvicesInput(e.target.value)}
-          placeholder="Enter medical advice..."
-          className="w-full p-2 border border-[#CBD5E0] rounded-md text-[11px] focus:outline-none"
+          placeholder="Enter medical advice here..."
+          className="w-full p-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[12px] font-semibold text-[#1E293B] placeholder:text-[#A0AEC0] focus:bg-white focus:outline-none transition-all resize-none"
         />
 
-        {/* Templates checkboxes */}
-        <div className="flex flex-col gap-1.5 select-none text-[10.5px] font-bold text-[#4A5568]">
-          <label className="flex items-center gap-1.5 cursor-pointer">
+        {/* Checkbox Templates Section */}
+        <div className="flex flex-col gap-2 select-none text-[11px] font-bold text-[#4A5568] pt-1">
+          {/* Default templates */}
+          <label className="flex items-center gap-2 cursor-pointer w-fit">
             <input
               type="checkbox"
               checked={advRest}
-              onChange={(e) => setAdvRest(e.target.checked)}
-              className="rounded text-primary border-gray-300 w-3.5 h-3.5"
+              onChange={(e) => {
+                setAdvRest(e.target.checked);
+                handleToggleTemplate("Please take some rest.", e.target.checked);
+              }}
+              className="rounded text-primary border-gray-300 w-4 h-4 cursor-pointer focus:ring-0"
             />
             Please take some rest.
           </label>
-          <label className="flex items-center gap-1.5 cursor-pointer">
+          <label className="flex items-center gap-2 cursor-pointer w-fit">
             <input
               type="checkbox"
               checked={advWater}
-              onChange={(e) => setAdvWater(e.target.checked)}
-              className="rounded text-primary border-gray-300 w-3.5 h-3.5"
+              onChange={(e) => {
+                setAdvWater(e.target.checked);
+                handleToggleTemplate("Drink plenty of water.", e.target.checked);
+              }}
+              className="rounded text-primary border-gray-300 w-4 h-4 cursor-pointer focus:ring-0"
             />
             Drink plenty of water.
           </label>
+
+          {/* Dynamically created templates (Masters) */}
+          {customTemplates.map((text, idx) => (
+            <label key={idx} className="flex items-center gap-2 cursor-pointer w-fit text-[#4B5563]">
+              <input
+                type="checkbox"
+                onChange={(e) => handleToggleTemplate(text, e.target.checked)}
+                className="rounded text-indigo-600 border-gray-300 w-4 h-4 cursor-pointer focus:ring-0"
+              />
+              {text}
+            </label>
+          ))}
         </div>
       </div>
     </section>

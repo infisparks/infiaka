@@ -22,6 +22,8 @@ import LifestyleHabitsDrawer, { LifestyleHabit } from "@/components/LifestyleHab
 import FoodAllergyDrawer, { FoodAllergy } from "@/components/FoodAllergyDrawer";
 import OtherMedHistoryDrawer, { OtherMedHistory } from "@/components/OtherMedHistoryDrawer";
 import TravelHistoryDrawer, { TravelHistoryItem } from "@/components/TravelHistoryDrawer";
+import ProceduresCard, { ProcedureItem } from "@/components/ProceduresCard";
+import ReferToDoctorCard, { ReferralItem } from "@/components/ReferToDoctorCard";
 
 
 interface Patient {
@@ -467,6 +469,17 @@ function DashboardContent() {
   const [advicesInput, setAdvicesInput] = useState("");
   const [advRest, setAdvRest] = useState(false);
   const [advWater, setAdvWater] = useState(false);
+
+  // Procedures list state
+  const [rxProcedures, setRxProcedures] = useState<ProcedureItem[]>([
+    { id: "1", name: "Actinotherapy", duration: "After 3 Days", note: "" },
+    { id: "2", name: "APTT", duration: "After 3 Days", note: "" }
+  ]);
+
+  // Referrals list state
+  const [referrals, setReferrals] = useState<ReferralItem[]>([
+    { id: "1", doctorName: "shaikh mudassir", notes: "" }
+  ]);
 
   // Reset form inputs helper
   const resetForm = () => {
@@ -1241,22 +1254,32 @@ function DashboardContent() {
             setPrivateNotes={setPrivateNotes}
           />
  
-          <FollowUpCard
-            followUpVal={followUpVal}
-            setFollowUpVal={setFollowUpVal}
-            followUpNotes={followUpNotes}
-            setFollowUpNotes={setFollowUpNotes}
-            refDoctorInput={refDoctorInput}
-            setRefDoctorInput={setRefDoctorInput}
+          <ReferToDoctorCard
+            referrals={referrals}
+            setReferrals={setReferrals}
           />
- 
-          <AdvicesCard
-            advicesInput={advicesInput}
-            setAdvicesInput={setAdvicesInput}
-            advRest={advRest}
-            setAdvRest={setAdvRest}
-            advWater={advWater}
-            setAdvWater={setAdvWater}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full items-start">
+            <FollowUpCard
+              followUpVal={followUpVal}
+              setFollowUpVal={setFollowUpVal}
+              followUpNotes={followUpNotes}
+              setFollowUpNotes={setFollowUpNotes}
+            />
+   
+            <AdvicesCard
+              advicesInput={advicesInput}
+              setAdvicesInput={setAdvicesInput}
+              advRest={advRest}
+              setAdvRest={setAdvRest}
+              advWater={advWater}
+              setAdvWater={setAdvWater}
+            />
+          </div>
+
+          <ProceduresCard
+            procedures={rxProcedures}
+            setProcedures={setRxProcedures}
           />
 
         </main>
