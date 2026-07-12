@@ -1,29 +1,137 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-
-/* ─── Static suggestion lists ────────────────────────────────────── */
-const freqMedications = [
-  { name: "Dolopar 650 Tablet", generic: "PARACETAMOL (650MG)", form: "tablet" },
-  { name: "Cyclopam Tablet", generic: "DICYCLOMINE (20MG) + PARACETAMOL (500MG)", form: "tablet" },
-  { name: "Enzoflam Tablet", generic: "DICLOFENAC (50MG) + PARACETAMOL (325MG) + SERRATIOPEPTIDASE (15MG)", form: "tablet" },
-  { name: "Drotin-M Tablet", generic: "DROTAVERINE (80MG) + MEFENAMIC ACID (250MG)", form: "tablet" },
-  { name: "Ultracet Tablet", generic: "PARACETAMOL/ACETAMINOPHEN (325MG) + TRAMADOL (37.5MG)", form: "tablet" },
-  { name: "Drotin Plus Tablet", generic: "DROTAVERINE (80MG) + PARACETAMOL (500MG)", form: "tablet" },
-  { name: "Ultracet Semi Tablet", generic: "PARACETAMOL/ACETAMINOPHEN (162.5MG) + TRAMADOL (18.75MG)", form: "tablet" },
-  { name: "Naproxen 250mg Tablet", generic: "NAPROXEN (250MG)", form: "tablet" }
-];
-
-const SUGGESTED_DOSES = ["1 Tablet", "2 Tablets", "1 Capsule", "2 Capsules", "1 tsp (5ml)", "2 tsp (10ml)", "1 Drop", "2 Drops", "1 Puff", "2 Puffs"];
-const SUGGESTED_FREQS = ["1-1-1", "1-0-1", "1-0-0", "0-1-0", "0-0-1", "Once Daily", "Twice Daily", "Thrice Daily", "As needed (PRN)"];
-const SUGGESTED_TIMINGS = ["After Meal", "Before Meal", "Empty Stomach", "With Food", "Bedtime"];
-const SUGGESTED_DURATIONS = ["3 Days", "5 Days", "7 Days", "10 Days", "15 Days", "30 Days", "Ongoing"];
-const SUGGESTED_STARTS = ["Today", "Tomorrow", "In 2 Days", "In 3 Days"];
-const SUGGESTED_INSTRS = ["if pain", "if fever", "before bed", "empty stomach"];
+import React, { useState, useRef, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { AutoComplete } from "primereact/autocomplete";
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
 const initials = (name: string) =>
   name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+
+// Database helper functions
+async function fetchOptions(categoryId: number, search: string = "") {
+  try {
+    let query = supabase
+      .from("aka_master_dropdown_catalog")
+      .select("value")
+      .eq("category_id", categoryId)
+      .order("usage_count", { ascending: false })
+      .limit(40);
+
+    if (search) {
+      query = query.ilike("value", `%${search}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data.map((d: any) => d.value);
+  } catch (err) {
+    console.error("Error fetching options:", err);
+    return [];
+  }
+}
+
+async function incrementOption(categoryId: number, value: string) {
+  if (!value || !value.trim()) return;
+  const val = value.trim();
+  try {
+    const { data } = await supabase
+      .from("aka_master_dropdown_catalog")
+      .select("id, usage_count")
+      .eq("category_id", categoryId)
+      .eq("value", val)
+      .maybeSingle();
+
+    if (data) {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .update({ usage_count: data.usage_count + 1 })
+        .eq("id", data.id);
+    } else {
+      await supabase
+        .from("aka_master_dropdown_catalog")
+        .insert({ category_id: categoryId, value: val, usage_count: 1 });
+    }
+  } catch (err) {
+    console.error("Error incrementing option:", err);
+  }
+}
+
+interface MedicineItem {
+  name: string;
+  generic: string;
+  form?: string;
+}
+
+async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
+  try {
+    if (!query || !query.trim()) {
+      const { data, error } = await supabase
+        .from("medicine")
+        .select("name, salt_composition, short_composition1, type")
+        .limit(10);
+      if (error) throw error;
+      return (data || []).map((m: any) => ({
+        name: m.name ?? "",
+        generic: m.salt_composition || m.short_composition1 || "",
+        form: m.type?.toLowerCase() || "tablet"
+      }));
+    }
+
+    const { data, error } = await supabase
+      .from("medicine")
+      .select("name, salt_composition, short_composition1, type")
+      .or(`name.ilike.%${query}%,salt_composition.ilike.%${query}%,short_composition1.ilike.%${query}%`)
+      .limit(20);
+    if (error) throw error;
+    return (data || []).map((m: any) => ({
+      name: m.name ?? "",
+      generic: m.salt_composition || m.short_composition1 || "",
+      form: m.type?.toLowerCase() || "tablet"
+    }));
+  } catch (err) {
+    console.error("Error searching medicines:", err);
+    return [];
+  }
+}
+
+async function insertMedicineIntoDb(name: string, generic: string = "", type: string = "tablet"): Promise<MedicineItem> {
+  try {
+    const { data, error } = await supabase
+      .from("medicine")
+      .insert({
+        name,
+        salt_composition: generic,
+        short_composition1: generic,
+        type: type.charAt(0).toUpperCase() + type.slice(1)
+      })
+      .select("name, salt_composition, short_composition1, type")
+      .single();
+    if (error) throw error;
+    return {
+      name: data.name ?? name,
+      generic: data.salt_composition || data.short_composition1 || generic,
+      form: data.type?.toLowerCase() || type
+    };
+  } catch (err) {
+    console.error("Error inserting medicine:", err);
+    return { name, generic, form: type };
+  }
+}
+
+async function updateMedicineGenericName(name: string, generic: string) {
+  try {
+    await supabase
+      .from("medicine")
+      .update({
+        salt_composition: generic,
+        short_composition1: generic
+      })
+      .eq("name", name);
+  } catch (err) {
+    console.error("Error updating generic name:", err);
+  }
+}
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 interface Medication {
@@ -44,30 +152,246 @@ interface MedicationsCardProps {
   setMedications: React.Dispatch<React.SetStateAction<Medication[]>>;
 }
 
+/* ─── Reusable autocomplete inline input ───────────────────────── */
+function InlineAutoComplete({
+  value,
+  onChange,
+  onBlur,
+  options,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onBlur: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+}) {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const dropdownClicked = useRef(false);
+
+  const search = (event: { query: string }) => {
+    const query = event.query.trim();
+    let results = options.filter((o) =>
+      o.toLowerCase().includes(query.toLowerCase())
+    );
+    if (!query || options.some(opt => opt === query)) {
+      results = options;
+    }
+    if (query && !options.some((o) => o.toLowerCase() === query.toLowerCase())) {
+      results = [...results, `+ Create "${query}"`];
+    }
+    setSuggestions(results);
+  };
+
+  const handleSelect = (e: { value: string }) => {
+    const val = e.value;
+    dropdownClicked.current = true;
+    if (val.startsWith('+ Create "')) {
+      const match = val.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : val;
+      onChange(custom);
+      onBlur(custom);
+    } else {
+      onChange(val);
+      onBlur(val);
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const val = e.target.value.trim();
+    setTimeout(() => {
+      if (dropdownClicked.current) {
+        dropdownClicked.current = false;
+        return;
+      }
+      onChange(val);
+      onBlur(val);
+    }, 180);
+  };
+
+  const itemTemplate = (item: string) => {
+    if (item.startsWith('+ Create "')) {
+      const match = item.match(/\+ Create "(.*)"/);
+      const custom = match ? match[1] : item;
+      return (
+        <span className="text-blue-600 font-bold flex items-center gap-1 text-[11px]">
+          <span>+ Create</span>
+          <span className="italic">"{custom}"</span>
+        </span>
+      );
+    }
+    return <span className="text-[11px] font-semibold text-[#334155]">{item}</span>;
+  };
+
+  return (
+    <div className="w-full h-full relative primereact-autocomplete-inline">
+      <AutoComplete
+        value={value}
+        suggestions={suggestions}
+        completeMethod={search}
+        onChange={(e) => onChange(e.value)}
+        onSelect={handleSelect}
+        onBlur={handleBlur}
+        itemTemplate={itemTemplate}
+        placeholder={placeholder}
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-350"
+        className="w-full h-full"
+        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+      />
+    </div>
+  );
+}
+
+/* ─── Reusable autocomplete inline input for medicine search ───── */
+function InlineMedicineAutoComplete({
+  value,
+  onChange,
+  onSelect,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSelect: (med: MedicineItem) => void;
+  placeholder?: string;
+}) {
+  const [suggestions, setSuggestions] = useState<MedicineItem[]>([]);
+  const dropdownClicked = useRef(false);
+
+  const search = async (event: { query: string }) => {
+    const query = event.query.trim();
+    const results = await searchMedicinesFromDb(query);
+    setSuggestions(results);
+  };
+
+  const handleSelect = (e: { value: MedicineItem }) => {
+    dropdownClicked.current = true;
+    onSelect(e.value);
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const val = e.target.value.trim();
+    setTimeout(() => {
+      if (dropdownClicked.current) {
+        dropdownClicked.current = false;
+        return;
+      }
+      onChange(val);
+    }, 180);
+  };
+
+  const itemTemplate = (item: MedicineItem) => {
+    return (
+      <div className="p-1">
+        <div className="text-[11px] font-bold text-[#1e293b]">{item.name}</div>
+        <div className="text-[8px] text-[#A0AEC0] uppercase font-semibold">{item.generic}</div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="w-full h-full relative primereact-autocomplete-inline flex items-center">
+      <AutoComplete
+        value={value}
+        suggestions={suggestions}
+        completeMethod={search}
+        field="name"
+        onChange={(e) => {
+          if (typeof e.value === "string") {
+            onChange(e.value);
+          } else if (e.value && typeof e.value === "object" && "name" in e.value) {
+            onChange((e.value as MedicineItem).name);
+          }
+        }}
+        onSelect={handleSelect}
+        onBlur={handleBlur}
+        itemTemplate={itemTemplate}
+        placeholder={placeholder}
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none p-0 placeholder:text-slate-350"
+        className="w-full h-full"
+        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+      />
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    Medications Component
-═══════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════ */
 export default function MedicationsCard({ medications, setMedications }: MedicationsCardProps) {
+  // Option Suggestion Lists from Supabase
+  const [doseOptions, setDoseOptions] = useState<string[]>([]);
+  const [freqOptions, setFreqOptions] = useState<string[]>([]);
+  const [timingOptions, setTimingOptions] = useState<string[]>([]);
+  const [durationOptions, setDurationOptions] = useState<string[]>([]);
+  const [startOptions, setStartOptions] = useState<string[]>([]);
+  const [instrOptions, setInstrOptions] = useState<string[]>([]);
+
+  // Fetch initial suggestion options from Supabase on mount
+  const refreshAllOptions = async () => {
+    setDoseOptions(await fetchOptions(20));
+    setFreqOptions(await fetchOptions(21));
+    setTimingOptions(await fetchOptions(22));
+    setDurationOptions(await fetchOptions(23));
+    setStartOptions(await fetchOptions(24));
+    setInstrOptions(await fetchOptions(25));
+  };
+
+  useEffect(() => {
+    refreshAllOptions();
+  }, []);
+
   /* search bar */
   const [medInput, setMedInput]               = useState("");
   const [medInputFocused, setMedInputFocused] = useState(false);
   const [searchHi, setSearchHi]               = useState(-1);
+  const [medSuggestions, setMedSuggestions]   = useState<MedicineItem[]>([]);
 
-  /* inline dropdowns highlight */
-  const [focusId, setFocusId]       = useState<string | null>(null);
-  const [focusField, setFocusField] = useState<string | null>(null);
-  const [rowHi, setRowHi]           = useState(-1);
+  useEffect(() => {
+    let active = true;
+    const fetchMeds = async () => {
+      const results = await searchMedicinesFromDb(medInput);
+      if (active) {
+        setMedSuggestions(results);
+      }
+    };
+    fetchMeds();
+    return () => {
+      active = false;
+    };
+  }, [medInput]);
 
   /* drag */
   const dragIdx = useRef<number | null>(null);
 
   /* ─── helpers ─── */
-  const addMedicine = (med: { name: string; generic: string; form?: string }) => {
+  const addMedicine = async (med: { name: string; generic: string; form?: string }) => {
+    // If the medicine generic matches empty, check if it's new custom typed text
+    let name = med.name.trim();
+    let generic = med.generic ? med.generic.trim() : "";
+    let form = med.form ?? "tablet";
+
+    // If it's a new custom entry, insert it into public.medicine in Supabase
+    const { data: existing } = await supabase
+      .from("medicine")
+      .select("name, salt_composition, short_composition1, type")
+      .eq("name", name)
+      .maybeSingle();
+
+    if (!existing) {
+      const inserted = await insertMedicineIntoDb(name, generic, form);
+      name = inserted.name;
+      generic = inserted.generic;
+      form = inserted.form ?? form;
+    } else {
+      generic = existing.salt_composition || existing.short_composition1 || generic;
+      form = existing.type?.toLowerCase() || form;
+    }
+
     const newMed = {
       id: Date.now().toString(),
-      name: med.name,
-      generic: med.generic,
-      form: med.form ?? "tablet",
+      name,
+      generic,
+      form,
       dose: "",
       freq: "",
       timing: "",
@@ -81,7 +405,21 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
     setSearchHi(-1);
   };
 
+  const dropdownClicked = useRef(false);
+
   const patch  = (id: string, diff: Partial<Medication>) => setMedications((p) => p.map((m) => (m.id === id ? { ...m, ...diff } : m)));
+
+  const handleInputBlur = async (categoryId: number, value: string) => {
+    if (!value || !value.trim()) return;
+    setTimeout(async () => {
+      if (dropdownClicked.current) {
+        dropdownClicked.current = false;
+        return;
+      }
+      await incrementOption(categoryId, value.trim());
+      refreshAllOptions();
+    }, 180);
+  };
   const remove = (id: string) => setMedications((p) => p.filter((m) => m.id !== id));
 
   /* drag reorder */
@@ -94,38 +432,9 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
   };
   const onDragEnd = () => { dragIdx.current = null; };
 
-  /* inline dropdown component */
-  const InlineDD = ({ id, field, opts, val }: { id: string; field: string; opts: string[]; val: string }) => {
-    if (focusId !== id || focusField !== field) return null;
-    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
-    if (!list.length) return null;
-    return (
-      <div className="absolute left-0 top-full mt-0.5 z-40 w-full min-w-[120px] bg-white border border-[#E2E8F0] rounded-lg shadow-xl overflow-hidden max-h-44 overflow-y-auto text-left">
-        {list.map((opt, i) => (
-          <div key={opt}
-            onMouseDown={() => { patch(id, { [field]: opt }); setFocusId(null); setFocusField(null); setRowHi(-1); }}
-            className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
-              ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
-          >{opt}</div>
-        ))}
-      </div>
-    );
-  };
-
-  const handleRowKey = (e: React.KeyboardEvent, id: string, field: string, opts: string[], val: string) => {
-    const list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
-    if (e.key === "ArrowDown") { e.preventDefault(); setRowHi((p) => Math.min(p + 1, list.length - 1)); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); setRowHi((p) => Math.max(p - 1, 0)); }
-    else if (e.key === "Enter") {
-      e.preventDefault();
-      if (rowHi >= 0 && list[rowHi]) { patch(id, { [field]: list[rowHi] }); setFocusId(null); setFocusField(null); setRowHi(-1); }
-    }
-    else if (e.key === "Escape") { setFocusId(null); setFocusField(null); setRowHi(-1); }
-  };
-
   /* search key events */
-  const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const list = freqMedications.filter((m) => !medInput || m.name.toLowerCase().includes(medInput.toLowerCase()));
+  const handleSearchKey = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const list = await searchMedicinesFromDb(medInput);
     if (e.key === "ArrowDown") { e.preventDefault(); setSearchHi((p) => Math.min(p + 1, list.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setSearchHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {
@@ -252,16 +561,17 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
 
                 {/* Col 1: Medicine Input */}
                 <div className="w-[27%] shrink-0 border-r border-[#E2E8F0] bg-white px-3 py-1.5 flex flex-col justify-between relative overflow-visible">
-                  <div className="flex items-center justify-between w-full">
-                    <input type="text" value={med.name}
-                      onChange={(e) => patch(med.id, { name: e.target.value })}
-                      onFocus={() => { setFocusId(med.id); setFocusField("name"); setRowHi(-1); }}
-                      onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
+                  <div className="flex items-center justify-between w-full h-7">
+                    <InlineMedicineAutoComplete
+                      value={med.name}
+                      onChange={(v) => patch(med.id, { name: v })}
+                      onSelect={async (m) => {
+                        patch(med.id, { name: m.name, generic: m.generic, form: m.form });
+                      }}
                       placeholder="Medicine"
-                      className="w-[80%] border-0 focus:ring-0 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none p-0 placeholder:text-slate-300"
                     />
                     {med.form && (
-                      <span className="text-[8.5px] text-[#A0AEC0] border border-slate-200 px-1 py-0.2 rounded font-extrabold select-none bg-slate-50 uppercase leading-none">
+                      <span className="text-[8.5px] text-[#A0AEC0] border border-slate-200 px-1 py-0.2 rounded font-extrabold select-none bg-slate-50 uppercase leading-none shrink-0 ml-1">
                         {med.form}
                       </span>
                     )}
@@ -272,96 +582,101 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                     </div>
                   )}
                   <div className="flex items-center justify-between w-full text-[#A0AEC0] pt-1">
-                    <span className="cursor-pointer hover:text-[#4A5568] transition-colors leading-none">
+                    <span 
+                      onClick={async () => {
+                        const newGen = prompt("Edit Generic Composition for " + med.name, med.generic);
+                        if (newGen !== null) {
+                          patch(med.id, { generic: newGen });
+                          await updateMedicineGenericName(med.name, newGen);
+                        }
+                      }}
+                      className="cursor-pointer hover:text-[#4A5568] transition-colors leading-none"
+                    >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
                         <path d="M12 4.5v15m7.5-7.5h-15"/>
                       </svg>
                     </span>
-                    <span className="cursor-pointer hover:text-[#4A5568] transition-colors leading-none">
+                    <span 
+                      onClick={async () => {
+                        const newGen = prompt("Edit Generic Composition for " + med.name, med.generic);
+                        if (newGen !== null) {
+                          patch(med.id, { generic: newGen });
+                          await updateMedicineGenericName(med.name, newGen);
+                        }
+                      }}
+                      className="cursor-pointer hover:text-[#4A5568] transition-colors leading-none"
+                    >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
                         <path d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125"/>
                       </svg>
                     </span>
                   </div>
-                  <InlineDD id={med.id} field="name" opts={freqMedications.map(m => m.name)} val={med.name} />
                 </div>
 
                 {/* Col 2: Dose */}
                 <div className="relative w-[10%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
-                  <input type="text" value={med.dose}
-                    onChange={(e) => patch(med.id, { dose: e.target.value })}
-                    onFocus={() => { setFocusId(med.id); setFocusField("dose"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, med.id, "dose", SUGGESTED_DOSES, med.dose)}
-                    placeholder="e.g 1 Tablet"
-                    className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-[#C0CADC]"
+                  <InlineAutoComplete
+                    value={med.dose}
+                    onChange={(v) => patch(med.id, { dose: v })}
+                    onBlur={(v) => handleInputBlur(20, v)}
+                    options={doseOptions}
+                    placeholder="Dose"
                   />
-                  <InlineDD id={med.id} field="dose" opts={SUGGESTED_DOSES} val={med.dose} />
                 </div>
 
                 {/* Col 3: Frequency */}
                 <div className="relative w-[10%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
-                  <input type="text" value={med.freq}
-                    onChange={(e) => patch(med.id, { freq: e.target.value })}
-                    onFocus={() => { setFocusId(med.id); setFocusField("freq"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, med.id, "freq", SUGGESTED_FREQS, med.freq)}
+                  <InlineAutoComplete
+                    value={med.freq}
+                    onChange={(v) => patch(med.id, { freq: v })}
+                    onBlur={(v) => handleInputBlur(21, v)}
+                    options={freqOptions}
                     placeholder="Frequency"
-                    className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-[#C0CADC]"
                   />
-                  <InlineDD id={med.id} field="freq" opts={SUGGESTED_FREQS} val={med.freq} />
                 </div>
 
                 {/* Col 4: Timing */}
                 <div className="relative w-[10%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
-                  <input type="text" value={med.timing}
-                    onChange={(e) => patch(med.id, { timing: e.target.value })}
-                    onFocus={() => { setFocusId(med.id); setFocusField("timing"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, med.id, "timing", SUGGESTED_TIMINGS, med.timing)}
+                  <InlineAutoComplete
+                    value={med.timing}
+                    onChange={(v) => patch(med.id, { timing: v })}
+                    onBlur={(v) => handleInputBlur(22, v)}
+                    options={timingOptions}
                     placeholder="Timing"
-                    className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-[#C0CADC]"
                   />
-                  <InlineDD id={med.id} field="timing" opts={SUGGESTED_TIMINGS} val={med.timing} />
                 </div>
 
                 {/* Col 5: Duration */}
                 <div className="relative w-[10%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
-                  <input type="text" value={med.duration}
-                    onChange={(e) => patch(med.id, { duration: e.target.value })}
-                    onFocus={() => { setFocusId(med.id); setFocusField("duration"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, med.id, "duration", SUGGESTED_DURATIONS, med.duration)}
+                  <InlineAutoComplete
+                    value={med.duration}
+                    onChange={(v) => patch(med.id, { duration: v })}
+                    onBlur={(v) => handleInputBlur(23, v)}
+                    options={durationOptions}
                     placeholder="Duration"
-                    className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-[#C0CADC]"
                   />
-                  <InlineDD id={med.id} field="duration" opts={SUGGESTED_DURATIONS} val={med.duration} />
                 </div>
 
                 {/* Col 6: Start From */}
                 <div className="relative w-[10%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
-                  <input type="text" value={med.start}
-                    onChange={(e) => patch(med.id, { start: e.target.value })}
-                    onFocus={() => { setFocusId(med.id); setFocusField("start"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, med.id, "start", SUGGESTED_STARTS, med.start)}
-                    placeholder="eg: 3 day"
-                    className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-[#C0CADC]"
+                  <InlineAutoComplete
+                    value={med.start}
+                    onChange={(v) => patch(med.id, { start: v })}
+                    onBlur={(v) => handleInputBlur(24, v)}
+                    options={startOptions}
+                    placeholder="Start From"
                   />
-                  <InlineDD id={med.id} field="start" opts={SUGGESTED_STARTS} val={med.start} />
                 </div>
 
                 {/* Col 7: Instructions */}
                 <div className="relative w-[18%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
-                  <input type="text" value={med.instr}
-                    onChange={(e) => patch(med.id, { instr: e.target.value })}
-                    onFocus={() => { setFocusId(med.id); setFocusField("instr"); setRowHi(-1); }}
-                    onBlur={() => setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160)}
-                    onKeyDown={(e) => handleRowKey(e, med.id, "instr", SUGGESTED_INSTRS, med.instr)}
+                  <InlineAutoComplete
+                    value={med.instr}
+                    onChange={(v) => patch(med.id, { instr: v })}
+                    onBlur={(v) => handleInputBlur(25, v)}
+                    options={instrOptions}
                     placeholder="Instructions"
-                    className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-[#C0CADC]"
                   />
-                  <InlineDD id={med.id} field="instr" opts={SUGGESTED_INSTRS} val={med.instr} />
                 </div>
 
                 {/* Col 8: Trash action */}
@@ -398,12 +713,13 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
 
         {/* Medicines Dropdown Autocomplete */}
         {medInputFocused && (() => {
-          const list = freqMedications.filter((m) => !medInput || m.name.toLowerCase().includes(medInput.toLowerCase()));
-          if (!list.length) return null;
+          const list = medSuggestions;
+          const hasCustomVal = medInput.trim() && !medSuggestions.some(m => m.name.toLowerCase() === medInput.trim().toLowerCase());
+          if (list.length === 0 && !hasCustomVal) return null;
           return (
             <div className="absolute left-3 right-3 top-full mt-0.5 z-40 bg-white border border-[#CBD5E0] rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto p-1.5 space-y-1">
               <div className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[9px] font-bold inline-block select-none mb-1">
-                FREQUENTLY PRESCRIBED BY YOU
+                SAMPLE MEDICINES
               </div>
               {list.map((med, i) => (
                 <div
@@ -413,9 +729,18 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                     ${i === searchHi ? "bg-blue-50" : "hover:bg-slate-50"}`}
                 >
                   <div className="text-[11px] font-bold text-[#1e293b]">{med.name}</div>
-                  <div className="text-[8px] text-[#A0AEC0] uppercase font-semibold">{med.generic}</div>
+                  {med.generic && <div className="text-[8px] text-[#A0AEC0] uppercase font-semibold">{med.generic}</div>}
                 </div>
               ))}
+              {hasCustomVal && (
+                <div
+                  onMouseDown={() => addMedicine({ name: medInput, generic: "" })}
+                  className="p-2 text-left rounded cursor-pointer text-blue-600 font-bold hover:bg-blue-50 border-t border-[#F1F5F9] flex items-center gap-1.5"
+                >
+                  <span>+ Create</span>
+                  <span className="italic">"{medInput.trim()}"</span>
+                </div>
+              )}
             </div>
           );
         })()}
