@@ -334,7 +334,7 @@ function InlineAutoComplete({
   };
 
   return (
-    <div className="w-full relative primereact-autocomplete-custom">
+    <div className="w-full h-full relative primereact-autocomplete-inline">
       <AutoComplete
         value={value}
         suggestions={suggestions}

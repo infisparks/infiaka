@@ -336,7 +336,7 @@ function InlineAutoComplete({
   };
 
   return (
-    <div className="w-full relative primereact-autocomplete-custom">
+    <div className="w-full h-7 relative primereact-autocomplete-inline">
       <AutoComplete
         value={value}
         suggestions={suggestions}
@@ -346,8 +346,8 @@ function InlineAutoComplete({
         onBlur={handleBlur}
         itemTemplate={itemTemplate}
         placeholder={placeholder}
-        inputClassName="w-full h-7 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] px-2 font-semibold text-[#334155] bg-white focus:outline-none placeholder:text-[#CBD5E0] transition-all"
-        className="w-full"
+        inputClassName="w-full h-full border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] px-2 font-semibold text-[#334155] bg-white focus:outline-none placeholder:text-[#CBD5E0] transition-all"
+        className="w-full h-full"
         panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
       />
     </div>
