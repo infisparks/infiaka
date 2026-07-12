@@ -166,26 +166,22 @@ function InlineLabAutoComplete({
 }) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const dropdownClicked = useRef(false);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const search = (event: { query: string }) => {
-    clearTimeout(searchTimer.current);
     const q = event.query.trim().toLowerCase();
-    searchTimer.current = setTimeout(() => {
-      let results = labOptions.filter((o) => o.toLowerCase().includes(q));
-      if (!q) results = labOptions;
-      if (q && !labOptions.some((o) => o.toLowerCase() === q)) {
-        results = [...results, `+ Add "${event.query.trim()}"`];
-      }
-      setSuggestions(results);
-    }, 200);
+    let results = labOptions.filter((o) => o.toLowerCase().includes(q));
+    if (!q) results = labOptions;
+    if (q && !labOptions.some((o) => o.toLowerCase() === q)) {
+      results = [...results, `+ Create "${event.query.trim()}"`];
+    }
+    setSuggestions(results);
   };
 
   const handleSelect = (e: { value: string }) => {
     dropdownClicked.current = true;
     const val = e.value;
-    if (val.startsWith('+ Add "')) {
-      const match = val.match(/\+ Add "(.*)"/)
+    if (val.startsWith('+ Create "')) {
+      const match = val.match(/\+ Create "(.*)"/);
       const custom = match ? match[1] : val;
       onChange(custom);
     } else {
@@ -203,12 +199,12 @@ function InlineLabAutoComplete({
   };
 
   const itemTemplate = (item: string) => {
-    if (item.startsWith('+ Add "')) {
-      const match = item.match(/\+ Add "(.*)"/)
+    if (item.startsWith('+ Create "')) {
+      const match = item.match(/\+ Create "(.*)"/);
       const custom = match ? match[1] : item;
       return (
         <div className="p-1">
-          <span className="text-blue-600 font-bold text-[11px]">+ Add "{custom}"</span>
+          <span className="text-blue-600 font-bold text-[11px]">+ Create "{custom}"</span>
         </div>
       );
     }
@@ -296,10 +292,19 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
   useEffect(() => {
     let active = true;
     const timer = setTimeout(() => {
-      const q = medInput.trim().toLowerCase();
-      const results = q
-        ? labNameOptions.filter((o) => o.toLowerCase().includes(q))
-        : labNameOptions.slice(0, 12);
+      const q = medInput.trim();
+      if (!q) {
+        if (active) setSearchSuggestions(labNameOptions.slice(0, 12));
+        return;
+      }
+      const qLower = q.toLowerCase();
+      let results = labNameOptions.filter((o) => o.toLowerCase().includes(qLower));
+      
+      const hasPerfectMatch = labNameOptions.some((o) => o.toLowerCase() === qLower);
+      if (!hasPerfectMatch) {
+        results = [...results, `+ Create "${q}"`];
+      }
+      
       if (active) setSearchSuggestions(results);
     }, 200);
     return () => { active = false; clearTimeout(timer); };
@@ -500,22 +505,37 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
         </div>
 
         {/* Dropdown suggestions */}
-        {medInputFocused && searchSuggestions.length > 0 && (
+        {medInputFocused && (searchSuggestions.length > 0 || medInput.trim()) && (
           <div className="absolute left-3 right-3 top-full mt-0.5 z-40 bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
             <div className="px-3 pt-2 pb-1 text-[9px] font-bold text-[#94A3B8] uppercase tracking-wide">
               {medInput.trim() ? "Matching Tests" : "Sample Tests"}
             </div>
-            {searchSuggestions.map((opt, i) => (
-              <div key={opt} onMouseDown={() => addLab(opt)}
-                className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
-                  ${i === searchHi ? "bg-blue-50" : "hover:bg-[#F8FAFC]"}`}
-              >
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-yellow-100 to-amber-200 flex items-center justify-center text-[8px] font-extrabold text-yellow-800 shrink-0 leading-none">
-                  {initials(opt) || "Li"}
+            {searchSuggestions.map((opt, i) => {
+              const isCreate = opt.startsWith('+ Create "');
+              let displayVal = opt;
+              if (isCreate) {
+                const match = opt.match(/\+ Create "(.*)"/);
+                displayVal = match ? match[1] : opt;
+              }
+              
+              return (
+                <div key={opt} onMouseDown={() => addLab(displayVal)}
+                  className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
+                    ${i === searchHi ? "bg-blue-50" : "hover:bg-[#F8FAFC]"}`}
+                >
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-yellow-100 to-amber-200 flex items-center justify-center text-[8px] font-extrabold text-yellow-800 shrink-0 leading-none">
+                    {isCreate ? "+" : (initials(opt) || "Li")}
+                  </div>
+                  {isCreate ? (
+                    <span className="text-[11.5px] font-bold text-blue-600">
+                      + Create <span className="italic font-semibold">"{displayVal}"</span>
+                    </span>
+                  ) : (
+                    <span className="text-[11.5px] font-semibold text-[#1E293B]">{opt}</span>
+                  )}
                 </div>
-                <span className="text-[11.5px] font-semibold text-[#1E293B]">{opt}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
