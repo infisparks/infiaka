@@ -535,6 +535,10 @@ function DashboardContent() {
   const [referringDoctorFocused, setReferringDoctorFocused] = useState(false);
   const [serviceRowFocused, setServiceRowFocused] = useState<string | null>(null);
 
+  // Autocomplete key navigation states
+  const [activeDDFocus, setActiveDDFocus] = useState<string | null>(null);
+  const [activeDDIndex, setActiveDDIndex] = useState<number>(-1);
+
   // Standalone vitals modals
   const [isVitalsOpen, setIsVitalsOpen] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
@@ -1083,6 +1087,114 @@ function DashboardContent() {
       s.toLowerCase().includes(state.toLowerCase())
     );
   }, [stateCache, state]);
+
+  // Autocomplete full option builders (with dynamic "+ Create" buttons inside)
+  const getDoctorOptions = () => {
+    const list = [...matchingDoctors];
+    if (treatingDoctor.trim() && !doctorCache.some(d => d.toLowerCase() === treatingDoctor.trim().toLowerCase())) {
+      list.push(`+ Create "${treatingDoctor.trim()}"`);
+    }
+    return list;
+  };
+
+  const getAddressOptions = () => {
+    const list = [...matchingAddresses];
+    if (permanentAddress.trim() && !addressCache.some(a => a.toLowerCase() === permanentAddress.trim().toLowerCase())) {
+      list.push(`+ Create "${permanentAddress.trim()}"`);
+    }
+    return list;
+  };
+
+  const getReferringDoctorOptions = () => {
+    const list = [...matchingReferringDoctors];
+    if (referringDoctor.trim() && !referringDoctorCache.some(r => r.toLowerCase() === referringDoctor.trim().toLowerCase())) {
+      list.push(`+ Create "${referringDoctor.trim()}"`);
+    }
+    return list;
+  };
+
+  const getCountryOptions = () => {
+    const list = [...matchingCountries];
+    if (country.trim() && !countryCache.some(c => c.toLowerCase() === country.trim().toLowerCase())) {
+      list.push(`+ Create "${country.trim()}"`);
+    }
+    return list;
+  };
+
+  const getStateOptions = () => {
+    const list = [...matchingStates];
+    if (state.trim() && !stateCache.some(s => s.toLowerCase() === state.trim().toLowerCase())) {
+      list.push(`+ Create "${state.trim()}"`);
+    }
+    return list;
+  };
+
+  const getServiceOptions = (val: string) => {
+    const filtered = serviceCache.filter(s => !val || s.name.toLowerCase().includes(val.toLowerCase()));
+    let list = filtered.map(s => s.name);
+    if (val.trim() && !serviceCache.some(s => s.name.toLowerCase() === val.trim().toLowerCase())) {
+      list.push(`+ Create "${val.trim()}" (Service)`);
+      list.push(`+ Create "${val.trim()}" (Product)`);
+    }
+    return list;
+  };
+
+  // Autocomplete generic keydown navigation
+  const handleInputKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    type: string,
+    optionsList: string[],
+    onSelect: (val: string) => void
+  ) => {
+    if (activeDDFocus !== type) {
+      setActiveDDFocus(type);
+      setActiveDDIndex(-1);
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveDDIndex((prev) => {
+        const nextIdx = Math.min(prev + 1, optionsList.length - 1);
+        return nextIdx;
+      });
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveDDIndex((prev) => {
+        const nextIdx = Math.max(prev - 1, 0);
+        return nextIdx;
+      });
+    } else if (e.key === "Enter") {
+      if (activeDDIndex >= 0 && optionsList[activeDDIndex]) {
+        e.preventDefault();
+        onSelect(optionsList[activeDDIndex]);
+        setActiveDDFocus(null);
+        setActiveDDIndex(-1);
+      }
+    } else if (e.key === "Escape") {
+      setActiveDDFocus(null);
+      setActiveDDIndex(-1);
+    }
+  };
+
+  const handleSelectService = (rowId: string, rowFee: number, val: string) => {
+    const isCreateService = val.startsWith('+ Create "') && val.endsWith('" (Service)');
+    const isCreateProduct = val.startsWith('+ Create "') && val.endsWith('" (Product)');
+    let finalVal = val;
+    if (isCreateService || isCreateProduct) {
+      const match = val.match(/\+ Create "(.*)" \((Service|Product)\)/);
+      finalVal = match ? match[1] : val;
+      const type = isCreateProduct ? "product" : "service";
+      incrementOption(164, finalVal, { type, price: rowFee });
+      updateServiceRow(rowId, finalVal, rowFee, type);
+    } else {
+      const matched = serviceCache.find((s) => s.name.toLowerCase() === val.toLowerCase());
+      if (matched) {
+        updateServiceRow(rowId, matched.name, matched.price, matched.type);
+      } else {
+        updateServiceRow(rowId, val, rowFee);
+      }
+    }
+  };
 
   // Services dynamic totals calculations
   const totalServiceFees = useMemo(() => {
@@ -2588,27 +2700,73 @@ function DashboardContent() {
                     <input
                       type="text"
                       value={permanentAddress}
-                      onChange={(e) => setPermanentAddress(e.target.value)}
-                      onFocus={() => setAddressFocused(true)}
-                      onBlur={() => setTimeout(() => setAddressFocused(false), 200)}
+                      onChange={(e) => {
+                        setPermanentAddress(e.target.value);
+                        setActiveDDFocus("address");
+                        setActiveDDIndex(-1);
+                      }}
+                      onKeyDown={(e) =>
+                        handleInputKeyDown(e, "address", getAddressOptions(), (val) => {
+                          let finalVal = val;
+                          const isCreate = val.startsWith('+ Create "');
+                          if (isCreate) {
+                            const match = val.match(/\+ Create "(.*)"/);
+                            finalVal = match ? match[1] : val;
+                            incrementOption(161, finalVal);
+                          }
+                          setPermanentAddress(finalVal);
+                          setLocalAddress(finalVal);
+                        })
+                      }
+                      onFocus={() => {
+                        setAddressFocused(true);
+                        setActiveDDFocus("address");
+                        setActiveDDIndex(-1);
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => {
+                          setAddressFocused(false);
+                          if (activeDDFocus === "address") setActiveDDFocus(null);
+                        }, 200);
+                      }}
                       placeholder="Type permanent address (e.g. mumbra)"
                       className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none focus:border-primary placeholder:text-gray-300"
                     />
                     
-                    {addressFocused && matchingAddresses.length > 0 && (
+                    {addressFocused && getAddressOptions().length > 0 && (
                       <div className="absolute left-0 top-full mt-1 z-30 w-full bg-white border border-[#CBD5E0] rounded-md shadow-lg max-h-32 overflow-y-auto p-1 space-y-0.5">
-                        {matchingAddresses.map((addr) => (
-                          <div
-                            key={addr}
-                            onClick={() => {
-                              setPermanentAddress(addr);
-                              setLocalAddress(addr);
-                            }}
-                            className="p-1.5 text-[11px] hover:bg-primary/5 rounded cursor-pointer text-left font-semibold text-foreground transition-colors"
-                          >
-                            {addr}
-                          </div>
-                        ))}
+                        {getAddressOptions().map((addr, idx) => {
+                          const isCreate = addr.startsWith('+ Create "');
+                          let displayVal = addr;
+                          if (isCreate) {
+                            const match = addr.match(/\+ Create "(.*)"/);
+                            displayVal = match ? match[1] : addr;
+                          }
+                          const isHighlighted = idx === activeDDIndex && activeDDFocus === "address";
+                          return (
+                            <div
+                              key={addr}
+                              onMouseDown={() => {
+                                let finalVal = displayVal;
+                                if (isCreate) {
+                                  incrementOption(161, displayVal);
+                                }
+                                setPermanentAddress(finalVal);
+                                setLocalAddress(finalVal);
+                              }}
+                              className={`p-1.5 text-[11px] rounded cursor-pointer text-left font-semibold transition-colors
+                                ${isHighlighted ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground"}`}
+                            >
+                              {isCreate ? (
+                                <span className="text-primary font-bold">
+                                  + Create <span className="italic font-semibold">"{displayVal}"</span>
+                                </span>
+                              ) : (
+                                addr
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -2629,24 +2787,71 @@ function DashboardContent() {
                     <input
                       type="text"
                       value={country}
-                      onChange={(e) => setCountry(e.target.value)}
-                      onFocus={() => setCountryFocused(true)}
-                      onBlur={() => setTimeout(() => setCountryFocused(false), 200)}
+                      onChange={(e) => {
+                        setCountry(e.target.value);
+                        setActiveDDFocus("country");
+                        setActiveDDIndex(-1);
+                      }}
+                      onKeyDown={(e) =>
+                        handleInputKeyDown(e, "country", getCountryOptions(), (val) => {
+                          let finalVal = val;
+                          const isCreate = val.startsWith('+ Create "');
+                          if (isCreate) {
+                            const match = val.match(/\+ Create "(.*)"/);
+                            finalVal = match ? match[1] : val;
+                            incrementOption(165, finalVal);
+                          }
+                          setCountry(finalVal);
+                        })
+                      }
+                      onFocus={() => {
+                        setCountryFocused(true);
+                        setActiveDDFocus("country");
+                        setActiveDDIndex(-1);
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => {
+                          setCountryFocused(false);
+                          if (activeDDFocus === "country") setActiveDDFocus(null);
+                        }, 200);
+                      }}
                       placeholder="India"
                       className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none focus:border-primary"
                     />
 
-                    {countryFocused && matchingCountries.length > 0 && (
+                    {countryFocused && getCountryOptions().length > 0 && (
                       <div className="absolute left-0 top-full mt-1 z-35 w-full bg-white border border-[#CBD5E0] rounded-md shadow-lg max-h-32 overflow-y-auto p-1 space-y-0.5">
-                        {matchingCountries.map((c) => (
-                          <div
-                            key={c}
-                            onClick={() => setCountry(c)}
-                            className="p-1.5 text-[11px] hover:bg-primary/5 rounded cursor-pointer text-left font-semibold text-foreground transition-colors"
-                          >
-                            {c}
-                          </div>
-                        ))}
+                        {getCountryOptions().map((c, idx) => {
+                          const isCreate = c.startsWith('+ Create "');
+                          let displayVal = c;
+                          if (isCreate) {
+                            const match = c.match(/\+ Create "(.*)"/);
+                            displayVal = match ? match[1] : c;
+                          }
+                          const isHighlighted = idx === activeDDIndex && activeDDFocus === "country";
+                          return (
+                            <div
+                              key={c}
+                              onMouseDown={() => {
+                                let finalVal = displayVal;
+                                if (isCreate) {
+                                  incrementOption(165, displayVal);
+                                }
+                                setCountry(finalVal);
+                              }}
+                              className={`p-1.5 text-[11px] rounded cursor-pointer text-left font-semibold transition-colors
+                                ${isHighlighted ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground"}`}
+                            >
+                              {isCreate ? (
+                                <span className="text-primary font-bold">
+                                  + Create <span className="italic font-semibold">"{displayVal}"</span>
+                                </span>
+                              ) : (
+                                c
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -2656,24 +2861,71 @@ function DashboardContent() {
                     <input
                       type="text"
                       value={state}
-                      onChange={(e) => setState(e.target.value)}
-                      onFocus={() => setStateFocused(true)}
-                      onBlur={() => setTimeout(() => setStateFocused(false), 200)}
+                      onChange={(e) => {
+                        setState(e.target.value);
+                        setActiveDDFocus("state");
+                        setActiveDDIndex(-1);
+                      }}
+                      onKeyDown={(e) =>
+                        handleInputKeyDown(e, "state", getStateOptions(), (val) => {
+                          let finalVal = val;
+                          const isCreate = val.startsWith('+ Create "');
+                          if (isCreate) {
+                            const match = val.match(/\+ Create "(.*)"/);
+                            finalVal = match ? match[1] : val;
+                            incrementOption(166, finalVal);
+                          }
+                          setState(finalVal);
+                        })
+                      }
+                      onFocus={() => {
+                        setStateFocused(true);
+                        setActiveDDFocus("state");
+                        setActiveDDIndex(-1);
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => {
+                          setStateFocused(false);
+                          if (activeDDFocus === "state") setActiveDDFocus(null);
+                        }, 200);
+                      }}
                       placeholder="Maharashtra"
                       className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none focus:border-primary"
                     />
 
-                    {stateFocused && matchingStates.length > 0 && (
+                    {stateFocused && getStateOptions().length > 0 && (
                       <div className="absolute left-0 top-full mt-1 z-35 w-full bg-white border border-[#CBD5E0] rounded-md shadow-lg max-h-32 overflow-y-auto p-1 space-y-0.5">
-                        {matchingStates.map((s) => (
-                          <div
-                            key={s}
-                            onClick={() => setState(s)}
-                            className="p-1.5 text-[11px] hover:bg-primary/5 rounded cursor-pointer text-left font-semibold text-foreground transition-colors"
-                          >
-                            {s}
-                          </div>
-                        ))}
+                        {getStateOptions().map((s, idx) => {
+                          const isCreate = s.startsWith('+ Create "');
+                          let displayVal = s;
+                          if (isCreate) {
+                            const match = s.match(/\+ Create "(.*)"/);
+                            displayVal = match ? match[1] : s;
+                          }
+                          const isHighlighted = idx === activeDDIndex && activeDDFocus === "state";
+                          return (
+                            <div
+                              key={s}
+                              onMouseDown={() => {
+                                let finalVal = displayVal;
+                                if (isCreate) {
+                                  incrementOption(166, displayVal);
+                                }
+                                setState(finalVal);
+                              }}
+                              className={`p-1.5 text-[11px] rounded cursor-pointer text-left font-semibold transition-colors
+                                ${isHighlighted ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground"}`}
+                            >
+                              {isCreate ? (
+                                <span className="text-primary font-bold">
+                                  + Create <span className="italic font-semibold">"{displayVal}"</span>
+                                </span>
+                              ) : (
+                                s
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -2717,24 +2969,71 @@ function DashboardContent() {
                       type="text"
                       required
                       value={treatingDoctor}
-                      onChange={(e) => setTreatingDoctor(e.target.value)}
-                      onFocus={() => setDoctorFocused(true)}
-                      onBlur={() => setTimeout(() => setDoctorFocused(false), 200)}
+                      onChange={(e) => {
+                        setTreatingDoctor(e.target.value);
+                        setActiveDDFocus("doctor");
+                        setActiveDDIndex(-1);
+                      }}
+                      onKeyDown={(e) =>
+                        handleInputKeyDown(e, "doctor", getDoctorOptions(), (val) => {
+                          let finalVal = val;
+                          const isCreate = val.startsWith('+ Create "');
+                          if (isCreate) {
+                            const match = val.match(/\+ Create "(.*)"/);
+                            finalVal = match ? match[1] : val;
+                            incrementOption(160, finalVal);
+                          }
+                          setTreatingDoctor(finalVal);
+                        })
+                      }
+                      onFocus={() => {
+                        setDoctorFocused(true);
+                        setActiveDDFocus("doctor");
+                        setActiveDDIndex(-1);
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => {
+                          setDoctorFocused(false);
+                          if (activeDDFocus === "doctor") setActiveDDFocus(null);
+                        }, 200);
+                      }}
                       placeholder="Type doctor name"
                       className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none focus:border-primary placeholder:text-gray-300"
                     />
 
-                    {doctorFocused && matchingDoctors.length > 0 && (
+                    {doctorFocused && getDoctorOptions().length > 0 && (
                       <div className="absolute left-0 top-full mt-1 z-35 w-full bg-white border border-[#CBD5E0] rounded-md shadow-lg max-h-32 overflow-y-auto p-1 space-y-0.5">
-                        {matchingDoctors.map((doc) => (
-                          <div
-                            key={doc}
-                            onClick={() => setTreatingDoctor(doc)}
-                            className="p-1.5 text-[11px] hover:bg-primary/5 rounded cursor-pointer text-left font-semibold text-foreground transition-colors"
-                          >
-                            {doc}
-                          </div>
-                        ))}
+                        {getDoctorOptions().map((doc, idx) => {
+                          const isCreate = doc.startsWith('+ Create "');
+                          let displayVal = doc;
+                          if (isCreate) {
+                            const match = doc.match(/\+ Create "(.*)"/);
+                            displayVal = match ? match[1] : doc;
+                          }
+                          const isHighlighted = idx === activeDDIndex && activeDDFocus === "doctor";
+                          return (
+                            <div
+                              key={doc}
+                              onMouseDown={() => {
+                                let finalVal = displayVal;
+                                if (isCreate) {
+                                  incrementOption(160, displayVal);
+                                }
+                                setTreatingDoctor(finalVal);
+                              }}
+                              className={`p-1.5 text-[11px] rounded cursor-pointer text-left font-semibold transition-colors
+                                ${isHighlighted ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground"}`}
+                            >
+                              {isCreate ? (
+                                <span className="text-primary font-bold">
+                                  + Create <span className="italic font-semibold">"{displayVal}"</span>
+                                </span>
+                              ) : (
+                                doc
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -2757,24 +3056,71 @@ function DashboardContent() {
                     <input
                       type="text"
                       value={referringDoctor}
-                      onChange={(e) => setReferringDoctor(e.target.value)}
-                      onFocus={() => setReferringDoctorFocused(true)}
-                      onBlur={() => setTimeout(() => setReferringDoctorFocused(false), 200)}
+                      onChange={(e) => {
+                        setReferringDoctor(e.target.value);
+                        setActiveDDFocus("referringDoctor");
+                        setActiveDDIndex(-1);
+                      }}
+                      onKeyDown={(e) =>
+                        handleInputKeyDown(e, "referringDoctor", getReferringDoctorOptions(), (val) => {
+                          let finalVal = val;
+                          const isCreate = val.startsWith('+ Create "');
+                          if (isCreate) {
+                            const match = val.match(/\+ Create "(.*)"/);
+                            finalVal = match ? match[1] : val;
+                            incrementOption(163, finalVal);
+                          }
+                          setReferringDoctor(finalVal);
+                        })
+                      }
+                      onFocus={() => {
+                        setReferringDoctorFocused(true);
+                        setActiveDDFocus("referringDoctor");
+                        setActiveDDIndex(-1);
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => {
+                          setReferringDoctorFocused(false);
+                          if (activeDDFocus === "referringDoctor") setActiveDDFocus(null);
+                        }, 200);
+                      }}
                       placeholder="e.g. Dadar East"
                       className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none focus:border-primary placeholder:text-gray-300"
                     />
 
-                    {referringDoctorFocused && matchingReferringDoctors.length > 0 && (
+                    {referringDoctorFocused && getReferringDoctorOptions().length > 0 && (
                       <div className="absolute left-0 top-full mt-1 z-35 w-full bg-white border border-[#CBD5E0] rounded-md shadow-lg max-h-32 overflow-y-auto p-1 space-y-0.5">
-                        {matchingReferringDoctors.map((doc) => (
-                          <div
-                            key={doc}
-                            onClick={() => setReferringDoctor(doc)}
-                            className="p-1.5 text-[11px] hover:bg-primary/5 rounded cursor-pointer text-left font-semibold text-foreground transition-colors"
-                          >
-                            {doc}
-                          </div>
-                        ))}
+                        {getReferringDoctorOptions().map((doc, idx) => {
+                          const isCreate = doc.startsWith('+ Create "');
+                          let displayVal = doc;
+                          if (isCreate) {
+                            const match = doc.match(/\+ Create "(.*)"/);
+                            displayVal = match ? match[1] : doc;
+                          }
+                          const isHighlighted = idx === activeDDIndex && activeDDFocus === "referringDoctor";
+                          return (
+                            <div
+                              key={doc}
+                              onMouseDown={() => {
+                                let finalVal = displayVal;
+                                if (isCreate) {
+                                  incrementOption(163, displayVal);
+                                }
+                                setReferringDoctor(finalVal);
+                              }}
+                              className={`p-1.5 text-[11px] rounded cursor-pointer text-left font-semibold transition-colors
+                                ${isHighlighted ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground"}`}
+                            >
+                              {isCreate ? (
+                                <span className="text-primary font-bold">
+                                  + Create <span className="italic font-semibold">"{displayVal}"</span>
+                                </span>
+                              ) : (
+                                doc
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -2809,24 +3155,65 @@ function DashboardContent() {
                               if (matched) {
                                 updateServiceRow(row.id, matched.name, matched.price, matched.type);
                               }
+                              setActiveDDFocus("service-" + row.id);
+                              setActiveDDIndex(-1);
                             }}
-                            onFocus={() => setServiceRowFocused(row.id)}
-                            onBlur={() => setTimeout(() => setServiceRowFocused(null), 200)}
+                            onKeyDown={(e) =>
+                              handleInputKeyDown(e, "service-" + row.id, getServiceOptions(row.name), (val) => {
+                                handleSelectService(row.id, row.fee, val);
+                              })
+                            }
+                            onFocus={() => {
+                              setServiceRowFocused(row.id);
+                              setActiveDDFocus("service-" + row.id);
+                              setActiveDDIndex(-1);
+                            }}
+                            onBlur={() => {
+                              setTimeout(() => {
+                                setServiceRowFocused(null);
+                                if (activeDDFocus === "service-" + row.id) setActiveDDFocus(null);
+                              }, 200);
+                            }}
                             placeholder="Consultation"
                             className="w-full h-7 px-2 border border-[#CBD5E0] rounded text-[11px] bg-white focus:outline-none"
                           />
                           
-                          {serviceRowFocused === row.id && (
+                          {serviceRowFocused === row.id && getServiceOptions(row.name).length > 0 && (
                             <div className="absolute left-0 top-full mt-0.5 z-35 w-full bg-white border border-[#CBD5E0] rounded shadow-md max-h-32 overflow-y-auto p-1 space-y-0.5">
-                              {serviceCache.map((s) => (
-                                <div
-                                  key={s.name}
-                                  onClick={() => updateServiceRow(row.id, s.name, s.price, s.type)}
-                                  className="p-1.5 text-[10px] hover:bg-primary/5 rounded cursor-pointer text-left font-semibold text-foreground transition-all"
-                                >
-                                  {s.name} ({s.type === 'product' ? 'Product' : 'Service'}) (₹{s.price})
-                                </div>
-                              ))}
+                              {getServiceOptions(row.name).map((opt, idx) => {
+                                const isCreateService = opt.startsWith('+ Create "') && opt.endsWith('" (Service)');
+                                const isCreateProduct = opt.startsWith('+ Create "') && opt.endsWith('" (Product)');
+                                const isCreate = isCreateService || isCreateProduct;
+                                let displayVal = opt;
+                                let displayType = "Service";
+                                if (isCreate) {
+                                  const match = opt.match(/\+ Create "(.*)" \((Service|Product)\)/);
+                                  displayVal = match ? match[1] : opt;
+                                  displayType = isCreateProduct ? "Product" : "Service";
+                                } else {
+                                  const matchedObj = serviceCache.find(s => s.name === opt);
+                                  displayType = matchedObj && matchedObj.type === "product" ? "Product" : "Service";
+                                }
+                                const isHighlighted = idx === activeDDIndex && activeDDFocus === ("service-" + row.id);
+                                return (
+                                  <div
+                                    key={opt}
+                                    onMouseDown={() => {
+                                      handleSelectService(row.id, row.fee, opt);
+                                    }}
+                                    className={`p-1.5 text-[10px] rounded cursor-pointer text-left font-semibold transition-colors
+                                      ${isHighlighted ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground"}`}
+                                  >
+                                    {isCreate ? (
+                                      <span className="text-primary font-bold">
+                                        + Create <span className="italic font-semibold">"{displayVal}"</span> ({displayType})
+                                      </span>
+                                    ) : (
+                                      <span>{opt} <span className="text-gray-400 font-normal">({displayType})</span></span>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
