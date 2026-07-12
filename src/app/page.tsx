@@ -103,6 +103,17 @@ interface Patient {
   isOngoing: boolean;
   arrivalTime: string;
   arrivalMinutesAgo: number;
+  opdRegistration?: {
+    registration_id: string;
+    appointment_date_time?: string;
+    clinic_name?: string;
+    treating_doctor?: string;
+    visit_category?: string;
+    referring_doctor?: string;
+    discount_amount?: number;
+    services?: Array<{ id: string; name: string; fee: number }>;
+    payments?: Array<{ id: string; mode: string; amount: number }>;
+  };
 }
 
 // Initial suggestion caches
@@ -369,6 +380,17 @@ function DashboardContent() {
             weight: reg.weight || "",
             spo2: reg.spo2 || "98",
             sugar: reg.sugar || "100",
+          },
+          opdRegistration: {
+            registration_id: reg.registration_id,
+            appointment_date_time: reg.appointment_date_time,
+            clinic_name: reg.clinic_name,
+            treating_doctor: reg.treating_doctor,
+            visit_category: reg.visit_category,
+            referring_doctor: reg.referring_doctor,
+            discount_amount: reg.discount_amount,
+            services: reg.services,
+            payments: reg.payments
           }
         };
       }).filter(Boolean) as Patient[];
@@ -741,6 +763,30 @@ function DashboardContent() {
         setInitialWeight(selectedBookingPatient.vitals.weight || "");
         setInitialSpo2(selectedBookingPatient.vitals.spo2 || "98");
         setInitialSugar(selectedBookingPatient.vitals.sugar || "100");
+      }
+
+      if (selectedBookingPatient.opdRegistration) {
+        const reg = selectedBookingPatient.opdRegistration;
+        if (reg.appointment_date_time) {
+          setAppointmentDateTime(reg.appointment_date_time.slice(0, 16));
+        }
+        setClinicName(reg.clinic_name || "DLPC - Dadar");
+        setTreatingDoctor(reg.treating_doctor || "DR. LAXMAN SALVE");
+        setVisitCategory(reg.visit_category || "First consultation");
+        setReferringDoctor(reg.referring_doctor || "Dadar East");
+        setDiscountAmount(Number(reg.discount_amount) || 0);
+        
+        if (reg.services && reg.services.length > 0) {
+          setServicesRows(reg.services);
+        } else {
+          setServicesRows([{ id: "1", name: "First consultation", fee: 2000 }]);
+        }
+        
+        if (reg.payments && reg.payments.length > 0) {
+          setPaymentsRows(reg.payments);
+        } else {
+          setPaymentsRows([{ id: "1", mode: "Cash", amount: 0 }]);
+        }
       }
     }
   }, [selectedBookingPatient]);
@@ -1132,26 +1178,49 @@ function DashboardContent() {
         targetUhid = newP.uhid;
       }
 
-      // Insert registration details
-      const { error: rError } = await supabase
-        .from("aka_opd_registration")
-        .insert({
-          patient_uhid: targetUhid,
-          appointment_date_time: appointmentDateTime ? `${appointmentDateTime}:00+05:30` : null,
-          clinic_name: clinicName,
-          treating_doctor: treatingDoctor,
-          visit_category: visitCategory,
-          referring_doctor: referringDoctor,
-          discount_amount: discountAmount || 0,
-          services: servicesRows,
-          payments: paymentsRows,
-          bp: initialBp,
-          pulse: initialPulse,
-          weight: initialWeight,
-          spo2: initialSpo2,
-          sugar: initialSugar
-        });
-      if (rError) throw rError;
+      if (isUpdate && selectedBookingPatient!.opdRegistration?.registration_id) {
+        // Update existing registration details
+        const { error: rError } = await supabase
+          .from("aka_opd_registration")
+          .update({
+            appointment_date_time: appointmentDateTime ? `${appointmentDateTime}:00+05:30` : null,
+            clinic_name: clinicName,
+            treating_doctor: treatingDoctor,
+            visit_category: visitCategory,
+            referring_doctor: referringDoctor,
+            discount_amount: discountAmount || 0,
+            services: servicesRows,
+            payments: paymentsRows,
+            bp: initialBp,
+            pulse: initialPulse,
+            weight: initialWeight,
+            spo2: initialSpo2,
+            sugar: initialSugar
+          })
+          .eq("registration_id", selectedBookingPatient!.opdRegistration.registration_id);
+        if (rError) throw rError;
+      } else {
+        // Insert new registration details
+        const { error: rError } = await supabase
+          .from("aka_opd_registration")
+          .insert({
+            patient_uhid: targetUhid,
+            appointment_date_time: appointmentDateTime ? `${appointmentDateTime}:00+05:30` : null,
+            clinic_name: clinicName,
+            treating_doctor: treatingDoctor,
+            visit_category: visitCategory,
+            referring_doctor: referringDoctor,
+            discount_amount: discountAmount || 0,
+            services: servicesRows,
+            payments: paymentsRows,
+            bp: initialBp,
+            pulse: initialPulse,
+            weight: initialWeight,
+            spo2: initialSpo2,
+            sugar: initialSugar
+          });
+        if (rError) throw rError;
+      }
 
       await loadPatientsFromDb(selectedDate);
       closeBooking();
@@ -2070,7 +2139,10 @@ function DashboardContent() {
                     </button>
 
                     <button
-                      onClick={() => setSelectedBookingPatient(patient)}
+                      onClick={() => {
+                        setSelectedBookingPatient(patient);
+                        openBooking();
+                      }}
                       className="w-6 h-6 border border-[#CBD5E0] hover:bg-gray-50 rounded flex items-center justify-center shrink-0 text-primary"
                       title="Edit Patient Info"
                     >
