@@ -310,7 +310,7 @@ function InlineMedicineAutoComplete({
 }) {
   const [suggestions, setSuggestions] = useState<MedicineItem[]>([]);
   const dropdownClicked = useRef(false);
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   /* Debounce DB queries — avoids hitting Supabase on every keystroke */
   const search = (event: { query: string }) => {
