@@ -578,7 +578,16 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                     onBlur={(e) => {
                       const v = e.target.value;
                       handleInputBlur(1, v);
-                      setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160);
+                      setTimeout(() => {
+                        setFocusField((curr) => {
+                          if (curr === "name") {
+                            setFocusId(null);
+                            setRowHi(-1);
+                            return null;
+                          }
+                          return curr;
+                        });
+                      }, 160);
                     }}
                     onKeyDown={(e) => handleRowKey(e, sym.id, "name", symptomOptions, sym.name)}
                     placeholder="Symptom name"
@@ -595,7 +604,16 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                     onBlur={(e) => {
                       const v = e.target.value;
                       handleInputBlur(2, v);
-                      setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160);
+                      setTimeout(() => {
+                        setFocusField((curr) => {
+                          if (curr === "duration") {
+                            setFocusId(null);
+                            setRowHi(-1);
+                            return null;
+                          }
+                          return curr;
+                        });
+                      }, 160);
                     }}
                     onKeyDown={(e) => handleRowKey(e, sym.id, "duration", durationOptions, sym.duration)}
                     placeholder="Duration"
@@ -612,7 +630,16 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                     onBlur={(e) => {
                       const v = e.target.value;
                       handleInputBlur(3, v);
-                      setTimeout(() => { setFocusId(null); setFocusField(null); setRowHi(-1); }, 160);
+                      setTimeout(() => {
+                        setFocusField((curr) => {
+                          if (curr === "severity") {
+                            setFocusId(null);
+                            setRowHi(-1);
+                            return null;
+                          }
+                          return curr;
+                        });
+                      }, 160);
                     }}
                     onKeyDown={(e) => handleRowKey(e, sym.id, "severity", severityOptions, sym.severity)}
                     placeholder="Severity"
