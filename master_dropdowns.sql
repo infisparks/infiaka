@@ -4,18 +4,51 @@
 -- 1. Ensure metadata column exists on aka_master_dropdown_catalog
 ALTER TABLE public.aka_master_dropdown_catalog ADD COLUMN IF NOT EXISTS metadata jsonb null;
 
--- 2. Insert Category definitions if they don't already exist
-INSERT INTO public.aka_dropdown_categories (id, name, allow_custom)
-VALUES 
-  (160, 'treating_doctor', true),
-  (161, 'patient_address', true),
-  (162, 'clinic_name', false), -- ONLY selection from dropdown, no custom input addition allowed
-  (163, 'referring_doctor', true),
-  (164, 'services_and_products', true),
-  (165, 'country_list', true),
-  (166, 'state_list', true)
-ON CONFLICT (id) DO UPDATE 
-SET name = EXCLUDED.name, allow_custom = EXCLUDED.allow_custom;
+-- 2. Insert Category definitions dynamically based on column schema ('name' or 'category_name')
+DO $$
+DECLARE
+    col_name text;
+BEGIN
+    IF EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'aka_dropdown_categories' 
+          AND column_name = 'name'
+    ) THEN
+        col_name := 'name';
+    ELSIF EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'aka_dropdown_categories' 
+          AND column_name = 'category_name'
+    ) THEN
+        col_name := 'category_name';
+    ELSE
+        RAISE EXCEPTION 'Neither column "name" nor "category_name" exists on public.aka_dropdown_categories.';
+    END IF;
+
+    EXECUTE format('
+        INSERT INTO public.aka_dropdown_categories (id, %I, allow_custom)
+        VALUES 
+          (160, $1, true),
+          (161, $2, true),
+          (162, $3, false),
+          (163, $4, true),
+          (164, $5, true),
+          (165, $6, true),
+          (166, $7, true)
+        ON CONFLICT (id) DO UPDATE 
+        SET %I = EXCLUDED.%I, allow_custom = EXCLUDED.allow_custom;
+    ', col_name, col_name, col_name)
+    USING 
+      'treating_doctor', 
+      'patient_address', 
+      'clinic_name', 
+      'referring_doctor', 
+      'services_and_products', 
+      'country_list', 
+      'state_list';
+END $$;
 
 -- 3. Delete old entries for these categories to prevent duplicates
 DELETE FROM public.aka_master_dropdown_catalog WHERE category_id IN (160, 161, 162, 163, 164, 165, 166);
