@@ -2328,7 +2328,16 @@ function DashboardContent() {
                       <option value="Mr">Mr</option>
                       <option value="Mrs">Mrs</option>
                       <option value="Ms">Ms</option>
+                      <option value="Miss">Miss</option>
+                      <option value="Master">Master</option>
                       <option value="Dr">Dr</option>
+                      <option value="Dt">Dt</option>
+                      <option value="Prof">Prof</option>
+                      <option value="Rev">Rev</option>
+                      <option value="Shri">Shri</option>
+                      <option value="Smt">Smt</option>
+                      <option value="Baby">Baby</option>
+                      <option value="Baby Of">Baby Of</option>
                     </select>
                   </div>
 
