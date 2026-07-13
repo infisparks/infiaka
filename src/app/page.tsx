@@ -1336,26 +1336,8 @@ function DashboardContent() {
       const redColor: [number, number, number]      = [220, 38, 38];
       const greenColor: [number, number, number]    = [22, 163, 74];
 
-      // ── Header branding when not WhatsApp ──────────────────────────
-      if (!isWhatsapp) {
-          doc.setFont("Poppins", "bold").setFontSize(14).setTextColor(...primaryColor);
-          doc.text((patient.opdRegistration?.clinic_name || "OPD CLINIC").toUpperCase(), MARGIN, 15);
-          
-          doc.setFont("Poppins", "normal").setFontSize(7.5).setTextColor(...textGray);
-          doc.text("Comprehensive & Advanced Healthcare Center", MARGIN, 19);
-          doc.text("Treating Doctor: " + (patient.opdRegistration?.treating_doctor || "DR. LAXMAN SALVE"), MARGIN, 23);
-          
-          doc.setFont("Poppins", "normal").setFontSize(7).setTextColor(...textGray);
-          doc.text("Receipt of Payment", PAGE_W - MARGIN, 15, { align: "right" });
-          doc.text("Reg No: 123456", PAGE_W - MARGIN, 19, { align: "right" });
-          
-          // Separator line
-          doc.setDrawColor(...borderColor).setLineWidth(0.3);
-          doc.line(MARGIN, 26, PAGE_W - MARGIN, 26);
-      }
-
       // ── PATIENT PROFILE CARD ───────────────────────────────────────
-      const cardY = isWhatsapp ? 43 : 29;
+      const cardY = isWhatsapp ? 43 : 34;
       doc.setFillColor(248, 250, 252);
       doc.setDrawColor(...borderColor);
       doc.setLineWidth(0.2);
