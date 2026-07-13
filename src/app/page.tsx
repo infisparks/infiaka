@@ -2126,9 +2126,22 @@ function DashboardContent() {
                       </button>
                     </div>
 
-                    <div className="inline-flex items-center gap-1 bg-[#FEF3C7] border border-[#FDE68A] text-[#92400E] px-2 py-0.5 rounded text-[10px] font-bold select-none">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#D97706] animate-pulse"></span>
-                      Since: {patient.arrivalMinutesAgo}m - {patient.arrivalTime}
+                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-text-secondary font-medium pt-0.5">
+                      {patient.opdRegistration?.treating_doctor && (
+                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-sm">
+                          Dr: <span className="font-bold">{patient.opdRegistration.treating_doctor}</span>
+                        </span>
+                      )}
+                      {(patient.localAddress || patient.permanentAddress) && (
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-sm">
+                          Location: <span className="font-bold">{patient.localAddress || patient.permanentAddress}</span>
+                        </span>
+                      )}
+                      {patient.opdRegistration?.referring_doctor && (
+                        <span className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-100 rounded-sm">
+                          Reference: <span className="font-bold">{patient.opdRegistration.referring_doctor}</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
