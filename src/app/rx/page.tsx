@@ -171,6 +171,10 @@ function RxPageContent() {
   const [rxProcedures, setRxProcedures] = useState<ProcedureItem[]>([]);
   const [referrals, setReferrals] = useState<ReferralItem[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [printShowHeader, setPrintShowHeader] = useState(true);
+  const [printHeaderHeight, setPrintHeaderHeight] = useState(30);
+  const [printShowFooter, setPrintShowFooter] = useState(true);
+  const [printFooterHeight, setPrintFooterHeight] = useState(30);
 
   // Load patient context from DB on mount
   useEffect(() => {
@@ -2125,7 +2129,7 @@ function RxPageContent() {
       {/* PROFESSIONAL RX PREVIEW MODAL */}
       {isPreviewOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-text">
-          <div className="bg-[#F8FAFC] w-full max-w-4xl h-[90vh] rounded-xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+          <div className="bg-[#F8FAFC] w-full max-w-5xl h-[90vh] rounded-xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
             {/* Modal Header */}
             <div className="bg-white border-b border-[#E2E8F0] px-5 py-3 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
@@ -2154,30 +2158,123 @@ function RxPageContent() {
               </div>
             </div>
 
-            {/* Modal Body (Scrollable Paper area) */}
-            <div className="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-200">
-              {/* Paper representation */}
-              <div className="bg-white w-[794px] min-h-[1123px] shadow-lg rounded border border-slate-300 p-10 flex flex-col justify-between text-left text-[#111827] font-sans relative">
-                
-                {/* Paper Top Header */}
+            {/* Modal Body with Settings Sidebar + Paper representation */}
+            <div className="flex-1 flex overflow-hidden">
+              
+              {/* Left Settings Sidebar */}
+              <div className="w-72 bg-white border-r border-[#E2E8F0] p-5 flex flex-col gap-6 overflow-y-auto shrink-0 text-left select-none no-print">
                 <div>
-                  <div className="flex justify-between items-start border-b-2 border-primary pb-4 mb-5">
-                    <div>
-                      <div className="text-[20px] font-black text-primary tracking-tight uppercase">
-                        {currentRxPatient.opdRegistration?.clinic_name || "OPD CLINIC"}
-                      </div>
-                      <p className="m-0 text-[#718096] text-[11px] font-semibold mt-0.5">
-                        Comprehensive & Advanced Healthcare Clinic
-                      </p>
-                    </div>
-                    <div className="text-right text-[11px] text-[#4A5568] leading-normal font-semibold">
-                      <strong className="text-primary text-[13px] block mb-0.5">
-                        {currentRxPatient.opdRegistration?.treating_doctor || "DR. TREATING DOCTOR"}
-                      </strong>
-                      <span>MBBS, MD (Medicine)</span><br />
-                      <span>Reg No: 123456</span>
-                    </div>
+                  <h4 className="text-[12px] font-black text-slate-700 uppercase tracking-wider mb-2">Print Adjustments</h4>
+                  <p className="text-[10px] text-slate-400 font-medium leading-relaxed mb-4">
+                    Adjust space to align the print precisely with your pre-printed prescription pad/stationery.
+                  </p>
+                </div>
+
+                {/* Header Settings */}
+                <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-700">Show Header</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={printShowHeader} 
+                        onChange={(e) => setPrintShowHeader(e.target.checked)}
+                        className="sr-only peer" 
+                      />
+                      <div className="w-8 h-4 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
                   </div>
+                  
+                  {!printShowHeader && (
+                    <div className="space-y-1.5 pt-1 border-t border-slate-150 mt-1">
+                      <div className="flex justify-between text-[10px] font-bold text-slate-550">
+                        <span>Header Space Height</span>
+                        <span className="text-primary">{printHeaderHeight} mm</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        step="5"
+                        value={printHeaderHeight}
+                        onChange={(e) => setPrintHeaderHeight(Number(e.target.value))}
+                        className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer Settings */}
+                <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-700">Show Footer & Sign</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={printShowFooter} 
+                        onChange={(e) => setPrintShowFooter(e.target.checked)}
+                        className="sr-only peer" 
+                      />
+                      <div className="w-8 h-4 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+                  
+                  {!printShowFooter && (
+                    <div className="space-y-1.5 pt-1 border-t border-slate-150 mt-1">
+                      <div className="flex justify-between text-[10px] font-bold text-slate-555">
+                        <span>Footer Space Height</span>
+                        <span className="text-primary">{printFooterHeight} mm</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        step="5"
+                        value={printFooterHeight}
+                        onChange={(e) => setPrintFooterHeight(Number(e.target.value))}
+                        className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-auto border-t border-slate-100 pt-3 text-center">
+                  <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                    Prescription Pad Controls
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Scrollable Paper Preview Area */}
+              <div className="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-200">
+                {/* Paper representation */}
+                <div className="bg-white w-[794px] min-h-[1123px] shadow-lg rounded border border-slate-300 p-10 flex flex-col justify-between text-left text-[#111827] font-sans relative">
+                  
+                  {/* Paper Top Header */}
+                  <div>
+                    {printShowHeader ? (
+                      <div className="flex justify-between items-start border-b-2 border-primary pb-4 mb-5">
+                        <div>
+                          <div className="text-[20px] font-black text-primary tracking-tight uppercase">
+                            {currentRxPatient.opdRegistration?.clinic_name || "OPD CLINIC"}
+                          </div>
+                          <p className="m-0 text-[#718096] text-[11px] font-semibold mt-0.5">
+                            Comprehensive & Advanced Healthcare Clinic
+                          </p>
+                        </div>
+                        <div className="text-right text-[11px] text-[#4A5568] leading-normal font-semibold">
+                          <strong className="text-primary text-[13px] block mb-0.5">
+                            {currentRxPatient.opdRegistration?.treating_doctor || "DR. TREATING DOCTOR"}
+                          </strong>
+                          <span>MBBS, MD (Medicine)</span><br />
+                          <span>Reg No: 123456</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ height: `${printHeaderHeight}mm` }} className="w-full shrink-0 border-b border-dashed border-slate-200 mb-5 flex items-center justify-center text-[10px] text-slate-400 select-none">
+                        [Pre-printed Letterhead Header Space: {printHeaderHeight}mm]
+                      </div>
+                    )}
 
                   {/* Patient Info Bar */}
                   <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-[#E2E8F0] p-4 rounded-lg text-[11.5px] font-semibold mb-6">
@@ -2470,22 +2567,30 @@ function RxPageContent() {
                   </div>
 
                   {/* Sign-off row */}
-                  <div className="flex justify-between items-end pt-5 border-t border-[#F1F5F9] text-[10.5px] font-semibold text-slate-400">
-                    <div>
-                      <span>Generated by DLPC Clinic Portal</span>
+                  {printShowFooter ? (
+                    <div className="flex justify-between items-end pt-5 border-t border-[#F1F5F9] text-[10.5px] font-semibold text-slate-400">
+                      <div>
+                        <span>Generated by DLPC Clinic Portal</span>
+                      </div>
+                      <div className="text-center w-40">
+                        <div className="border-b border-[#CBD5E0] h-8"></div>
+                        <div className="text-[9.5px] uppercase font-bold text-slate-500 mt-1">Doctor Signature</div>
+                      </div>
                     </div>
-                    <div className="text-center w-40">
-                      <div className="border-b border-[#CBD5E0] h-8"></div>
-                      <div className="text-[9.5px] uppercase font-bold text-slate-500 mt-1">Doctor Signature</div>
+                  ) : (
+                    <div style={{ height: `${printFooterHeight}mm` }} className="w-full shrink-0 border-t border-dashed border-slate-200 mt-5 flex items-center justify-center text-[10px] text-slate-400 select-none">
+                      [Pre-printed Letterhead Footer Space: {printFooterHeight}mm]
                     </div>
-                  </div>
+                  )}
                 </div>
 
               </div>
             </div>
-
+            
           </div>
+
         </div>
+      </div>
       )}
 
     </div>
@@ -2521,6 +2626,10 @@ function RxPageContent() {
       otherHistory={otherHistory}
       otherHistoryTitle={otherHistoryTitle}
       travelHistory={travelHistory}
+      showHeader={printShowHeader}
+      headerHeight={printHeaderHeight}
+      showFooter={printShowFooter}
+      footerHeight={printFooterHeight}
     />
   </>
 );

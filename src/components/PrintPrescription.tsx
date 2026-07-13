@@ -122,6 +122,12 @@ interface PrintPrescriptionProps {
   otherHistory?: any[];
   otherHistoryTitle?: string;
   travelHistory?: any[];
+
+  // Header & Footer adjustments
+  showHeader?: boolean;
+  headerHeight?: number;
+  showFooter?: boolean;
+  footerHeight?: number;
 }
 
 export default function PrintPrescription({
@@ -156,6 +162,11 @@ export default function PrintPrescription({
   otherHistory = [],
   otherHistoryTitle = "",
   travelHistory = [],
+
+  showHeader = true,
+  headerHeight = 0,
+  showFooter = true,
+  footerHeight = 0,
 }: PrintPrescriptionProps) {
   
   // Compile medical history elements into display format
@@ -235,23 +246,27 @@ export default function PrintPrescription({
       `}} />
 
       {/* ─── HEADER ─── */}
-      <div className="flex justify-between items-start border-b-2 border-primary pb-4 mb-4">
-        <div>
-          <div className="text-[20px] font-black text-[#4f46e5] uppercase tracking-tight">
-            {patient?.opdRegistration?.clinic_name || "OPD CLINIC"}
+      {showHeader ? (
+        <div className="flex justify-between items-start border-b-2 border-primary pb-4 mb-4">
+          <div>
+            <div className="text-[20px] font-black text-[#4f46e5] uppercase tracking-tight">
+              {patient?.opdRegistration?.clinic_name || "OPD CLINIC"}
+            </div>
+            <p className="m-0 text-[#64748b] text-[11px] font-semibold mt-0.5">
+              Comprehensive & Advanced Healthcare Clinic
+            </p>
           </div>
-          <p className="m-0 text-[#64748b] text-[11px] font-semibold mt-0.5">
-            Comprehensive & Advanced Healthcare Clinic
-          </p>
+          <div className="text-right text-[11.5px] leading-normal font-semibold">
+            <strong className="text-[#4f46e5] text-[13.5px] block mb-0.5">
+              {patient?.opdRegistration?.treating_doctor || "DR. TREATING DOCTOR"}
+            </strong>
+            <span>MBBS, MD (Medicine)</span><br />
+            <span>Reg No: 123456</span>
+          </div>
         </div>
-        <div className="text-right text-[11.5px] leading-normal font-semibold">
-          <strong className="text-[#4f46e5] text-[13.5px] block mb-0.5">
-            {patient?.opdRegistration?.treating_doctor || "DR. TREATING DOCTOR"}
-          </strong>
-          <span>MBBS, MD (Medicine)</span><br />
-          <span>Reg No: 123456</span>
-        </div>
-      </div>
+      ) : (
+        <div style={{ height: `${headerHeight}mm` }} className="w-full shrink-0" />
+      )}
 
       {/* ─── PATIENT INFORMATION GRID ─── */}
       <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-[#e2e8f0] p-4 rounded-lg text-[11.5px] font-semibold mb-5">
@@ -582,15 +597,19 @@ export default function PrintPrescription({
       </div>
 
       {/* ─── FOOTER SIGNATURE ROW ─── */}
-      <div className="flex justify-between items-end pt-8 mt-12 border-t border-[#f1f5f9] text-[10px] font-semibold text-slate-400 avoid-break">
-        <div>
-          <span>Generated via DLPC Clinic Management System</span>
+      {showFooter ? (
+        <div className="flex justify-between items-end pt-8 mt-12 border-t border-[#f1f5f9] text-[10px] font-semibold text-slate-400 avoid-break">
+          <div>
+            <span>Generated via DLPC Clinic Management System</span>
+          </div>
+          <div className="text-center w-40">
+            <div className="border-b border-[#cbd5e1] h-8"></div>
+            <div className="text-[9px] uppercase font-bold text-slate-500 mt-1">Doctor Signature</div>
+          </div>
         </div>
-        <div className="text-center w-40">
-          <div className="border-b border-[#cbd5e1] h-8"></div>
-          <div className="text-[9px] uppercase font-bold text-slate-500 mt-1">Doctor Signature</div>
-        </div>
-      </div>
+      ) : (
+        <div style={{ height: `${footerHeight}mm` }} className="w-full shrink-0" />
+      )}
 
     </div>
   );
