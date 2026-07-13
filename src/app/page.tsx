@@ -285,8 +285,8 @@ function DashboardContent() {
 
         let isComp = false;
         if (typeof window !== "undefined") {
-          const completedList = JSON.parse(localStorage.getItem("completed_patients") || "[]");
-          isComp = completedList.includes(p.uhid);
+          const completedList = JSON.parse(localStorage.getItem("completed_appointments") || "[]");
+          isComp = completedList.includes(String(reg.registration_id));
         }
 
         return {
@@ -940,19 +940,24 @@ function DashboardContent() {
   }, [totalServiceFees, discountAmount, paymentsRows.length]);
 
   // Handlers for managing the patients in the main queue list
-  const handleToggleCompleted = (patientId: string) => {
+  const handleToggleCompleted = (patientId: string, regId?: string) => {
     setPatients((prev) =>
       prev.map((p) => {
-        if (p.id === patientId) {
+        const match = regId && p.opdRegistration?.registration_id 
+          ? String(p.opdRegistration.registration_id) === String(regId)
+          : p.id === patientId;
+
+        if (match) {
           const nextVal = !p.isCompleted;
-          const completedList = JSON.parse(localStorage.getItem("completed_patients") || "[]");
+          const completedList = JSON.parse(localStorage.getItem("completed_appointments") || "[]");
           let updatedList;
+          const trackingKey = regId || p.opdRegistration?.registration_id || patientId;
           if (nextVal) {
-            updatedList = Array.from(new Set([...completedList, patientId]));
+            updatedList = Array.from(new Set([...completedList, String(trackingKey)]));
           } else {
-            updatedList = completedList.filter((id: string) => id !== patientId);
+            updatedList = completedList.filter((id: string) => id !== String(trackingKey));
           }
-          localStorage.setItem("completed_patients", JSON.stringify(updatedList));
+          localStorage.setItem("completed_appointments", JSON.stringify(updatedList));
           return {
             ...p,
             isCompleted: nextVal,
@@ -1989,7 +1994,7 @@ function DashboardContent() {
                     </button>
 
                     <button
-                      onClick={() => handleToggleCompleted(patient.id)}
+                      onClick={() => handleToggleCompleted(patient.id, patient.opdRegistration?.registration_id)}
                       className="w-6 h-6 border border-red-200 text-red-500 bg-red-50/30 hover:bg-red-50 rounded flex items-center justify-center shrink-0 transition-colors"
                       title={patient.isCompleted ? "Restore patient to queue" : "Checkout patient"}
                     >

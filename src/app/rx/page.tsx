@@ -1456,10 +1456,13 @@ function RxPageContent() {
       };
       localStorage.setItem(`saved_rx_${currentRxPatient.id}`, JSON.stringify(rxState));
 
-      // 2. Add to completed patients list
-      const completedList = JSON.parse(localStorage.getItem("completed_patients") || "[]");
-      if (!completedList.includes(currentRxPatient.id)) {
-        localStorage.setItem("completed_patients", JSON.stringify([...completedList, currentRxPatient.id]));
+      // 2. Add to completed appointments list
+      const regId = currentRxPatient.opdRegistration?.registration_id;
+      if (regId) {
+        const completedList = JSON.parse(localStorage.getItem("completed_appointments") || "[]");
+        if (!completedList.includes(String(regId))) {
+          localStorage.setItem("completed_appointments", JSON.stringify([...completedList, String(regId)]));
+        }
       }
 
       // 3. Save updated vitals in aka_opd_registration database table
