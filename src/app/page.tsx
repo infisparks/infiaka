@@ -2013,7 +2013,7 @@ function DashboardContent() {
 
                     <button
                       onClick={() => {
-                        openPrescription(patient.id);
+                        openPrescription(patient.opdRegistration?.registration_id || patient.id);
                       }}
                       className="px-3 h-6 bg-primary hover:bg-primary-hover text-white rounded text-[10px] font-extrabold shadow-xs transition-colors flex items-center justify-center gap-1.5 shrink-0"
                     >

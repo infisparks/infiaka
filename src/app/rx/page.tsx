@@ -260,11 +260,27 @@ function RxPageContent() {
     const loadPatientData = async () => {
       try {
         setLoading(true);
-        // Fetch patient details
+        // Fetch OPD registration details first (rxPatientId corresponds to the OPD registration_id)
+        const { data: regData, error: rError } = await supabase
+          .from("aka_opd_registration")
+          .select("*")
+          .eq("registration_id", rxPatientId)
+          .maybeSingle();
+
+        if (rError) throw rError;
+        if (!regData) {
+          setCurrentRxPatient(null);
+          setLoading(false);
+          return;
+        }
+
+        const patientUhid = regData.patient_uhid;
+
+        // Fetch patient details using the UHID from the registration
         const { data: pData, error: pError } = await supabase
           .from("patient_detail")
           .select("*")
-          .eq("uhid", rxPatientId)
+          .eq("uhid", patientUhid)
           .maybeSingle();
 
         if (pError) throw pError;
@@ -273,17 +289,6 @@ function RxPageContent() {
           setLoading(false);
           return;
         }
-
-        // Fetch latest registration
-        const { data: regData, error: rError } = await supabase
-          .from("aka_opd_registration")
-          .select("*")
-          .eq("patient_uhid", rxPatientId)
-          .order("registration_id", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (rError) throw rError;
 
         // Map registration services & payments to compute amount
         const billAmt = regData?.services 
@@ -353,7 +358,7 @@ function RxPageContent() {
         const { data: histData, error: hError } = await supabase
           .from("aka_patient_medical_history")
           .select("*")
-          .eq("patient_uhid", rxPatientId)
+          .eq("patient_uhid", patientUhid)
           .maybeSingle();
 
         if (hError) {
