@@ -2055,7 +2055,7 @@ function DashboardContent() {
                         {patient.name}
                       </h4>
                       <span className="text-[11px] font-medium text-text-secondary shrink-0">
-                        | {patient.gender} | {patient.age}y
+                        | {patient.gender} | {patient.age}y | UHID: <span className="font-semibold text-foreground select-all">{patient.id}</span> | OPD ID: <span className="font-semibold text-foreground select-all">{patient.opdRegistration?.registration_id || "N/A"}</span>
                       </span>
                     </div>
 
