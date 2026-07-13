@@ -449,7 +449,18 @@ function DashboardContent() {
   };
   const [activeTab, setActiveTab] = useState<"MY_OPD" | "COMPLETED">("MY_OPD");
   const [searchQuery, setSearchQuery] = useState("");
-  const [doctorSelect, setDoctorSelect] = useState("Madan");
+  const [selectedDoctorFilter, setSelectedDoctorFilter] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("selected_doctor_filter") || "All";
+    }
+    return "All";
+  });
+  const [selectedClinicFilter, setSelectedClinicFilter] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("selected_clinic_filter") || "All";
+    }
+    return "All";
+  });
 
   // Autocomplete cache variables
   const [addressCache, setAddressCache] = useState(initialAddressCache);
@@ -526,15 +537,22 @@ function DashboardContent() {
   const [initialSugar, setInitialSugar] = useState("100");
 
   // Tab counts
-  const opdPatientsCount = useMemo(() => patients.filter((p) => !p.isCompleted).length, [patients]);
-  const completedPatientsCount = useMemo(() => patients.filter((p) => p.isCompleted).length, [patients]);
-
   // Main Dashboard Filtered Patients List
-  const filteredPatients = useMemo(() => {
+  const filteredAllPatients = useMemo(() => {
     return patients.filter((p) => {
-      if (activeTab === "MY_OPD" && p.isCompleted) return false;
-      if (activeTab === "COMPLETED" && !p.isCompleted) return false;
-
+      // 1. Doctor Filter
+      if (selectedDoctorFilter !== "All") {
+        if (p.opdRegistration?.treating_doctor?.toLowerCase() !== selectedDoctorFilter.toLowerCase()) {
+          return false;
+        }
+      }
+      // 2. Clinic/Hospital Filter
+      if (selectedClinicFilter !== "All") {
+        if (p.opdRegistration?.clinic_name?.toLowerCase() !== selectedClinicFilter.toLowerCase()) {
+          return false;
+        }
+      }
+      // 3. Search query
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         return (
@@ -545,7 +563,19 @@ function DashboardContent() {
       }
       return true;
     });
-  }, [patients, activeTab, searchQuery]);
+  }, [patients, selectedDoctorFilter, selectedClinicFilter, searchQuery]);
+
+  // Tab counts
+  const opdPatientsCount = useMemo(() => filteredAllPatients.filter((p) => !p.isCompleted).length, [filteredAllPatients]);
+  const completedPatientsCount = useMemo(() => filteredAllPatients.filter((p) => p.isCompleted).length, [filteredAllPatients]);
+
+  const filteredPatients = useMemo(() => {
+    return filteredAllPatients.filter((p) => {
+      if (activeTab === "MY_OPD" && p.isCompleted) return false;
+      if (activeTab === "COMPLETED" && !p.isCompleted) return false;
+      return true;
+    });
+  }, [filteredAllPatients, activeTab]);
 
   // Right Sidebar Booking Patient Search Match
   const bookingSearchResults = useMemo(() => {
@@ -1862,19 +1892,47 @@ function DashboardContent() {
               Today
             </button>
 
-            {/* Doctor Dropdown */}
+            {/* Clinic Filter Dropdown */}
             <div className="flex items-center border border-[#E5E7EB] rounded-md bg-white px-2 py-0.5 cursor-pointer hover:bg-gray-50">
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-1.5 flex items-center justify-center">
+              <div className="w-2 h-2 rounded-full bg-indigo-500 mr-1.5 flex items-center justify-center">
                 <div className="w-1 h-1 rounded-full bg-white"></div>
               </div>
               <select
-                value={doctorSelect}
-                onChange={(e) => setDoctorSelect(e.target.value)}
-                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent pr-1.5 cursor-pointer"
+                value={selectedClinicFilter}
+                onChange={(e) => {
+                  setSelectedClinicFilter(e.target.value);
+                  localStorage.setItem("selected_clinic_filter", e.target.value);
+                }}
+                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent pr-1.5 cursor-pointer max-w-[130px] truncate"
               >
-                <option value="Madan">Madan</option>
-                <option value="Kabir">Dr. Kabir</option>
-                <option value="Pooja">Dr. Pooja</option>
+                <option value="All">All Clinics</option>
+                {clinicCache.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Doctor Filter Dropdown */}
+            <div className="flex items-center border border-[#E5E7EB] rounded-md bg-white px-2 py-0.5 cursor-pointer hover:bg-gray-50">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 flex items-center justify-center">
+                <div className="w-1 h-1 rounded-full bg-white"></div>
+              </div>
+              <select
+                value={selectedDoctorFilter}
+                onChange={(e) => {
+                  setSelectedDoctorFilter(e.target.value);
+                  localStorage.setItem("selected_doctor_filter", e.target.value);
+                }}
+                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent pr-1.5 cursor-pointer max-w-[130px] truncate"
+              >
+                <option value="All">All Doctors</option>
+                {doctorCache.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
               </select>
             </div>
 
