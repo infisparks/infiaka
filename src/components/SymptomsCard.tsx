@@ -23,7 +23,7 @@ async function fetchOptions(categoryId: number, search: string = "") {
       .select("value")
       .eq("category_id", categoryId)
       .order("usage_count", { ascending: false })
-      .limit(40);
+      .limit(1000);
 
     if (search) {
       query = query.ilike("value", `%${search}%`);
@@ -97,12 +97,19 @@ function ChipTagField({
   const autoRef = useRef<any>(null);
 
   const search = (event: { query: string }) => {
-    const query = event.query.trim();
-    let results = options.filter((o) =>
-      o.toLowerCase().includes(query.toLowerCase())
-    );
-    if (query && !options.some((o) => o.toLowerCase() === query.toLowerCase())) {
-      results = [...results, `+ Create "${query}"`];
+    const query = event.query.trim().toLowerCase();
+    let results = options
+      .filter((o) => o.toLowerCase().includes(query))
+      .sort((a, b) => {
+        if (!query) return 0;
+        const aStarts = a.toLowerCase().startsWith(query);
+        const bStarts = b.toLowerCase().startsWith(query);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      });
+    if (event.query.trim() && !options.some((o) => o.toLowerCase() === query)) {
+      results = [...results, `+ Create "${event.query.trim()}"`];
     }
     setSuggestions(results);
   };
@@ -188,15 +195,22 @@ function AutoInput({
   const autoRef = useRef<any>(null);
 
   const search = (event: { query: string }) => {
-    const query = event.query.trim();
-    let results = options.filter((o) =>
-      o.toLowerCase().includes(query.toLowerCase())
-    );
-    if (!query || options.some(opt => opt === query)) {
+    const query = event.query.trim().toLowerCase();
+    let results = options
+      .filter((o) => o.toLowerCase().includes(query))
+      .sort((a, b) => {
+        if (!query) return 0;
+        const aStarts = a.toLowerCase().startsWith(query);
+        const bStarts = b.toLowerCase().startsWith(query);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      });
+    if (!query || options.some(opt => opt.toLowerCase() === query)) {
       results = options;
     }
-    if (query && !options.some((o) => o.toLowerCase() === query.toLowerCase())) {
-      results = [...results, `+ Create "${query}"`];
+    if (event.query.trim() && !options.some((o) => o.toLowerCase() === query)) {
+      results = [...results, `+ Create "${event.query.trim()}"`];
     }
     setSuggestions(results);
   };
@@ -297,15 +311,22 @@ function InlineAutoComplete({
   const autoRef = useRef<any>(null);
 
   const search = (event: { query: string }) => {
-    const query = event.query.trim();
-    let results = options.filter((o) =>
-      o.toLowerCase().includes(query.toLowerCase())
-    );
-    if (!query || options.some(opt => opt === query)) {
+    const query = event.query.trim().toLowerCase();
+    let results = options
+      .filter((o) => o.toLowerCase().includes(query))
+      .sort((a, b) => {
+        if (!query) return 0;
+        const aStarts = a.toLowerCase().startsWith(query);
+        const bStarts = b.toLowerCase().startsWith(query);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      });
+    if (!query || options.some(opt => opt.toLowerCase() === query)) {
       results = options;
     }
-    if (query && !options.some((o) => o.toLowerCase() === query.toLowerCase())) {
-      results = [...results, `+ Create "${query}"`];
+    if (event.query.trim() && !options.some((o) => o.toLowerCase() === query)) {
+      results = [...results, `+ Create "${event.query.trim()}"`];
     }
     setSuggestions(results);
   };
@@ -670,7 +691,17 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
         </div>
 
         {searchOpen && (() => {
-          const list = symptomOptions.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+          const query = searchVal.trim().toLowerCase();
+          const list = symptomOptions
+            .filter((o) => !query || o.toLowerCase().includes(query))
+            .sort((a, b) => {
+              if (!query) return 0;
+              const aStarts = a.toLowerCase().startsWith(query);
+              const bStarts = b.toLowerCase().startsWith(query);
+              if (aStarts && !bStarts) return -1;
+              if (!aStarts && bStarts) return 1;
+              return 0;
+            });
           const hasCustomVal = searchVal.trim() && !symptomOptions.some(o => o.toLowerCase() === searchVal.trim().toLowerCase());
           if (list.length === 0 && !hasCustomVal) return null;
           return (
