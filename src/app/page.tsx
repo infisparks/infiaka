@@ -1150,7 +1150,7 @@ function DashboardContent() {
         }
       });
 
-      const isUpdate = !!selectedBookingPatient;
+      const isUpdate = !!selectedBookingPatient && selectedBookingPatient.id.startsWith("DLPC");
       let targetUhid = "";
 
       if (isUpdate) {
