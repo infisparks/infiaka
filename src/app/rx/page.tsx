@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, Suspense, useEffect } from "react";
+import React, { useState, useMemo, Suspense, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -101,6 +101,8 @@ function RxPageContent() {
   const searchParams = useSearchParams();
   const rxPatientId = searchParams.get("rx");
 
+  const printRef = useRef<any>(null);
+
   const [loading, setLoading] = useState(true);
   const [currentRxPatient, setCurrentRxPatient] = useState<Patient | null>(null);
 
@@ -175,6 +177,78 @@ function RxPageContent() {
   const [printHeaderHeight, setPrintHeaderHeight] = useState(30);
   const [printShowFooter, setPrintShowFooter] = useState(true);
   const [printFooterHeight, setPrintFooterHeight] = useState(30);
+  const [printShowLetterhead, setPrintShowLetterhead] = useState(true);
+
+  // Subsequent page settings
+  const [printShowHeaderPage2, setPrintShowHeaderPage2] = useState(false);
+  const [printHeaderHeightPage2, setPrintHeaderHeightPage2] = useState(15);
+  const [printShowFooterPage2, setPrintShowFooterPage2] = useState(true);
+  const [printFooterHeightPage2, setPrintFooterHeightPage2] = useState(15);
+  const [printShowLetterheadPage2, setPrintShowLetterheadPage2] = useState(false);
+
+  // Load prescription print settings from Supabase on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("aka_setting")
+          .select("metadata")
+          .eq("setting_key", "prescription_settings")
+          .maybeSingle();
+        if (data && data.metadata) {
+          const meta = data.metadata;
+          if (meta.showLetterhead !== undefined) setPrintShowLetterhead(meta.showLetterhead);
+          if (meta.showHeader !== undefined) setPrintShowHeader(meta.showHeader);
+          if (meta.showFooter !== undefined) setPrintShowFooter(meta.showFooter);
+          if (meta.headerHeight !== undefined) setPrintHeaderHeight(meta.headerHeight);
+          if (meta.footerHeight !== undefined) setPrintFooterHeight(meta.footerHeight);
+
+          if (meta.showLetterheadPage2 !== undefined) setPrintShowLetterheadPage2(meta.showLetterheadPage2);
+          if (meta.showHeaderPage2 !== undefined) setPrintShowHeaderPage2(meta.showHeaderPage2);
+          if (meta.showFooterPage2 !== undefined) setPrintShowFooterPage2(meta.showFooterPage2);
+          if (meta.headerHeightPage2 !== undefined) setPrintHeaderHeightPage2(meta.headerHeightPage2);
+          if (meta.footerHeightPage2 !== undefined) setPrintFooterHeightPage2(meta.footerHeightPage2);
+        }
+      } catch (err) {
+        console.error("Error loading prescription settings:", err);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  // Save settings helper
+  const savePrescriptionSettings = async (updates: {
+    showLetterhead?: boolean;
+    showHeader?: boolean;
+    showFooter?: boolean;
+    headerHeight?: number;
+    footerHeight?: number;
+    showLetterheadPage2?: boolean;
+    showHeaderPage2?: boolean;
+    showFooterPage2?: boolean;
+    headerHeightPage2?: number;
+    footerHeightPage2?: number;
+  }) => {
+    try {
+      const { data } = await supabase
+        .from("aka_setting")
+        .select("metadata")
+        .eq("setting_key", "prescription_settings")
+        .maybeSingle();
+
+      const existingMeta = data?.metadata || {};
+      const newMeta = { ...existingMeta, ...updates };
+
+      await supabase
+        .from("aka_setting")
+        .upsert(
+          { setting_key: "prescription_settings", metadata: newMeta },
+          { onConflict: "setting_key" }
+        );
+    } catch (err) {
+      console.error("Error saving prescription settings:", err);
+    }
+  };
 
   // Load patient context from DB on mount
   useEffect(() => {
@@ -1794,9 +1868,13 @@ function RxPageContent() {
     }
   };
 
-  const handlePrintPrescription = () => {
+  const handlePrintPrescription = async () => {
     if (!currentRxPatient) return;
-    window.print();
+    if (printRef.current) {
+      await printRef.current.generatePDF();
+    } else {
+      window.print();
+    }
   };
 
   if (loading) {
@@ -2170,6 +2248,26 @@ function RxPageContent() {
                   </p>
                 </div>
 
+                {/* Letterhead Background Settings */}
+                <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-700">Use Letterhead Background</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={printShowLetterhead} 
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setPrintShowLetterhead(val);
+                          savePrescriptionSettings({ showLetterhead: val });
+                        }}
+                        className="sr-only peer" 
+                      />
+                      <div className="w-8 h-4 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+                </div>
+
                 {/* Header Settings */}
                 <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
                   <div className="flex items-center justify-between">
@@ -2178,7 +2276,11 @@ function RxPageContent() {
                       <input 
                         type="checkbox" 
                         checked={printShowHeader} 
-                        onChange={(e) => setPrintShowHeader(e.target.checked)}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setPrintShowHeader(val);
+                          savePrescriptionSettings({ showHeader: val });
+                        }}
                         className="sr-only peer" 
                       />
                       <div className="w-8 h-4 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
@@ -2187,7 +2289,7 @@ function RxPageContent() {
                   
                   {!printShowHeader && (
                     <div className="space-y-1.5 pt-1 border-t border-slate-150 mt-1">
-                      <div className="flex justify-between text-[10px] font-bold text-slate-550">
+                      <div className="flex justify-between text-[10px] font-bold text-slate-555">
                         <span>Header Space Height</span>
                         <span className="text-primary">{printHeaderHeight} mm</span>
                       </div>
@@ -2197,7 +2299,11 @@ function RxPageContent() {
                         max="100" 
                         step="5"
                         value={printHeaderHeight}
-                        onChange={(e) => setPrintHeaderHeight(Number(e.target.value))}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setPrintHeaderHeight(val);
+                          savePrescriptionSettings({ headerHeight: val });
+                        }}
                         className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
                       />
                     </div>
@@ -2212,7 +2318,11 @@ function RxPageContent() {
                       <input 
                         type="checkbox" 
                         checked={printShowFooter} 
-                        onChange={(e) => setPrintShowFooter(e.target.checked)}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setPrintShowFooter(val);
+                          savePrescriptionSettings({ showFooter: val });
+                        }}
                         className="sr-only peer" 
                       />
                       <div className="w-8 h-4 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
@@ -2231,7 +2341,123 @@ function RxPageContent() {
                         max="100" 
                         step="5"
                         value={printFooterHeight}
-                        onChange={(e) => setPrintFooterHeight(Number(e.target.value))}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setPrintFooterHeight(val);
+                          savePrescriptionSettings({ footerHeight: val });
+                        }}
+                        className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Second Page Adjustments Separator */}
+                <div className="border-t border-[#E2E8F0] pt-4 mt-2">
+                  <h4 className="text-[12px] font-black text-slate-700 uppercase tracking-wider mb-2">Second Page Adjustments</h4>
+                  <p className="text-[10px] text-slate-400 font-medium leading-relaxed mb-4">
+                    Customize layouts for content overflowing onto Page 2 and subsequent pages.
+                  </p>
+                </div>
+
+                {/* Page 2 Letterhead Settings */}
+                <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-700">Use Background on Page 2</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={printShowLetterheadPage2} 
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setPrintShowLetterheadPage2(val);
+                          savePrescriptionSettings({ showLetterheadPage2: val });
+                        }}
+                        className="sr-only peer" 
+                      />
+                      <div className="w-8 h-4 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Page 2 Header Settings */}
+                <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-700">Show Header on Page 2</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={printShowHeaderPage2} 
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setPrintShowHeaderPage2(val);
+                          savePrescriptionSettings({ showHeaderPage2: val });
+                        }}
+                        className="sr-only peer" 
+                      />
+                      <div className="w-8 h-4 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+                  
+                  {!printShowHeaderPage2 && (
+                    <div className="space-y-1.5 pt-1 border-t border-slate-150 mt-1">
+                      <div className="flex justify-between text-[10px] font-bold text-slate-555">
+                        <span>Header Space Height</span>
+                        <span className="text-primary">{printHeaderHeightPage2} mm</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        step="5"
+                        value={printHeaderHeightPage2}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setPrintHeaderHeightPage2(val);
+                          savePrescriptionSettings({ headerHeightPage2: val });
+                        }}
+                        className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Page 2 Footer Settings */}
+                <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-700">Show Footer on Page 2</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={printShowFooterPage2} 
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setPrintShowFooterPage2(val);
+                          savePrescriptionSettings({ showFooterPage2: val });
+                        }}
+                        className="sr-only peer" 
+                      />
+                      <div className="w-8 h-4 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+                  
+                  {!printShowFooterPage2 && (
+                    <div className="space-y-1.5 pt-1 border-t border-slate-150 mt-1">
+                      <div className="flex justify-between text-[10px] font-bold text-slate-555">
+                        <span>Footer Space Height</span>
+                        <span className="text-primary">{printFooterHeightPage2} mm</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        step="5"
+                        value={printFooterHeightPage2}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setPrintFooterHeightPage2(val);
+                          savePrescriptionSettings({ footerHeightPage2: val });
+                        }}
                         className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
                       />
                     </div>
@@ -2248,11 +2474,17 @@ function RxPageContent() {
               {/* Right Scrollable Paper Preview Area */}
               <div className="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-200">
                 {/* Paper representation */}
-                <div className="bg-white w-[794px] min-h-[1123px] shadow-lg rounded border border-slate-300 p-10 flex flex-col justify-between text-left text-[#111827] font-sans relative">
-                  
+                <div className="bg-white w-[794px] min-h-[1123px] shadow-lg rounded border border-slate-300 p-10 flex flex-col justify-between text-left text-[#111827] font-sans relative overflow-hidden">
+                  {printShowLetterhead && (
+                    <img 
+                      src="/letterhead.jpg" 
+                      alt="Letterhead Background" 
+                      className="absolute inset-0 w-full h-full object-cover pointer-events-none opacity-85 z-0" 
+                    />
+                  )}
                   {/* Paper Top Header */}
-                  <div>
-                    {printShowHeader ? (
+                  <div className="relative z-10 flex-1 flex flex-col">
+                    {(printShowHeader && !printShowLetterhead) ? (
                       <div className="flex justify-between items-start border-b-2 border-primary pb-4 mb-5">
                         <div>
                           <div className="text-[20px] font-black text-primary tracking-tight uppercase">
@@ -2568,7 +2800,7 @@ function RxPageContent() {
 
                   {/* Sign-off row */}
                   {printShowFooter ? (
-                    <div className="flex justify-between items-end pt-5 border-t border-[#F1F5F9] text-[10.5px] font-semibold text-slate-400">
+                    <div className="flex justify-between items-end pt-5 border-t border-[#F1F5F9] text-[10.5px] font-semibold text-slate-400 relative z-10">
                       <div>
                         <span>Generated by DLPC Clinic Portal</span>
                       </div>
@@ -2578,7 +2810,7 @@ function RxPageContent() {
                       </div>
                     </div>
                   ) : (
-                    <div style={{ height: `${printFooterHeight}mm` }} className="w-full shrink-0 border-t border-dashed border-slate-200 mt-5 flex items-center justify-center text-[10px] text-slate-400 select-none">
+                    <div style={{ height: `${printFooterHeight}mm` }} className="w-full shrink-0 border-t border-dashed border-slate-200 mt-5 flex items-center justify-center text-[10px] text-slate-400 select-none relative z-10">
                       [Pre-printed Letterhead Footer Space: {printFooterHeight}mm]
                     </div>
                   )}
@@ -2596,6 +2828,7 @@ function RxPageContent() {
     </div>
 
     <PrintPrescription
+      ref={printRef}
       patient={currentRxPatient}
       bp={bp}
       pulse={pulse}
@@ -2630,6 +2863,12 @@ function RxPageContent() {
       headerHeight={printHeaderHeight}
       showFooter={printShowFooter}
       footerHeight={printFooterHeight}
+      showLetterhead={printShowLetterhead}
+      showHeaderPage2={printShowHeaderPage2}
+      headerHeightPage2={printHeaderHeightPage2}
+      showFooterPage2={printShowFooterPage2}
+      footerHeightPage2={printFooterHeightPage2}
+      showLetterheadPage2={printShowLetterheadPage2}
     />
   </>
 );

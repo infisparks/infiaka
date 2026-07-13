@@ -265,7 +265,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
   const containerRef = useRef<HTMLDivElement>(null);
 
   useImperativeHandle(ref, () => ({
-    generatePDF: async (returnBlobUrl = false) => {
+    generatePDF: async () => {
       try {
         const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
         const pageWidth = doc.internal.pageSize.getWidth(); // 210
@@ -898,11 +898,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
 
         const pdfBlob = doc.output("blob");
         const blobURL = URL.createObjectURL(pdfBlob);
-        if (returnBlobUrl) {
-            return blobURL;
-        } else {
-            window.open(blobURL, "_blank");
-        }
+        window.open(blobURL, "_blank");
       } catch (err) {
         console.error("Error generating PDF:", err);
       }
