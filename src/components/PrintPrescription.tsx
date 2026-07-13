@@ -1,6 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState, useImperativeHandle, forwardRef, useRef } from "react";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface SymptomsItem {
   id: string;
@@ -82,6 +84,7 @@ interface Patient {
   gender: string;
   phone: string;
   queueNo?: string;
+  permanentAddress?: string;
   opdRegistration?: {
     clinic_name?: string;
     treating_doctor?: string;
@@ -128,9 +131,92 @@ interface PrintPrescriptionProps {
   headerHeight?: number;
   showFooter?: boolean;
   footerHeight?: number;
+  showLetterhead?: boolean;
+  showHeaderPage2?: boolean;
+  headerHeightPage2?: number;
+  showFooterPage2?: boolean;
+  footerHeightPage2?: number;
+  showLetterheadPage2?: boolean;
 }
 
-export default function PrintPrescription({
+function calculateFollowUpDate(baseDate: Date, durationStr: string | undefined): Date | null {
+    if (!durationStr) return null;
+    const dur = durationStr.toLowerCase().trim();
+    const date = new Date(baseDate);
+    
+    const match = dur.match(/^(\d+)([dwmy])$/);
+    if (!match) {
+        const numberMatch = dur.match(/^(\d+)\s*(day|week|month|year)s?$/);
+        if (numberMatch) {
+            const val = parseInt(numberMatch[1], 10);
+            const unit = numberMatch[2];
+            if (unit === 'day') date.setDate(date.getDate() + val);
+            else if (unit === 'week') date.setDate(date.getDate() + val * 7);
+            else if (unit === 'month') date.setMonth(date.getMonth() + val);
+            else if (unit === 'year') date.setFullYear(date.getFullYear() + val);
+            return date;
+        }
+        const parsed = Date.parse(durationStr);
+        if (!isNaN(parsed)) {
+            return new Date(parsed);
+        }
+        return null;
+    }
+    
+    const val = parseInt(match[1], 10);
+    const unit = match[2];
+    
+    if (unit === 'd') {
+        date.setDate(date.getDate() + val);
+    } else if (unit === 'w') {
+        date.setDate(date.getDate() + val * 7);
+    } else if (unit === 'm') {
+        date.setMonth(date.getMonth() + val);
+    } else if (unit === 'y') {
+        date.setFullYear(date.getFullYear() + val);
+    }
+    return date;
+}
+
+function formatFollowUpDate(date: Date): string {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    const dayName = days[date.getDay()];
+    const monthName = months[date.getMonth()];
+    const day = date.getDate();
+    const year = date.getFullYear();
+    
+    return `${dayName} ${monthName} ${day} ${year}`;
+}
+
+function formatDuration(raw: string | undefined): string {
+    if (!raw) return '-';
+    raw = raw.trim().toLowerCase();
+    const match = raw.match(/^(\d+)\s*([a-zA-Z]+)$/);
+    if (match) {
+        const count = parseInt(match[1]);
+        const suffix = match[2];
+        if (suffix.startsWith('d')) {
+            return `${count} ${count === 1 ? 'Day' : 'Days'}`;
+        } else if (suffix.startsWith('w')) {
+            return `${count} ${count === 1 ? 'Week' : 'Weeks'}`;
+        } else if (suffix.startsWith('m')) {
+            return `${count} ${count === 1 ? 'Mth' : 'Mths'}`;
+        } else if (suffix.startsWith('y')) {
+            return `${count} ${count === 1 ? 'Yr' : 'Yrs'}`;
+        }
+    }
+    let formatted = raw
+        .replace(/(\d+)\s*d/, (m, g1) => `${g1} ${g1 === '1' ? 'Day' : 'Days'}`)
+        .replace(/(\d+)\s*w/, (m, g1) => `${g1} ${g1 === '1' ? 'Week' : 'Weeks'}`)
+        .replace(/(\d+)\s*m/, (m, g1) => `${g1} ${g1 === '1' ? 'Mth' : 'Mths'}`)
+        .replace(/(\d+)\s*y/, (m, g1) => `${g1} ${g1 === '1' ? 'Yr' : 'Yrs'}`);
+    if (!formatted) return raw;
+    return formatted;
+}
+
+const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function PrintPrescription({
   patient,
   bp,
   pulse,
@@ -167,7 +253,661 @@ export default function PrintPrescription({
   headerHeight = 0,
   showFooter = true,
   footerHeight = 0,
-}: PrintPrescriptionProps) {
+  showLetterhead = true,
+  showHeaderPage2 = false,
+  headerHeightPage2 = 0,
+  showFooterPage2 = true,
+  footerHeightPage2 = 0,
+  showLetterheadPage2 = false,
+}, ref) {
+
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    generatePDF: async (returnBlobUrl = false) => {
+      try {
+        const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+        const pageWidth = doc.internal.pageSize.getWidth(); // 210
+        const pageHeight = doc.internal.pageSize.getHeight(); // 297
+
+        // Load background letterhead image if enabled
+        let letterheadBase64 = "";
+        if (showLetterhead || showLetterheadPage2) {
+          try {
+            const response = await fetch("/letterhead.jpg");
+            if (response.ok) {
+              const buffer = await response.arrayBuffer();
+              let binary = "";
+              const bytes = new Uint8Array(buffer);
+              for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+              }
+              letterheadBase64 = window.btoa(binary);
+            }
+          } catch (e) {
+            console.error("Failed to load background letterhead image:", e);
+          }
+        }
+
+        let pagesCount = 1;
+
+        const getPageParams = (pageNum: number) => {
+          if (pageNum === 1) {
+            return {
+              headerHeight: (showHeader && !showLetterhead) ? 20 : headerHeight,
+              maxContentY: pageHeight - footerHeight - 25,
+              showFooter: showFooter,
+              footerHeight: footerHeight,
+              drawBg: showLetterhead
+            };
+          } else {
+            return {
+              headerHeight: (showHeaderPage2 && !showLetterheadPage2) ? 20 : (headerHeightPage2 || 15),
+              maxContentY: pageHeight - (footerHeightPage2 || 15) - 25,
+              showFooter: showFooterPage2,
+              footerHeight: footerHeightPage2 || 15,
+              drawBg: showLetterheadPage2
+            };
+          }
+        };
+
+        const drawBackgroundForPage = (pageNum: number) => {
+          const params = getPageParams(pageNum);
+          if (params.drawBg && letterheadBase64) {
+            doc.addImage(letterheadBase64, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+          }
+        };
+
+        const drawTextHeaderForPage = (pageNum: number) => {
+          if (pageNum > 1 && showHeaderPage2 && !showLetterheadPage2) {
+            // Draw secondary page clinic header
+            doc.setFont(fontName, "bold").setFontSize(9).setTextColor(99, 102, 241);
+            const clinicName = (patient?.opdRegistration?.clinic_name || "OPD CLINIC").toUpperCase();
+            doc.text(clinicName, 20, 10);
+            
+            doc.setFont(fontName, "normal").setFontSize(8).setTextColor(107, 114, 128);
+            doc.text("Page " + pageNum, pageWidth - 20, 10, { align: "right" });
+            
+            doc.setDrawColor(226, 232, 240).setLineWidth(0.2);
+            doc.line(20, 13, pageWidth - 20, 13);
+          }
+        };
+
+        // Draw background letterhead on first page
+        drawBackgroundForPage(1);
+
+        // Draw background letterhead and text header on any new page automatically
+        const docAny = doc as any;
+        if (docAny.events && typeof docAny.events.on === 'function') {
+          docAny.events.on('addPage', () => {
+            pagesCount += 1;
+            drawBackgroundForPage(pagesCount);
+            drawTextHeaderForPage(pagesCount);
+          });
+        }
+
+        // Load Poppins fonts from jsDelivr CDN
+        let fontName = "helvetica";
+        try {
+          const [regRes, boldRes] = await Promise.all([
+            fetch("https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Regular.ttf").then(res => res.arrayBuffer()),
+            fetch("https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf").then(res => res.arrayBuffer())
+          ]);
+
+          const toBase64 = (buffer: ArrayBuffer) => {
+            let binary = "";
+            const bytes = new Uint8Array(buffer);
+            for (let i = 0; i < bytes.byteLength; i++) {
+              binary += String.fromCharCode(bytes[i]);
+            }
+            return window.btoa(binary);
+          };
+
+          const regularBase64 = toBase64(regRes);
+          const boldBase64 = toBase64(boldRes);
+
+          doc.addFileToVFS("Poppins-Regular.ttf", regularBase64);
+          doc.addFont("Poppins-Regular.ttf", "Poppins", "normal");
+          doc.addFileToVFS("Poppins-Bold.ttf", boldBase64);
+          doc.addFont("Poppins-Bold.ttf", "Poppins", "bold");
+          fontName = "Poppins";
+        } catch (e) {
+          console.error("Failed to load Poppins web fonts, falling back to Helvetica:", e);
+        }
+
+        doc.setFont(fontName, "normal");
+        
+        // Theme Colors
+        const colorPrimary: [number, number, number] = [99, 102, 241]; // Indigo Purple matches the UI
+        const colorHeader: [number, number, number] = [0, 102, 204]; // Blue for section titles to match requested image
+        const textDark = [17, 24, 39];
+        const textGray = [107, 114, 128];
+
+        let currentY = (showHeader && !showLetterhead) ? 20 : headerHeight;
+
+        const checkPageBreak = (neededHeight = 0) => {
+            const currentParams = getPageParams(pagesCount);
+            if (currentY + neededHeight > currentParams.maxContentY) {
+                doc.addPage();
+                const nextParams = getPageParams(pagesCount);
+                currentY = nextParams.headerHeight;
+                return true;
+            }
+            return false;
+        };
+
+        const drawInlineSection = (title: string, items: any[]) => {
+            if (!items || items.length === 0) return;
+            checkPageBreak(8);
+
+            let startX = 20;
+            let y = currentY;
+            const maxWidth = 190;
+            const lineHeight = 5.5;
+
+            // Draw Title
+            doc.setFont(fontName, "bold").setFontSize(9).setTextColor(colorHeader[0], colorHeader[1], colorHeader[2]);
+            doc.text(title + " : ", startX, y);
+            let currentX = startX + doc.getTextWidth(title + " : ");
+
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+
+                const drawText = (text: string, isBold: boolean) => {
+                    if (!text) return;
+                    doc.setFont(fontName, isBold ? "bold" : "normal").setFontSize(9);
+                    doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+
+                    const lines = text.split(/\r?\n/);
+                    lines.forEach((line, lineIdx) => {
+                        if (lineIdx > 0) {
+                            currentY += lineHeight;
+                            y = currentY;
+                            currentX = startX + 10;
+                            checkPageBreak(lineHeight);
+                            y = currentY;
+                        }
+
+                        const words = line.split(' ');
+                        words.forEach((word) => {
+                            if (!word) return;
+                            const wWidth = doc.getTextWidth(word + " ");
+                            if (currentX + wWidth > maxWidth) {
+                                currentY += lineHeight;
+                                y = currentY;
+                                currentX = startX + 10;
+                                checkPageBreak(lineHeight);
+                                y = currentY;
+                            }
+                            doc.text(word, currentX, y);
+                            currentX += doc.getTextWidth(word + " ");
+                        });
+                    });
+                };
+
+                drawText(item.main, true);
+                drawText(item.sub, false);
+
+                if (i < items.length - 1) {
+                    doc.setFont(fontName, "bold").setFontSize(9).setTextColor(textDark[0], textDark[1], textDark[2]);
+                    const sep = " | ";
+                    const wWidth = doc.getTextWidth(sep);
+                    if (currentX + wWidth > maxWidth) {
+                        currentY += lineHeight;
+                        y = currentY;
+                        currentX = startX + 10;
+                        checkPageBreak(lineHeight);
+                        y = currentY;
+                    }
+                    doc.text(sep, currentX, y);
+                    currentX += wWidth;
+                }
+            }
+            currentY = y + lineHeight;
+        };
+
+        const getHistItems = (arr: any[], mainKey: string) => {
+            if (!arr) return [];
+            return arr.map(item => {
+                let main = item[mainKey] || item.name || item.destination || item.member || item.relation || item.condition || item.medicineName || item.item || item.title || 'Unknown';
+                let subs = [];
+                if (item.status) subs.push(`Status: ${item.status}`);
+                if (item.severity) subs.push(`Severity: ${item.severity}`);
+                if (item.duration) subs.push(`Duration: ${item.duration}`);
+                if (item.since) subs.push(`Since: ${item.since}`);
+                if (item.travelDate) subs.push(`Since: ${item.travelDate}`);
+                if (item.relation) subs.push(`Relation: ${item.relation}`);
+                if (item.member) subs.push(`Relation: ${item.member}`);
+                if (item.note) subs.push(`Note: ${item.note}`);
+                if (item.notes) subs.push(`Note: ${item.notes}`);
+                let subStr = subs.length > 0 ? `(${subs.join(', ')})` : '';
+                return { main: main, sub: subStr ? ` ${subStr}` : '' };
+            });
+        };
+
+        // 1. Header Row
+        if (showHeader && !showLetterhead) {
+          doc.setFontSize(18);
+          doc.setFont(fontName, "bold");
+          doc.setTextColor(99, 102, 241); // #4f46e5 (Indigo primary)
+          const clinicName = (patient?.opdRegistration?.clinic_name || "OPD CLINIC").toUpperCase();
+          doc.text(clinicName, 20, currentY);
+
+          doc.setFontSize(9);
+          doc.setFont(fontName, "bold");
+          doc.setTextColor(100, 116, 139); // Slate-500
+          doc.text("Comprehensive & Advanced Healthcare Clinic", 20, currentY + 5);
+
+          // Right aligned doctor details
+          doc.setFontSize(12);
+          doc.setFont(fontName, "bold");
+          doc.setTextColor(99, 102, 241);
+          const doctorName = (patient?.opdRegistration?.treating_doctor || "DR. TREATING DOCTOR").toUpperCase();
+          doc.text(doctorName, pageWidth - 20, currentY, { align: "right" });
+
+          doc.setFontSize(9);
+          doc.setFont(fontName, "normal");
+          doc.setTextColor(17, 24, 39); // slate-900
+          doc.text("MBBS, MD (Medicine)", pageWidth - 20, currentY + 5, { align: "right" });
+          doc.text("Reg No: 123456", pageWidth - 20, currentY + 9, { align: "right" });
+
+          currentY += 14;
+
+          // Header border line
+          doc.setDrawColor(99, 102, 241);
+          doc.setLineWidth(0.6);
+          doc.line(20, currentY, pageWidth - 20, currentY);
+          currentY += 8; // Margin before patient info
+        }
+
+        // 2. Patient Info Grid
+        doc.setFont(fontName, "bold").setFontSize(11).setTextColor(textDark[0], textDark[1], textDark[2]);
+        const nameStr = `${patient?.title || "Mr/Mrs"} ${patient?.name || ""}`;
+        doc.text(nameStr, 20, currentY);
+        const nameWidth = doc.getTextWidth(nameStr);
+
+        doc.setFont(fontName, "normal").setFontSize(10).setTextColor(textDark[0], textDark[1], textDark[2]);
+        const ageInfo = `, ${patient?.gender || "N/A"}, ${patient?.age || '0'} ${patient?.ageUnit || 'Y'}(s), +${patient?.phone || 'N/A'}`;
+        doc.text(ageInfo, 20 + nameWidth, currentY);
+
+        const dDate = new Date();
+        const formattedDateStr = dDate.toLocaleDateString('en-GB');
+        doc.setFont(fontName, "bold").setFontSize(10).setTextColor(textDark[0], textDark[1], textDark[2]);
+        doc.text(formattedDateStr, 190, currentY, { align: "right" });
+
+        currentY += 6;
+
+        doc.setFont(fontName, "bold").setFontSize(9).setTextColor(textDark[0], textDark[1], textDark[2]);
+        doc.text("UHID : ", 20, currentY);
+        let curX = 20 + doc.getTextWidth("UHID : ");
+
+        doc.setFont(fontName, "normal").setFontSize(9);
+        const uhidStr = `${patient?.id || 'N/A'}`;
+        doc.text(uhidStr, curX, currentY);
+        curX += doc.getTextWidth(uhidStr);
+
+        if (patient?.permanentAddress) {
+            doc.setFont(fontName, "bold");
+            doc.text(", Address : ", curX, currentY);
+            curX += doc.getTextWidth(", Address : ");
+            doc.setFont(fontName, "normal");
+            const addrSplit = patient.permanentAddress.split(',')[0];
+            doc.text(addrSplit, curX, currentY);
+            curX += doc.getTextWidth(addrSplit);
+        }
+
+        if (patient?.opdRegistration?.referring_doctor) {
+            doc.setFont(fontName, "bold");
+            doc.text(", Reference : ", curX, currentY);
+            curX += doc.getTextWidth(", Reference : ");
+            doc.setFont(fontName, "normal");
+            doc.text(patient.opdRegistration.referring_doctor + ".", curX, currentY);
+        }
+
+        currentY += 4;
+        doc.setDrawColor(226, 232, 240).line(20, currentY, 190, currentY);
+        currentY += 6;
+
+        // Vitals
+        const activeVitals = [];
+        if (bp) activeVitals.push({ main: `BP: ${bp} mmHg`, sub: "" });
+        if (pulse) activeVitals.push({ main: `Pulse: ${pulse} bpm`, sub: "" });
+        if (weight) activeVitals.push({ main: `Weight: ${weight} kg`, sub: "" });
+        if (spo2) activeVitals.push({ main: `SpO2: ${spo2}%`, sub: "" });
+        if (sugar) activeVitals.push({ main: `Sugar: ${sugar} mg/dL`, sub: "" });
+        if (activeVitals.length > 0) {
+            drawInlineSection("VITALS", activeVitals);
+        }
+
+        // 1. SYMPTOMS
+        if (symptoms && symptoms.length > 0) {
+            const symItems = symptoms.map(i => {
+                let subs = [];
+                if (i.duration) subs.push(`Since: ${i.duration}`);
+                if (i.severity) subs.push(`Severity: ${i.severity}`);
+                if (i.headacheSites && i.headacheSites.length > 0) subs.push(`Headache site: ${i.headacheSites.join(', ')}`);
+                if (i.painTypes && i.painTypes.length > 0) subs.push(`Type of pain: ${i.painTypes.join(', ')}`);
+                if (i.clinicalCourse) subs.push(`Clinical course: ${i.clinicalCourse}`);
+                if (i.note) subs.push(`Note: ${i.note}`);
+                return { main: i.name, sub: subs.length > 0 ? ` (${subs.join(' | ')})` : '' };
+            });
+            drawInlineSection("SYMPTOMS", symItems);
+        }
+
+        // 2. PATIENT MEDICAL HISTORY (Conditions)
+        if (conditions && conditions.length > 0) {
+            drawInlineSection("Patient Medical History", getHistItems(conditions, 'name'));
+        }
+
+        // 3. CURRENT MEDICATIONS
+        if (currentMeds && currentMeds.length > 0) {
+            drawInlineSection("Current Medications", getHistItems(currentMeds, 'name'));
+        }
+
+        // 4. DRUG ALLERGIES
+        if (allergies && allergies.length > 0) {
+            drawInlineSection("Drug Allergies", getHistItems(allergies, 'name'));
+        }
+
+        // 5. PAST PROCEDURES
+        if (procedures && procedures.length > 0) {
+            drawInlineSection("Past Procedures", getHistItems(procedures, 'name'));
+        }
+
+        // Food Allergies
+        if (foodAllergies && foodAllergies.length > 0) {
+            drawInlineSection("Food Allergies", getHistItems(foodAllergies, 'name'));
+        }
+
+        // Family History
+        if (familyItems && familyItems.length > 0) {
+            drawInlineSection("Family History", getHistItems(familyItems, 'name'));
+        }
+
+        // Lifestyle Habits
+        if (habits && habits.length > 0) {
+            drawInlineSection("Lifestyle Habits", getHistItems(habits, 'name'));
+        }
+
+        // Travel History
+        if (travelHistory && travelHistory.length > 0) {
+            drawInlineSection("Travel History", getHistItems(travelHistory, 'destination'));
+        }
+
+        // Other Medical History
+        if (otherHistory && otherHistory.length > 0) {
+            drawInlineSection(otherHistoryTitle || "Other History", getHistItems(otherHistory, 'name'));
+        }
+
+        // 6. DIAGNOSIS
+        if (diagnoses && diagnoses.length > 0) {
+            const diagItems = diagnoses.map(d => {
+                let subs = [];
+                if (d.since) subs.push(`Since: ${d.since}`);
+                if (d.status) subs.push(`Status: ${d.status}`);
+                if (d.severity) subs.push(`Severity: ${d.severity}`);
+                if (d.abdominalRegions && d.abdominalRegions.length > 0) subs.push(`Abdominal region: ${d.abdominalRegions.join(', ')}`);
+                if (d.painTypes && d.painTypes.length > 0) subs.push(`Type of pain: ${d.painTypes.join(', ')}`);
+                if (d.relievedBy && d.relievedBy.length > 0) subs.push(`Abdominal symptom relieved by: ${d.relievedBy.join(', ')}`);
+                if (d.abdominalTenderness) subs.push(`Abdominal tenderness: ${d.abdominalTenderness}`);
+                if (d.palpations && d.palpations.length > 0) subs.push(`Per abdomen palpation: ${d.palpations.join(', ')}`);
+                if (d.auscultations && d.auscultations.length > 0) subs.push(`Abdomen auscultatory finding: ${d.auscultations.join(', ')}`);
+                if (d.clinicalCourse) subs.push(`Clinical course: ${d.clinicalCourse}`);
+                if (d.note) subs.push(`Note: ${d.note}`);
+                return { main: d.name, sub: subs.length > 0 ? ` (${subs.join(' | ')})` : '' };
+            });
+            drawInlineSection("DIAGNOSIS", diagItems);
+        }
+
+        // --- PRESCRIPTION TITLE ---
+        if (medications && medications.length > 0) {
+            checkPageBreak(15);
+            currentY += 4;
+            doc.setFont(fontName, "bold").setFontSize(11).setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
+            const titleText = "PRESCRIPTION";
+            const tWidth = doc.getTextWidth(titleText);
+            doc.text(titleText, 105, currentY, { align: "center" });
+            doc.setDrawColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]).setLineWidth(0.5);
+            doc.line(105 - tWidth / 2, currentY + 1, 105 + tWidth / 2, currentY + 1);
+            currentY += 6;
+
+            const tableBody = medications.map((m, index) => {
+                const category = m.form ? `(${m.form})` : '';
+                const name = m.name || '';
+                const comp = m.generic || '';
+
+                let medText = name;
+                if (category) medText += `\n${category}`;
+                if (comp) medText += `\n${comp}`;
+
+                return [
+                    (index + 1).toString(),
+                    { content: medText },
+                    m.dose || '-',
+                    m.freq || '-',
+                    formatDuration(m.duration),
+                    m.instr || '-'
+                ];
+            });
+
+            autoTable(doc, {
+                startY: currentY,
+                margin: { 
+                    left: 15, 
+                    right: 15, 
+                    bottom: footerHeight + 15, 
+                    top: showHeader ? 20 : headerHeight 
+                },
+                head: [['', 'Medications', 'Dose', 'Frequency', 'Duration', 'Remarks']],
+                body: tableBody,
+                theme: 'grid',
+                headStyles: { fillColor: [240, 235, 255], textColor: [0, 0, 0], fontSize: 9, font: fontName, fontStyle: 'bold', halign: 'center', lineColor: colorPrimary, lineWidth: 0.2 },
+                bodyStyles: { fontSize: 8.5, font: fontName, cellPadding: 3, textColor: [0, 0, 0], lineColor: colorPrimary, lineWidth: 0.2 },
+                columnStyles: {
+                    0: { halign: 'center', cellWidth: 8, fontStyle: 'bold' },
+                    1: { cellWidth: 55 },
+                    2: { halign: 'center', cellWidth: 20 },
+                    3: { halign: 'center', cellWidth: 25 },
+                    4: { halign: 'center', cellWidth: 20 },
+                    5: { cellWidth: 52 }
+                },
+                willDrawCell: (data) => {
+                    const pageNum = doc.getNumberOfPages();
+                    const params = getPageParams(pageNum);
+                    data.settings.margin.bottom = params.footerHeight + 15;
+                    data.settings.margin.top = params.headerHeight;
+
+                    if (data.column.index === 1 && data.cell.section === 'body') {
+                        const cell = data.cell;
+                        (data.cell as any).originalTextLines = data.cell.text;
+                        data.cell.text = [];
+
+                        const originalText = (cell.raw && typeof cell.raw === 'object') ? (cell.raw as any).content : (cell.raw || '');
+                        const originalName = originalText.split('\n')[0] || '';
+                        const textWidth = cell.width - cell.padding('left') - cell.padding('right');
+
+                        const oldFont = doc.getFont();
+                        doc.setFont(fontName, "bold");
+                        doc.setFontSize(cell.styles.fontSize || 8.5);
+                        const wrappedNameLines = doc.splitTextToSize(originalName, textWidth);
+                        doc.setFont(oldFont.fontName, oldFont.fontStyle);
+
+                        (data.cell as any).nameLineCount = wrappedNameLines.length;
+                        data.cell.styles.minCellHeight = 11;
+                    }
+                },
+                didDrawCell: (data) => {
+                    if (data.column.index === 1 && data.cell.section === 'body') {
+                        const cell = data.cell;
+                        const lines = (cell as any).originalTextLines;
+                        const nameLineCount = (cell as any).nameLineCount || 1;
+                        if (lines && lines.length > 0) {
+                            let textY = cell.y + cell.padding('top') + (cell.styles.fontSize / doc.internal.scaleFactor);
+                            const textX = cell.x + cell.padding('left');
+                            const lineSpacing = (cell.styles as any).lineHeight || 1.15;
+                            const fontSizeMm = cell.styles.fontSize / doc.internal.scaleFactor;
+
+                            for (let i = 0; i < lines.length; i++) {
+                                const isName = i < nameLineCount;
+                                if (isName) {
+                                    doc.setFont(fontName, "bold");
+                                } else {
+                                    doc.setFont(fontName, "normal");
+                                }
+                                doc.text(lines[i], textX, textY);
+                                textY += fontSizeMm * lineSpacing;
+                            }
+                            doc.setFont(fontName, "normal");
+                        }
+                    }
+                }
+            });
+            currentY = (doc as any).lastAutoTable.finalY + 8;
+        }
+
+        // --- PRESCRIBED LAB TESTS ---
+        if (labs && labs.length > 0) {
+            const labItems = labs.map(l => {
+                let subs = [];
+                if (l.testOn) subs.push(`On: ${l.testOn}`);
+                if (l.repeatOn) subs.push(`Repeat: ${l.repeatOn}`);
+                if (l.remarks) subs.push(`Remark: ${l.remarks}`);
+                return { main: l.name, sub: subs.length > 0 ? ` (${subs.join(' | ')})` : '' };
+            });
+            drawInlineSection("PRESCRIBED LAB TESTS", labItems);
+        }
+
+        // --- INVESTIGATIVE READINGS ---
+        if (labResults && labResults.length > 0) {
+            const resultItems = labResults.map(r => {
+                let info = r.name;
+                let subs = [];
+                if (r.reading) subs.push(r.reading + (r.unit ? ` ${r.unit}` : ''));
+                if (r.interpretation) subs.push(`[${r.interpretation}]`);
+                if (r.date) subs.push(r.date);
+                if (r.notes) subs.push(r.notes);
+                return { main: info, sub: subs.length > 0 ? `: ${subs.join(' - ')}` : '' };
+            });
+            drawInlineSection("INVESTIGATIVE READINGS", resultItems);
+        }
+
+        // --- REFER TO ---
+        if (referrals && referrals.length > 0) {
+            const refItems = referrals.map(ref => {
+                let info = ref.doctorName;
+                let subs = [];
+                if (ref.notes) subs.push(ref.notes);
+                return { main: info, sub: subs.length > 0 ? `, ${subs.join(' | ')}` : '' };
+            });
+            drawInlineSection("REFER TO", refItems);
+        }
+
+        // --- ADVICE ---
+        const advList = [];
+        if (advicesInput) {
+            advList.push({ main: advicesInput, sub: '' });
+        }
+        if (advRest) {
+            advList.push({ main: "Please take some rest.", sub: '' });
+        }
+        if (advWater) {
+            advList.push({ main: "Drink plenty of water.", sub: '' });
+        }
+        if (advList.length > 0) {
+            drawInlineSection("ADVICE", advList);
+        }
+
+        // --- PROCEDURES ---
+        if (rxProcedures && rxProcedures.length > 0) {
+            const procItems = rxProcedures.map(p => {
+                let subs = [];
+                if (p.duration) subs.push(`Note: ${p.duration}`);
+                if (p.note) subs.push(`Note: ${p.note}`);
+                return { main: p.name, sub: subs.length > 0 ? ` (${subs.join(' | ')})` : '' };
+            });
+            drawInlineSection("PROCEDURES", procItems);
+        }
+
+        // --- REMARKS / NOTES ---
+        if (notesForPatient) {
+            drawInlineSection("NOTES", [{ main: notesForPatient, sub: '' }]);
+        }
+
+        // --- FOLLOW UP ---
+        let followUpDate: Date | null = null;
+        if (followUpVal) {
+            followUpDate = calculateFollowUpDate(new Date(), followUpVal);
+        }
+
+        if (followUpDate || followUpVal) {
+            checkPageBreak(10);
+            
+            doc.setFont(fontName, "bold").setFontSize(9).setTextColor(colorHeader[0], colorHeader[1], colorHeader[2]);
+            const label = "FOLLOWUP: ";
+            doc.text(label, 20, currentY);
+            let curX = 20 + doc.getTextWidth(label);
+            
+            doc.setFont(fontName, "normal").setFontSize(9).setTextColor(textDark[0], textDark[1], textDark[2]);
+            const visitOnText = "Visit on ";
+            doc.text(visitOnText, curX, currentY);
+            curX += doc.getTextWidth(visitOnText);
+            
+            doc.setFont(fontName, "bold").setFontSize(9).setTextColor(textDark[0], textDark[1], textDark[2]);
+            const displayDate = followUpDate ? formatFollowUpDate(followUpDate) : followUpVal;
+            doc.text(displayDate, curX, currentY);
+            curX += doc.getTextWidth(displayDate);
+
+            if (followUpNotes) {
+                doc.setFont(fontName, "normal").setFontSize(9).setTextColor(textGray[0], textGray[1], textGray[2]);
+                doc.text(` (${followUpNotes})`, curX, currentY);
+            }
+            
+            currentY += 6;
+        }
+
+        // --- SIGNATURE FOOTER ---
+        const footerParams = getPageParams(pagesCount);
+        if (currentY + 25 > footerParams.maxContentY) {
+            doc.addPage();
+            const newParams = getPageParams(pagesCount);
+            currentY = newParams.headerHeight;
+        }
+
+        const finalParams = getPageParams(pagesCount);
+        const footerY = Math.max(currentY + 10, pageHeight - finalParams.footerHeight - 20);
+
+        if (finalParams.showFooter) {
+            doc.setDrawColor(241, 245, 249);
+            doc.setLineWidth(0.2);
+            doc.line(15, footerY, pageWidth - 15, footerY);
+
+            doc.setFont(fontName, "normal");
+            doc.setFontSize(8);
+            doc.setTextColor(148, 163, 184);
+            doc.text("Generated via DLPC Clinic Management System", 15, footerY + 6);
+
+            doc.setDrawColor(203, 213, 225);
+            doc.line(pageWidth - 55, footerY + 12, pageWidth - 15, footerY + 12);
+
+            doc.setFont(fontName, "bold");
+            doc.setFontSize(8);
+            doc.setTextColor(100, 116, 139);
+            doc.text("DOCTOR SIGNATURE", pageWidth - 35, footerY + 16, { align: "center" });
+        }
+
+        const pdfBlob = doc.output("blob");
+        const blobURL = URL.createObjectURL(pdfBlob);
+        if (returnBlobUrl) {
+            return blobURL;
+        } else {
+            window.open(blobURL, "_blank");
+        }
+      } catch (err) {
+        console.error("Error generating PDF:", err);
+      }
+    }
+  }));
   
   // Compile medical history elements into display format
   const compileHistoryText = (items: any[], title: string) => {
@@ -193,13 +933,24 @@ export default function PrintPrescription({
   };
 
   return (
-    <div className="print-prescription-container w-full bg-white text-[#0f172a] font-sans p-8 select-text">
+    <div 
+      ref={containerRef}
+      className={`print-prescription-container w-full bg-white text-[#0f172a] font-sans p-8 select-text ${isGeneratingPDF ? "force-visible-pdf" : ""}`}
+    >
       
       {/* ─── PRINT ONLY STYLES ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media screen {
           .print-prescription-container {
             display: none !important;
+          }
+          .print-prescription-container.force-visible-pdf {
+            display: block !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: -9999px !important;
+            width: 800px !important;
+            z-index: -9999 !important;
           }
         }
         @media print {
@@ -613,4 +1364,6 @@ export default function PrintPrescription({
 
     </div>
   );
-}
+});
+
+export default PrintPrescription;
