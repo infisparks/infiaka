@@ -169,6 +169,7 @@ function RxPageContent() {
   
   const [rxProcedures, setRxProcedures] = useState<ProcedureItem[]>([]);
   const [referrals, setReferrals] = useState<ReferralItem[]>([]);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Load patient context from DB on mount
   useEffect(() => {
@@ -2226,7 +2227,10 @@ function RxPageContent() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded text-[11px] font-bold flex items-center gap-1 transition-colors">
+          <button
+            onClick={() => setIsPreviewOpen(true)}
+            className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded text-[11px] font-bold flex items-center gap-1 transition-colors"
+          >
             Preview
           </button>
           <button 
@@ -2246,6 +2250,372 @@ function RxPageContent() {
           </button>
         </div>
       </footer>
+
+      {/* PROFESSIONAL RX PREVIEW MODAL */}
+      {isPreviewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-text">
+          <div className="bg-[#F8FAFC] w-full max-w-4xl h-[90vh] rounded-xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+            {/* Modal Header */}
+            <div className="bg-white border-b border-[#E2E8F0] px-5 py-3 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-extrabold text-[#1E293B]">Prescription Preview</span>
+                <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Professional Print Layout
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handlePrintPrescription}
+                  className="px-3.5 py-1.5 bg-primary hover:bg-primary-hover text-white text-[11px] font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  Print / Save PDF
+                </button>
+                <button
+                  onClick={() => setIsPreviewOpen(false)}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 transition-colors border border-slate-250 bg-white"
+                  title="Close Preview"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body (Scrollable Paper area) */}
+            <div className="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-200">
+              {/* Paper representation */}
+              <div className="bg-white w-[794px] min-h-[1123px] shadow-lg rounded border border-slate-300 p-10 flex flex-col justify-between text-left text-[#111827] font-sans relative">
+                
+                {/* Paper Top Header */}
+                <div>
+                  <div className="flex justify-between items-start border-b-2 border-primary pb-4 mb-5">
+                    <div>
+                      <div className="text-[20px] font-black text-primary tracking-tight uppercase">
+                        {currentRxPatient.opdRegistration?.clinic_name || "OPD CLINIC"}
+                      </div>
+                      <p className="m-0 text-[#718096] text-[11px] font-semibold mt-0.5">
+                        Comprehensive & Advanced Healthcare Clinic
+                      </p>
+                    </div>
+                    <div className="text-right text-[11px] text-[#4A5568] leading-normal font-semibold">
+                      <strong className="text-primary text-[13px] block mb-0.5">
+                        {currentRxPatient.opdRegistration?.treating_doctor || "DR. TREATING DOCTOR"}
+                      </strong>
+                      <span>MBBS, MD (Medicine)</span><br />
+                      <span>Reg No: 123456</span>
+                    </div>
+                  </div>
+
+                  {/* Patient Info Bar */}
+                  <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-[#E2E8F0] p-4 rounded-lg text-[11.5px] font-semibold mb-6">
+                    <div className="space-y-1">
+                      <div>
+                        <span className="text-[#718096]">Patient Name:</span>{" "}
+                        <span className="text-[#1A202C] font-extrabold select-text">
+                          {currentRxPatient.title || "Mr/Mrs"} {currentRxPatient.name}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[#718096]">Age / Gender:</span>{" "}
+                        <span className="text-[#1A202C]">
+                          {currentRxPatient.age} {currentRxPatient.ageUnit || 'Year'}(s) / {currentRxPatient.gender}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[#718096]">Phone:</span>{" "}
+                        <span className="text-[#1A202C] select-text">{currentRxPatient.phone}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1 text-right">
+                      <div>
+                        <span className="text-[#718096]">Prescription Date:</span>{" "}
+                        <span className="text-[#1A202C]">
+                          {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[#718096]">UHID / Queue No:</span>{" "}
+                        <span className="text-[#1A202C] select-text">
+                          {currentRxPatient.id} / Q-{currentRxPatient.queueNo || "01"}
+                        </span>
+                      </div>
+                      {currentRxPatient.opdRegistration?.referring_doctor && (
+                        <div>
+                          <span className="text-[#718096]">Referred By:</span>{" "}
+                          <span className="text-[#1A202C] select-text">
+                            {currentRxPatient.opdRegistration.referring_doctor}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Vitals Ribbon */}
+                  {(bp || pulse || weight || spo2 || sugar) && (
+                    <div className="mb-6">
+                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">Vitals</div>
+                      <div className="grid grid-cols-5 gap-3 bg-[#F8FAFC] border border-[#E2E8F0] px-3 py-2 rounded-lg text-center select-text">
+                        {bp && (
+                          <div>
+                            <div className="text-[9px] font-bold text-[#718096] uppercase">BP</div>
+                            <div className="text-[12px] font-extrabold text-[#2D3748]">{bp} <span className="text-[9px] font-semibold text-slate-400">mmHg</span></div>
+                          </div>
+                        )}
+                        {pulse && (
+                          <div>
+                            <div className="text-[9px] font-bold text-[#718096] uppercase">Pulse</div>
+                            <div className="text-[12px] font-extrabold text-[#2D3748]">{pulse} <span className="text-[9px] font-semibold text-slate-400">bpm</span></div>
+                          </div>
+                        )}
+                        {weight && (
+                          <div>
+                            <div className="text-[9px] font-bold text-[#718096] uppercase">Weight</div>
+                            <div className="text-[12px] font-extrabold text-[#2D3748]">{weight} <span className="text-[9px] font-semibold text-slate-400">kg</span></div>
+                          </div>
+                        )}
+                        {spo2 && (
+                          <div>
+                            <div className="text-[9px] font-bold text-[#718096] uppercase">SpO2</div>
+                            <div className="text-[12px] font-extrabold text-[#2D3748]">{spo2}<span className="text-[9px] font-semibold text-slate-400">%</span></div>
+                          </div>
+                        )}
+                        {sugar && (
+                          <div>
+                            <div className="text-[9px] font-bold text-[#718096] uppercase">Sugar</div>
+                            <div className="text-[12px] font-extrabold text-[#2D3748]">{sugar} <span className="text-[9px] font-semibold text-slate-400">mg/dL</span></div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Main Grid: Symptoms, Diagnosis | Rx Medications */}
+                  <div className="grid grid-cols-3 gap-6 items-start mt-4">
+                    {/* Left Column (Symptoms, Diagnoses, Suggested Labs, Lab Results, Procedures, Referrals) */}
+                    <div className="col-span-1 border-r border-[#E2E8F0] pr-6 space-y-5 select-text">
+                      {/* Symptoms */}
+                      {symptoms.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
+                            Symptoms / Complaints
+                          </div>
+                          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+                            {symptoms.map((s, idx) => (
+                              <li key={idx}>
+                                {s.name}{" "}
+                                {s.duration && (
+                                  <span className="text-slate-400 font-medium">({s.duration})</span>
+                                )}{" "}
+                                {s.severity && (
+                                  <span className="text-[9.5px] uppercase font-bold text-[#718096] bg-slate-100 px-1.5 py-0.5 rounded ml-1">
+                                    {s.severity}
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Diagnoses */}
+                      {diagnoses.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
+                            Diagnoses
+                          </div>
+                          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+                            {diagnoses.map((d, idx) => (
+                              <li key={idx}>
+                                {d.name}{" "}
+                                {d.since && (
+                                  <span className="text-slate-400 font-medium">(since {d.since})</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Suggested Labs */}
+                      {labs.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
+                            Suggested Investigations
+                          </div>
+                          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+                            {labs.map((l, idx) => (
+                              <li key={idx}>
+                                {l.name}{" "}
+                                {l.testOn && (
+                                  <span className="text-slate-400 font-medium">(Test: {l.testOn})</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Lab Results */}
+                      {labResults.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
+                            Lab Results
+                          </div>
+                          <div className="space-y-2 text-[10.5px] font-semibold text-slate-700">
+                            {labResults.map((r, idx) => (
+                              <div key={idx} className="border-b pb-1.5 last:border-0">
+                                <div className="font-bold text-[#1a202c]">{r.name}</div>
+                                <div className="flex gap-2 text-[10px] text-slate-500 mt-0.5">
+                                  <span>Reading: <strong className="text-slate-700">{r.reading} {r.unit}</strong></span>
+                                  {r.interpretation && (
+                                    <span className={`px-1 rounded font-bold text-[9px] uppercase ${
+                                      r.interpretation.toLowerCase() === "high" ? "bg-red-50 text-red-600" :
+                                      r.interpretation.toLowerCase() === "low" ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600"
+                                    }`}>
+                                      {r.interpretation}
+                                    </span>
+                                  )}
+                                </div>
+                                {r.notes && <div className="text-[9.5px] text-slate-400 mt-0.5 italic">Note: {r.notes}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Suggested Procedures */}
+                      {rxProcedures.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
+                            Suggested Procedures
+                          </div>
+                          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+                            {rxProcedures.map((p, idx) => (
+                              <li key={idx}>
+                                {p.name}{" "}
+                                {p.duration && (
+                                  <span className="text-slate-400 font-medium">({p.duration})</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Doctor Referrals */}
+                      {referrals.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
+                            Refer To Specialist
+                          </div>
+                          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+                            {referrals.map((ref, idx) => (
+                              <li key={idx}>
+                                {ref.doctorName}{" "}
+                                {ref.notes && (
+                                  <span className="text-slate-400 font-medium">({ref.notes})</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right Column (Medications Rx Symbol & Medicine Cards) */}
+                    <div className="col-span-2 space-y-4 select-text">
+                      <div className="text-[32px] font-bold text-primary font-serif -mt-2 leading-none">Rₓ</div>
+                      
+                      {medications.length > 0 ? (
+                        <div className="space-y-3">
+                          {medications.map((m, idx) => (
+                            <div key={idx} className="border-l-4 border-primary pl-3 py-1 space-y-0.5 bg-slate-50/50 rounded-r-md">
+                              <div className="text-[12.5px] font-bold text-[#1E293B]">{m.name}</div>
+                              {m.generic && <div className="text-[9.5px] text-[#718096] uppercase font-semibold">{m.generic}</div>}
+                              <div className="text-[11px] font-semibold text-slate-700 flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+                                <span><strong>Dose:</strong> {m.dose}</span>
+                                <span><strong>Frequency:</strong> {m.freq}</span>
+                                <span><strong>Timing:</strong> {m.timing}</span>
+                                {m.duration && <span><strong>Duration:</strong> {m.duration}</span>}
+                              </div>
+                              {m.instr && (
+                                <div className="text-[10px] text-slate-500 italic mt-0.5">
+                                  Instruction: {m.instr}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-slate-400 italic">No medications prescribed.</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Segment: Follow Up, Advice, Notes, Signature */}
+                <div className="border-t border-[#E2E8F0] pt-4 mt-8 flex flex-col space-y-4">
+                  <div className="grid grid-cols-2 gap-6 text-[11px] font-semibold text-slate-700 select-text">
+                    <div className="space-y-2">
+                      {/* Follow Up */}
+                      {followUpVal && (
+                        <div>
+                          <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5">Follow Up</strong>
+                          <div>
+                            {followUpVal}{" "}
+                            {followUpNotes && <span className="text-slate-500">({followUpNotes})</span>}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Doctor Notes */}
+                      {notesForPatient && (
+                        <div>
+                          <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5">Doctor Notes for Patient</strong>
+                          <div className="bg-slate-50 p-2 rounded text-[10.5px] leading-relaxed border border-[#E2E8F0] white-space-pre-line font-medium text-slate-600">
+                            {notesForPatient}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      {/* Advices */}
+                      {(advicesInput || advRest || advWater) && (
+                        <div>
+                          <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5">General Advice</strong>
+                          <div className="space-y-1">
+                            {advicesInput && <div>{advicesInput}</div>}
+                            <div className="flex gap-3 text-[10px] font-bold text-slate-500">
+                              {advRest && <span className="bg-slate-100 px-2 py-0.5 rounded">🛌 Rest Recommended</span>}
+                              {advWater && <span className="bg-slate-100 px-2 py-0.5 rounded">💧 Drink Plentiful Water</span>}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sign-off row */}
+                  <div className="flex justify-between items-end pt-5 border-t border-[#F1F5F9] text-[10.5px] font-semibold text-slate-400">
+                    <div>
+                      <span>Generated by DLPC Clinic Portal</span>
+                    </div>
+                    <div className="text-center w-40">
+                      <div className="border-b border-[#CBD5E0] h-8"></div>
+                      <div className="text-[9.5px] uppercase font-bold text-slate-500 mt-1">Doctor Signature</div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );
