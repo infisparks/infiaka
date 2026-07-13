@@ -92,6 +92,7 @@ function ChipTagField({
   onToggle: (v: string) => void;
 }) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const autoRef = useRef<any>(null);
 
   const search = (event: { query: string }) => {
     const query = event.query.trim();
@@ -140,11 +141,17 @@ function ChipTagField({
       <label className="block text-[11px] font-semibold text-[#556376]">{label}</label>
       <div className="border border-[#E2E8F0] focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100 rounded-md bg-white min-h-[36px] transition-all cursor-text flex items-center">
         <AutoComplete
+          ref={autoRef}
           value={selected}
           suggestions={suggestions}
           completeMethod={search}
           onChange={handleChange}
           multiple
+          minLength={0}
+          onFocus={(e) => {
+            search({ query: "" });
+            autoRef.current?.search(e, "", "dropdown");
+          }}
           itemTemplate={itemTemplate}
           placeholder={selected.length === 0 ? label : ""}
           inputClassName="w-full text-[11px] font-semibold text-[#1e293b] focus:outline-none placeholder:text-[#C0CADC] bg-transparent border-0 shadow-none p-1.5 focus:ring-0"
@@ -176,6 +183,7 @@ function AutoInput({
 }) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const dropdownClicked = useRef(false);
+  const autoRef = useRef<any>(null);
 
   const search = (event: { query: string }) => {
     const query = event.query.trim();
@@ -236,12 +244,18 @@ function AutoInput({
       <label className="block text-[11px] font-semibold text-[#556376]">{label}</label>
       <div className="relative">
         <AutoComplete
+          ref={autoRef}
           value={value}
           suggestions={suggestions}
           completeMethod={search}
           onChange={(e) => onChange(e.value)}
           onSelect={handleSelect}
           onBlur={handleBlur}
+          minLength={0}
+          onFocus={(e) => {
+            search({ query: value || "" });
+            autoRef.current?.search(e, value || "", "dropdown");
+          }}
           itemTemplate={itemTemplate}
           placeholder={placeholder ?? label}
           inputClassName="w-full h-8.5 px-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] bg-white focus:outline-none font-semibold text-[#334155] placeholder:text-[#C0CADC] transition-all"
@@ -278,6 +292,7 @@ function InlineAutoComplete({
 }) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const dropdownClicked = useRef(false);
+  const autoRef = useRef<any>(null);
 
   const search = (event: { query: string }) => {
     const query = event.query.trim();
@@ -336,12 +351,18 @@ function InlineAutoComplete({
   return (
     <div className="w-full h-full relative primereact-autocomplete-inline">
       <AutoComplete
+        ref={autoRef}
         value={value}
         suggestions={suggestions}
         completeMethod={search}
         onChange={(e) => onChange(e.value)}
         onSelect={handleSelect}
         onBlur={handleBlur}
+        minLength={0}
+        onFocus={(e) => {
+          search({ query: value || "" });
+          autoRef.current?.search(e, value || "", "dropdown");
+        }}
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-300"
@@ -414,7 +435,7 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
   const addDiagnosis = async (name: string) => {
     if (!name.trim()) return;
     const cleanName = name.trim();
-    setDiagnoses((p) => [...p, { id: Date.now().toString(), name: cleanName, since: "", status: "" }]);
+    setDiagnoses((p) => [...p, { id: "temp_" + Date.now(), name: cleanName, since: "", status: "" }]);
     setSearchVal(""); setSearchOpen(false); setSearchHi(-1);
 
     // Save selection / create custom option in Supabase

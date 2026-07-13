@@ -4,27 +4,7 @@ import React, { useState, useMemo, Suspense, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-import VitalsCard from "@/components/VitalsCard";
-import MedicalHistoryCard from "@/components/MedicalHistoryCard";
-import SymptomsCard from "@/components/SymptomsCard";
-import DiagnosisCard from "@/components/DiagnosisCard";
-import MedicationsCard from "@/components/MedicationsCard";
-import LabsCard from "@/components/LabsCard";
-import ResultsCard from "@/components/ResultsCard";
-import NotesCard from "@/components/NotesCard";
-import FollowUpCard from "@/components/FollowUpCard";
-import AdvicesCard from "@/components/AdvicesCard";
-import CurrentMedicationsDrawer, { CurrentMedication } from "@/components/CurrentMedicationsDrawer";
-import ExistingConditionsDrawer, { ExistingCondition } from "@/components/ExistingConditionsDrawer";
-import SurgicalProceduresDrawer, { SurgicalProcedure } from "@/components/SurgicalProceduresDrawer";
-import FamilyHistoryDrawer, { FamilyHistoryItem } from "@/components/FamilyHistoryDrawer";
-import DrugAllergiesDrawer, { DrugAllergy } from "@/components/DrugAllergiesDrawer";
-import LifestyleHabitsDrawer, { LifestyleHabit } from "@/components/LifestyleHabitsDrawer";
-import FoodAllergyDrawer, { FoodAllergy } from "@/components/FoodAllergyDrawer";
-import OtherMedHistoryDrawer, { OtherMedHistory } from "@/components/OtherMedHistoryDrawer";
-import TravelHistoryDrawer, { TravelHistoryItem } from "@/components/TravelHistoryDrawer";
-import ProceduresCard, { ProcedureItem } from "@/components/ProceduresCard";
-import ReferToDoctorCard, { ReferralItem } from "@/components/ReferToDoctorCard";
+
 
 
 const getKolkataDateString = (offset = 0): string => {
@@ -69,6 +49,7 @@ const getInitialAppointmentDateTime = (): string => {
 };
 
 interface Patient {
+  patient_id?: number;
   id: string;
   queueNo: string;
   title?: string;
@@ -97,6 +78,11 @@ interface Patient {
     height?: string;
     bmi?: string;
     respRate?: string;
+    egfrScore?: string;
+    cvdRisk?: string;
+    crclScore?: string;
+    qriskScore?: string;
+    bsaScore?: string;
   };
   customTags: string[];
   isCompleted: boolean;
@@ -345,11 +331,25 @@ function DashboardContent() {
         const billAmt = reg.services 
           ? reg.services.reduce((acc: number, s: any) => acc + (Number(s.fee) || 0), 0)
           : 0;
-        const pMethod = reg.payments && reg.payments[0]?.mode 
-          ? reg.payments[0].mode 
-          : "Cash";
+        const paymentsList = reg.payments && Array.isArray(reg.payments) ? reg.payments : [];
+        const modesWithAmount: string[] = paymentsList.filter((p: any) => (p.amount || 0) > 0).map((p: any) => String(p.mode));
+        const uniqueModes: string[] = Array.from(new Set(modesWithAmount.length > 0 ? modesWithAmount : paymentsList.map((p: any) => String(p.mode))));
+        let pMethod = "Cash";
+        if (uniqueModes.includes("Cash") && uniqueModes.includes("Online")) {
+          pMethod = "Cash + Online";
+        } else if (uniqueModes.length > 0) {
+          pMethod = uniqueModes[0];
+        }
+
+
+        let isComp = false;
+        if (typeof window !== "undefined") {
+          const completedList = JSON.parse(localStorage.getItem("completed_patients") || "[]");
+          isComp = completedList.includes(p.uhid);
+        }
 
         return {
+          patient_id: p.patient_id,
           id: p.uhid,
           queueNo: String(idx + 1).padStart(2, "0"),
           title: p.title || "Mr",
@@ -364,23 +364,23 @@ function DashboardContent() {
           localAddress: p.local_address || "",
           country: p.country || "India",
           state: p.state || "Maharashtra",
-          statusTags: ["Ongoing"],
+          statusTags: isComp ? ["Completed"] : ["Ongoing"],
           billAmount: billAmt,
           paymentMethod: pMethod,
           isAbhaCreated: false,
           customTags: [],
-          isCompleted: false,
-          isOngoing: true,
+          isCompleted: isComp,
+          isOngoing: !isComp,
           arrivalTime: reg.created_at 
             ? new Date(reg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
             : new Date(p.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           arrivalMinutesAgo: 0,
           vitals: {
-            bp: reg.bp || "120/80",
+            bp: reg.bp || "",
             pulse: reg.pulse || "",
             weight: reg.weight || "",
-            spo2: reg.spo2 || "98",
-            sugar: reg.sugar || "100",
+            spo2: reg.spo2 || "",
+            sugar: reg.sugar || "",
           },
           opdRegistration: {
             registration_id: reg.registration_id,
@@ -476,25 +476,12 @@ function DashboardContent() {
   const [patientDirectory, setPatientDirectory] = useState<Patient[]>([]);
 
   // --- VIEW TRANSITION CONTROLLERS (Synced with URL parameter ?rx=PATIENT_ID) ---
-  const rxPatientId = searchParams.get("rx");
-
-  const currentRxPatient = useMemo(() => {
-    if (!rxPatientId) return null;
-    return patients.find((p) => p.id === rxPatientId) || null;
-  }, [patients, rxPatientId]);
-
-  const activeView = rxPatientId && currentRxPatient ? "prescription" : "dashboard";
-
   const openPrescription = (patientId: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("rx", patientId);
-    router.replace(`${pathname}?${params.toString()}`);
+    router.push(`/rx?rx=${patientId}`);
   };
 
   const closePrescription = () => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("rx");
-    router.replace(`${pathname}?${params.toString()}`);
+    router.push("/");
   };
 
   // URL State Synchronizer for Right Sidebar (Add OPD Registration)
@@ -625,153 +612,7 @@ function DashboardContent() {
 
 
 
-  // --- PRESCRIPTION PAD DYNAMIC STATE VARIABLES (Screenshots #1-#5) ---
-  // DB Map: public.visit_vitals
-  const [rxSystolic, setRxSystolic] = useState("120");
-  const [rxDiastolic, setRxDiastolic] = useState("80");
-  const [rxTemp, setRxTemp] = useState("98.6");
-  const [rxSpo2, setRxSpo2] = useState("98");
-  const [rxPulse, setRxPulse] = useState("72");
-  const [rxRespRate, setRxRespRate] = useState("16");
-  const [rxHeight, setRxHeight] = useState("175");
-  const [rxWeight, setRxWeight] = useState("70");
-  const [rxBmi, setRxBmi] = useState("22.9");
 
-  // Calculators states (BSA, CrCl, eGFR etc.)
-  const [egfrScore, setEgfrScore] = useState("");
-  const [cvdRisk, setCvdRisk] = useState("");
-  const [crclScore, setCrclScore] = useState("");
-  const [qriskScore, setQriskScore] = useState("");
-  const [bsaScore, setBsaScore] = useState("");
-
-  // Medical History states
-  const [histDiabetes, setHistDiabetes] = useState(false);
-  const [histDiabetesSince, setHistDiabetesSince] = useState("");
-  const [histHypothyroid, setHistHypothyroid] = useState(false);
-  const [histHypertension, setHistHypertension] = useState(false);
-  const [histAlcohol, setHistAlcohol] = useState(false);
-  const [histTobacco, setHistTobacco] = useState(false);
-  const [histSmoke, setHistSmoke] = useState(false);
-  const [histNoKnown, setHistNoKnown] = useState(false);
-
-  // Current Medications state
-  const [currentMeds, setCurrentMeds] = useState<CurrentMedication[]>([]);
-  const [isCurrentMedsOpen, setIsCurrentMedsOpen] = useState(false);
-
-  // Existing Conditions state
-  const [conditions, setConditions] = useState<ExistingCondition[]>([]);
-  const [isConditionsOpen, setIsConditionsOpen] = useState(false);
-
-  // Past Surgical Procedures state
-  const [procedures, setProcedures] = useState<SurgicalProcedure[]>([]);
-  const [isProceduresOpen, setIsProceduresOpen] = useState(false);
-
-  // Family History state
-  const [familyItems, setFamilyItems] = useState<FamilyHistoryItem[]>([]);
-  const [isFamilyOpen, setIsFamilyOpen] = useState(false);
-
-  // Drug Allergies state
-  const [allergies, setAllergies] = useState<DrugAllergy[]>([]);
-  const [isAllergiesOpen, setIsAllergiesOpen] = useState(false);
-
-  // Lifestyle Habits state
-  const [habits, setHabits] = useState<LifestyleHabit[]>([]);
-  const [isHabitsOpen, setIsHabitsOpen] = useState(false);
-
-  // Food/Other Allergy state
-  const [foodAllergies, setFoodAllergies] = useState<FoodAllergy[]>([]);
-  const [isFoodAllergyOpen, setIsFoodAllergyOpen] = useState(false);
-
-  // Other Medical History state
-  const [otherHistory, setOtherHistory] = useState<OtherMedHistory[]>([]);
-  const [otherHistoryTitle, setOtherHistoryTitle] = useState("");
-  const [isOtherHistoryOpen, setIsOtherHistoryOpen] = useState(false);
-
-  // Travel History state
-  const [travelHistory, setTravelHistory] = useState<TravelHistoryItem[]>([]);
-  const [isTravelOpen, setIsTravelOpen] = useState(false);
-
-  // Symptoms state
-  // DB Map: public.visit_symptoms
-  const [symptoms, setSymptoms] = useState<Array<{
-    id: string;
-    name: string;
-    duration: string;
-    severity: string;
-    headacheSite?: string;
-    typeOfPain?: string;
-    clinicalCourse?: string;
-    note?: string;
-  }>>([
-    { id: "1", name: "Head Pain", duration: "1 Hour", severity: "Severe" }
-  ]);
-  const [symptomInput, setSymptomInput] = useState("");
-  const [symptomFocusId, setSymptomFocusId] = useState<string | null>(null);
-  const [symptomFocusField, setSymptomFocusField] = useState<string | null>(null); // "name" | "duration" | "severity"
-
-  // Symptoms More Options Modal State
-  const [activeMoreOptionsSymptomId, setActiveMoreOptionsSymptomId] = useState<string | null>(null);
-  const [headacheSite, setHeadacheSite] = useState("");
-  const [typeOfPain, setTypeOfPain] = useState("");
-  const [clinicalCourse, setClinicalCourse] = useState("");
-  const [moreOptionsNote, setMoreOptionsNote] = useState("");
-  const [headacheSiteFocused, setHeadacheSiteFocused] = useState(false);
-  const [typeOfPainFocused, setTypeOfPainFocused] = useState(false);
-
-  // Diagnoses state
-  // DB Map: public.visit_diagnoses
-  const [diagnoses, setDiagnoses] = useState<Array<{ id: string; name: string; since: string; status: string }>>([
-    { id: "1", name: "Period pain", since: "2 Days", status: "Active" }
-  ]);
-  const [diagnosisInput, setDiagnosisInput] = useState("");
-
-  // Medications list
-  // DB Map: public.visit_prescriptions
-  const [medications, setMedications] = useState<Array<{ id: string; name: string; generic: string; dose: string; freq: string; timing: string; duration: string; start: string; instr: string }>>([
-    { id: "1", name: "Dolopar 650 Tablets", generic: "PARACETAMOL (650MG)", dose: "2 capsule", freq: "1-1-1", timing: "After Meal", duration: "10 Days", start: "Today", instr: "" },
-    { id: "2", name: "Meftal-Spas Tablet", generic: "DICYCLOMINE (10MG) + MEFENAMIC ACID (250MG)", dose: "1 Tablet", freq: "1-0-1", timing: "After Meal", duration: "3 Days", start: "Today", instr: "" }
-  ]);
-  const [medInput, setMedInput] = useState("");
-  const [medInputFocused, setMedInputFocused] = useState(false);
-
-  // Lab Investigations
-  const [labs, setLabs] = useState<Array<{ id: string; name: string; testOn: string; repeatOn: string; remarks: string }>>([
-    { id: "1", name: "Liver Function Test (LFT)", testOn: "2026-07-11", repeatOn: "2026-07-25", remarks: "" }
-  ]);
-  const [labInput, setLabInput] = useState("");
-
-  // Lab Results
-  const [labResults, setLabResults] = useState<Array<{ id: string; name: string; unit: string; reading: string; interpretation: string; date: string; notes: string }>>([
-    { id: "1", name: "HbA1c (Glycosylated Hemoglobin)", unit: "%", reading: "23", interpretation: "High", date: "11 Jul 26", notes: "" }
-  ]);
-  const [labResultInput, setLabResultInput] = useState("");
-
-  // Examination findings
-  const [findings, setFindings] = useState<Array<{ id: string; text: string; note: string }>>([
-    { id: "1", text: "2", note: "" }
-  ]);
-  const [findingInput, setFindingInput] = useState("");
-
-  // Follow Ups, Advices, and Notes
-  const [notesForPatient, setNotesForPatient] = useState("");
-  const [privateNotes, setPrivateNotes] = useState("");
-  const [refDoctorInput, setRefDoctorInput] = useState("");
-  const [followUpVal, setFollowUpVal] = useState("10 Days");
-  const [followUpNotes, setFollowUpNotes] = useState("");
-  const [advicesInput, setAdvicesInput] = useState("");
-  const [advRest, setAdvRest] = useState(false);
-  const [advWater, setAdvWater] = useState(false);
-
-  // Procedures list state
-  const [rxProcedures, setRxProcedures] = useState<ProcedureItem[]>([
-    { id: "1", name: "Actinotherapy", duration: "After 3 Days", note: "" },
-    { id: "2", name: "APTT", duration: "After 3 Days", note: "" }
-  ]);
-
-  // Referrals list state
-  const [referrals, setReferrals] = useState<ReferralItem[]>([
-    { id: "1", doctorName: "shaikh mudassir", notes: "" }
-  ]);
 
   const incrementOption = async (categoryId: number, value: string, metadata?: any) => {
     if (!value?.trim()) return;
@@ -896,82 +737,7 @@ function DashboardContent() {
     }
   }, [bookParam, patientDirectory, selectedBookingPatient]);
 
-  // Load patient context into Prescription Pad on view transition
-  useEffect(() => {
-    if (currentRxPatient) {
-      if (currentRxPatient.vitals) {
-        if (currentRxPatient.vitals.bp) {
-          const bpParts = currentRxPatient.vitals.bp.split("/");
-          setRxSystolic(bpParts[0] || "120");
-          setRxDiastolic(bpParts[1] || "80");
-        }
-        setRxPulse(currentRxPatient.vitals.pulse || "72");
-        setRxWeight(currentRxPatient.vitals.weight || "70");
-        setRxSpo2(currentRxPatient.vitals.spo2 || "98");
-      }
-      
-      // Auto compute BMI
-      const h = Number(rxHeight) / 100;
-      const w = Number(rxWeight);
-      if (h > 0 && w > 0) {
-        setRxBmi((w / (h * h)).toFixed(1));
-      }
-    }
-  }, [currentRxPatient]);
 
-  // Calculate BMI dynamically when height or weight shifts in Prescription Pad
-  useEffect(() => {
-    const h = Number(rxHeight) / 100;
-    const w = Number(rxWeight);
-    if (h > 0 && w > 0) {
-      setRxBmi((w / (h * h)).toFixed(1));
-    } else {
-      setRxBmi("");
-    }
-  }, [rxHeight, rxWeight]);
-
-  // Vitals Calculators triggers
-  const handleCalculateBsa = () => {
-    const h = Number(rxHeight);
-    const w = Number(rxWeight);
-    if (h > 0 && w > 0) {
-      const bsa = Math.sqrt((h * w) / 3600);
-      setBsaScore(bsa.toFixed(2) + " m²");
-    } else {
-      setBsaScore("0.00 m²");
-    }
-  };
-
-  const handleCalculateCrCl = () => {
-    if (!currentRxPatient) return;
-    const ageVal = currentRxPatient.age;
-    const w = Number(rxWeight);
-    if (w > 0) {
-      // Cockcroft-Gault (Serum Creatinine assumed as 1.0 mg/dL as reference base)
-      const baseCrCl = ((140 - ageVal) * w) / 72;
-      const finalCrCl = currentRxPatient.gender === "Female" ? baseCrCl * 0.85 : baseCrCl;
-      setCrclScore(finalCrCl.toFixed(1) + " mL/min");
-    } else {
-      setCrclScore("0.0 mL/min");
-    }
-  };
-
-  const handleCalculateEgfr = () => {
-    if (!currentRxPatient) return;
-    // MDRD Mocked based on gender
-    const egfr = currentRxPatient.gender === "Female" ? 95 : 110;
-    setEgfrScore(egfr + " mL/min/1.73m²");
-  };
-
-  const handleCalculateCvd = () => {
-    // Framingham Risk Mocked
-    setCvdRisk("4.2 %");
-  };
-
-  const handleCalculateQrisk = () => {
-    // QRISK3 Mocked
-    setQriskScore("2.1 %");
-  };
 
   // Bidirectional calculations: Age ↔ DOB
   const calculateDobFromAge = (currentAge: string, unit: string) => {
@@ -1235,7 +1001,26 @@ function DashboardContent() {
   // Handlers for managing the patients in the main queue list
   const handleToggleCompleted = (patientId: string) => {
     setPatients((prev) =>
-      prev.map((p) => (p.id === patientId ? { ...p, isCompleted: !p.isCompleted } : p))
+      prev.map((p) => {
+        if (p.id === patientId) {
+          const nextVal = !p.isCompleted;
+          const completedList = JSON.parse(localStorage.getItem("completed_patients") || "[]");
+          let updatedList;
+          if (nextVal) {
+            updatedList = Array.from(new Set([...completedList, patientId]));
+          } else {
+            updatedList = completedList.filter((id: string) => id !== patientId);
+          }
+          localStorage.setItem("completed_patients", JSON.stringify(updatedList));
+          return {
+            ...p,
+            isCompleted: nextVal,
+            isOngoing: !nextVal,
+            statusTags: nextVal ? ["Completed"] : ["Ongoing"]
+          };
+        }
+        return p;
+      })
     );
   };
 
@@ -1507,431 +1292,263 @@ function DashboardContent() {
     }
   };
 
-  // --- PRESCRIPTION INTERACTIVE ACTIONS LOGIC ---
-  const handleAddSymptom = (name: string) => {
-    if (!name.trim()) return;
-    const newSym = { id: Date.now().toString(), name: name.trim(), duration: "1 Day", severity: "Mild" };
-    setSymptoms([...symptoms, newSym]);
-    setSymptomInput("");
-  };
 
-  const handleAddDiagnosis = (name: string) => {
-    if (!name.trim()) return;
-    const newDiag = { id: Date.now().toString(), name: name.trim(), since: "1 Week", status: "Active" };
-    setDiagnoses([...diagnoses, newDiag]);
-    setDiagnosisInput("");
-  };
 
-  const handleAddMedicine = (med: { name: string; generic: string }) => {
-    const newMed = {
-      id: Date.now().toString(),
-      name: med.name,
-      generic: med.generic,
-      dose: "1 Tablet",
-      freq: "1-0-1",
-      timing: "After Meal",
-      duration: "5 Days",
-      start: "Today",
-      instr: ""
-    };
-    setMedications([...medications, newMed]);
-    setMedInput("");
-    setMedInputFocused(false);
-  };
-
-  const handleAddLab = (name: string) => {
-    if (!name.trim()) return;
-    const newLab = { id: Date.now().toString(), name: name.trim(), testOn: "2026-07-11", repeatOn: "", remarks: "" };
-    setLabs([...labs, newLab]);
-    setLabInput("");
-  };
-
-  const handleAddLabResult = (name: string) => {
-    if (!name.trim()) return;
-    const newResult = { id: Date.now().toString(), name: name.trim(), unit: "", reading: "", interpretation: "Normal", date: "11 Jul 26", notes: "" };
-    setLabResults([...labResults, newResult]);
-    setLabResultInput("");
-  };
-
-  const handleFinishPrescription = () => {
-    if (!currentRxPatient) return;
+  const handlePrintBill = (patientId: string) => {
+    const patient = patients.find(p => p.id === patientId);
+    if (!patient) return;
     
-    // Save Prescription details into the master patient record & mark as Completed
-    const updatedPatient: Patient = {
-      ...currentRxPatient,
-      isCompleted: true,
-      isOngoing: false,
-      statusTags: ["Completed"],
-      vitals: {
-        bp: `${rxSystolic}/${rxDiastolic}`,
-        pulse: rxPulse,
-        weight: rxWeight,
-        spo2: rxSpo2,
-        height: rxHeight,
-        bmi: rxBmi,
-        respRate: rxRespRate
-      }
-    };
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
 
-    setPatients((prev) => prev.map((p) => (p.id === currentRxPatient.id ? updatedPatient : p)));
-    closePrescription();
+    const servicesList = patient.opdRegistration?.services || [];
+    const discount = patient.opdRegistration?.discount_amount || 0;
+    const totalFees = servicesList.reduce((acc: number, s: any) => acc + (Number(s.fee) || 0), 0);
+    const amountPaid = totalFees - discount;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Bill Receipt - ${patient.name}</title>
+          <style>
+            body { font-family: 'Inter', sans-serif; padding: 40px; color: #111827; max-width: 600px; margin: 0 auto; }
+            .header { border-bottom: 2px solid #E5E7EB; padding-bottom: 20px; margin-bottom: 20px; }
+            .title { font-size: 24px; font-weight: bold; color: #7C3AED; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 30px; font-size: 14px; }
+            .table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
+            .table th { border-bottom: 2px solid #E5E7EB; text-align: left; padding: 10px; font-size: 12px; text-transform: uppercase; color: #6B7280; }
+            .table td { border-bottom: 1px solid #E5E7EB; padding: 10px; font-size: 14px; }
+            .summary { margin-left: auto; width: 300px; font-size: 14px; }
+            .summary-row { display: flex; justify-content: space-between; padding: 5px 0; }
+            .total { font-weight: bold; border-top: 1px solid #E5E7EB; padding-top: 10px; font-size: 16px; color: #7C3AED; }
+            .footer { text-align: center; font-size: 12px; color: #9CA3AF; margin-top: 50px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">${patient.opdRegistration?.clinic_name || "OPD CLINIC"}</div>
+            <p style="margin: 5px 0 0 0; color: #6B7280; font-size: 14px;">Receipt of Payment</p>
+          </div>
+          <div class="info-grid">
+            <div>
+              <strong>Patient Name:</strong> ${patient.title || "Mr/Mrs"} ${patient.name}<br>
+              <strong>Age/Gender:</strong> ${patient.age}y / ${patient.gender}<br>
+              <strong>Phone:</strong> ${patient.phone}
+            </div>
+            <div style="text-align: right;">
+              <strong>Date:</strong> ${new Date().toLocaleDateString('en-IN')}<br>
+              <strong>Receipt No:</strong> REC-${patientId.slice(-6)}<br>
+              <strong>Treating Doctor:</strong> ${patient.opdRegistration?.treating_doctor || "N/A"}
+            </div>
+          </div>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Service / Item</th>
+                <th>Type</th>
+                <th style="text-align: right;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${servicesList.length > 0 ? servicesList.map((s: any) => `
+                <tr>
+                  <td>${s.name}</td>
+                  <td>${s.type === 'product' ? 'Product' : 'Service'}</td>
+                  <td style="text-align: right;">₹${s.fee}</td>
+                </tr>
+              `).join('') : `
+                <tr>
+                  <td>Consultation Fee</td>
+                  <td>Service</td>
+                  <td style="text-align: right;">₹${patient.billAmount}</td>
+                </tr>
+              `}
+            </tbody>
+          </table>
+          <div class="summary">
+            <div class="summary-row">
+              <span>Subtotal</span>
+              <span>₹${totalFees || patient.billAmount}</span>
+            </div>
+            ${discount > 0 ? `
+              <div class="summary-row">
+                <span>Discount</span>
+                <span>- ₹${discount}</span>
+              </div>
+            ` : ''}
+            <div class="summary-row total">
+              <span>Total Paid (${patient.paymentMethod})</span>
+              <span>₹${amountPaid || patient.billAmount}</span>
+            </div>
+          </div>
+          <div class="footer">
+            Thank you for visiting! Get well soon.
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              window.onafterprint = function() { window.close(); };
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
-  // --- PRESCRIPTION VIEW RENDER ---
-  const renderPrescriptionPad = () => {
-    if (!currentRxPatient) return null;
-    return (
-      <div className="flex flex-col h-screen w-screen bg-white overflow-hidden font-sans select-none">
-        
-        {/* PRESCRIPTION HEADER (Screenshot #1 top layout details) */}
-        <header className="h-12 bg-white border-b border-[#E2E8F0] px-4 flex items-center justify-between shrink-0 shadow-2xs">
-          {/* Patient summary details */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                closePrescription();
-              }}
-              className="p-1 hover:bg-[#E2E8F0] rounded-md text-[#718096] transition-colors"
-            >
-              <svg className="w-4 h-4 text-foreground" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-            </button>
-            <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-[12px]">
-              {currentRxPatient.name.charAt(0).toUpperCase()}
+  const handlePrintPrescription = (patientId: string) => {
+    const patient = patients.find(p => p.id === patientId);
+    if (!patient) return;
+
+    const saved = typeof window !== "undefined" ? JSON.parse(localStorage.getItem(`saved_rx_${patientId}`) || "null") : null;
+    const medList: any[] = saved ? saved.medications : [
+      { name: "Dolopar 650 Tablets", generic: "PARACETAMOL (650MG)", dose: "2 capsule", freq: "1-1-1", timing: "After Meal", duration: "10 Days", instr: "" },
+      { name: "Meftal-Spas Tablet", generic: "DICYCLOMINE (10MG) + MEFENAMIC ACID (250MG)", dose: "1 Tablet", freq: "1-0-1", timing: "After Meal", duration: "3 Days", instr: "" }
+    ];
+    const symList: any[] = saved ? saved.symptoms : [
+      { name: "Head Pain", duration: "1 Hour", severity: "Severe" }
+    ];
+    const diagList: any[] = saved ? saved.diagnoses : [
+      { name: "Period pain", since: "2 Days", status: "Active" }
+    ];
+    const labList: any[] = saved ? saved.labs : [
+      { name: "Liver Function Test (LFT)", remarks: "" }
+    ];
+    const notes = saved ? saved.notesForPatient : "";
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Prescription - ${patient.name}</title>
+          <style>
+            body { font-family: 'Inter', sans-serif; padding: 40px; color: #111827; max-width: 800px; margin: 0 auto; }
+            .header { border-bottom: 2px solid #7C3AED; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+            .clinic-name { font-size: 24px; font-weight: bold; color: #7C3AED; }
+            .doc-info { text-align: right; font-size: 13px; color: #4A5568; line-height: 1.4; }
+            .info-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; background: #F8FAFC; padding: 15px; border-radius: 8px; margin-bottom: 25px; font-size: 13px; line-height: 1.5; border: 1px solid #E2E8F0; }
+            .rx-section { margin-bottom: 25px; }
+            .rx-title { font-size: 13px; font-weight: bold; color: #7C3AED; border-bottom: 1px solid #E2E8F0; padding-bottom: 4px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+            .med-item { margin-bottom: 15px; padding-left: 10px; border-left: 2px solid #7C3AED; }
+            .med-name { font-size: 14px; font-weight: bold; color: #1F2937; }
+            .med-generic { font-size: 11px; color: #6B7280; text-transform: uppercase; margin-top: 1px; }
+            .med-instructions { font-size: 13px; color: #374151; font-weight: 500; margin-top: 4px; display: flex; gap: 15px; }
+            .vitals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; font-size: 13px; background: #F9FAFB; padding: 12px; border-radius: 6px; border: 1px dashed #CBD5E0; }
+            .rx-symbol { font-size: 36px; font-weight: bold; color: #7C3AED; font-family: Georgia, serif; margin: 15px 0; }
+            .footer { text-align: center; font-size: 11px; color: #9CA3AF; margin-top: 80px; border-top: 1px solid #E5E7EB; padding-top: 15px; }
+            .list-disc { padding-left: 20px; margin: 0; }
+            .list-disc li { margin-bottom: 5px; font-size: 13.5px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="clinic-name">${patient.opdRegistration?.clinic_name || "OPD CLINIC"}</div>
+              <p style="margin: 3px 0 0 0; color: #6B7280; font-size: 13px; font-weight: 500;">Comprehensive Care Clinic</p>
             </div>
-            <div className="text-left leading-tight">
-              <div className="flex items-center gap-2">
-                <span className="text-[12px] font-bold text-foreground select-text">{currentRxPatient.name}</span>
-                <span className="text-[11px] font-medium text-[#718096]">{currentRxPatient.age}y | {currentRxPatient.gender}</span>
+            <div class="doc-info">
+              <strong>${patient.opdRegistration?.treating_doctor || "Dr. Treating Doctor"}</strong><br>
+              MBBS, MD<br>
+              Reg No: 123456
+            </div>
+          </div>
+
+          <div class="info-grid">
+            <div>
+              <strong>Patient Name:</strong> ${patient.title || "Mr/Mrs"} ${patient.name}<br>
+              <strong>Age/Gender:</strong> ${patient.age} ${patient.ageUnit || 'Year'}(s) / ${patient.gender}<br>
+              <strong>Phone:</strong> ${patient.phone}
+            </div>
+            <div style="text-align: right;">
+              <strong>Date:</strong> ${new Date().toLocaleDateString('en-IN')}<br>
+              <strong>UHID / Queue No:</strong> ${patient.id} / Q-${patient.queueNo || "00"}<br>
+            </div>
+          </div>
+
+          ${patient.vitals && (patient.vitals.bp || patient.vitals.pulse || patient.vitals.weight || patient.vitals.spo2 || patient.vitals.sugar) ? `
+            <div class="rx-section">
+              <div class="rx-title">Vitals</div>
+              <div class="vitals-grid">
+                ${patient.vitals.bp ? `<div><strong>BP:</strong> ${patient.vitals.bp} mmHg</div>` : ''}
+                ${patient.vitals.pulse ? `<div><strong>Pulse:</strong> ${patient.vitals.pulse} bpm</div>` : ''}
+                ${patient.vitals.weight ? `<div><strong>Weight:</strong> ${patient.vitals.weight} kg</div>` : ''}
+                ${patient.vitals.spo2 ? `<div><strong>SpO2:</strong> ${patient.vitals.spo2}%</div>` : ''}
+                ${patient.vitals.sugar ? `<div><strong>Sugar:</strong> ${patient.vitals.sugar} mg/dL</div>` : ''}
               </div>
-              <span className="text-[9px] text-[#A0AEC0] font-semibold tracking-tight select-text">{currentRxPatient.phone}</span>
             </div>
+          ` : ''}
 
-            {/* Micro action shortcuts */}
-            <div className="flex items-center gap-1 border-l pl-2 border-[#E2E8F0] select-text">
-              <button
-                onClick={() => {
-                  setSelectedBookingPatient(currentRxPatient);
-                  openBooking(currentRxPatient.id);
-                }}
-                className="p-1 hover:bg-[#F1F5F9] rounded text-[#718096]"
-                title="Edit Details"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-              </button>
-              <button className="p-1 hover:bg-[#F1F5F9] rounded text-[#718096]" title="Video Teleconsultation">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </button>
-              <button className="p-1 hover:bg-[#F1F5F9] rounded text-[#718096]" title="Link record">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
-              </button>
-              <button className="p-1 hover:bg-[#F1F5F9] rounded text-[#718096]" title="PDF upload">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </button>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            ${symList.length > 0 ? `
+              <div class="rx-section">
+                <div class="rx-title">Symptoms / Complaints</div>
+                <ul class="list-disc">
+                  ${symList.map(s => `<li>${s.name} ${s.duration ? `(${s.duration})` : ''} - <span style="text-transform: capitalize; font-size: 11px; font-weight: bold; color: #4B5563;">${s.severity}</span></li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+
+            ${diagList.length > 0 ? `
+              <div class="rx-section">
+                <div class="rx-title">Diagnoses</div>
+                <ul class="list-disc">
+                  ${diagList.map(d => `<li>${d.name} ${d.since ? `(since ${d.since})` : ''}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="rx-symbol">Rₓ</div>
+
+          <div class="rx-section">
+            <div class="rx-title">Medications (Rx)</div>
+            ${medList.map(m => `
+              <div class="med-item">
+                <div class="med-name">${m.name}</div>
+                ${m.generic ? `<div class="med-generic">${m.generic}</div>` : ''}
+                <div class="med-instructions">
+                  <span><strong>Dosage:</strong> ${m.dose}</span>
+                  <span><strong>Frequency:</strong> ${m.freq}</span>
+                  <span><strong>Timing:</strong> ${m.timing}</span>
+                  ${m.duration ? `<span><strong>Duration:</strong> ${m.duration}</span>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          ${labList.length > 0 ? `
+            <div class="rx-section">
+              <div class="rx-title">Lab Investigations Suggested</div>
+              <ul class="list-disc">
+                ${labList.map(l => `<li>${l.name}</li>`).join('')}
+              </ul>
             </div>
+          ` : ''}
+
+          ${notes ? `
+            <div class="rx-section">
+              <div class="rx-title">Doctor Notes</div>
+              <div style="font-size: 13px; color: #374151; background: #F9FAFB; padding: 10px; border-radius: 6px; border: 1px solid #E5E7EB; white-space: pre-line;">
+                ${notes}
+              </div>
+            </div>
+          ` : ''}
+
+          <div class="footer">
+            Please follow the prescribed dosage carefully. Return for follow-up if symptoms persist.
           </div>
-
-          {/* Navigation tab bar in the center */}
-          <div className="flex items-center h-full">
-            <button className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground">Overview</button>
-            <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">Pad</button>
-            <button className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground">Canvas</button>
-            <button className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground">Medical Records</button>
-          </div>
-
-          {/* Right Header Controls */}
-          <div className="flex items-center gap-2">
-            <button className="px-2.5 py-1 border border-primary/20 hover:bg-primary/5 text-primary text-[10px] font-bold rounded">
-              DxaAI Assessments
-            </button>
-            <button className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white text-[10px] font-bold rounded flex items-center gap-1">
-              ✨ DocScribe
-            </button>
-            <button className="px-2 py-1 text-[10.5px] font-semibold text-[#4A5568] hover:bg-gray-100 rounded">
-              Templates
-            </button>
-            <button className="px-2 py-1 text-[10.5px] font-semibold text-[#4A5568] hover:bg-gray-100 rounded flex items-center gap-1">
-              ⚙ Configure
-            </button>
-            <span className="px-2.5 py-1 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded text-[10px] font-bold tracking-wide select-none cursor-pointer">
-              UPGRADE TO PRO
-            </span>
-          </div>
-        </header>
-
-        {/* PRESCRIPTION pad CONTENT (Scrollable area containing screenshots components) */}
-        <main className="flex-1 overflow-y-auto w-full bg-[#F8FAFC] p-5 space-y-5 pb-24">
-          
-          <VitalsCard
-            rxSystolic={rxSystolic}
-            setRxSystolic={setRxSystolic}
-            rxDiastolic={rxDiastolic}
-            setRxDiastolic={setRxDiastolic}
-            rxTemp={rxTemp}
-            setRxTemp={setRxTemp}
-            rxSpo2={rxSpo2}
-            setRxSpo2={setRxSpo2}
-            rxPulse={rxPulse}
-            setRxPulse={setRxPulse}
-            rxRespRate={rxRespRate}
-            setRxRespRate={setRxRespRate}
-            rxHeight={rxHeight}
-            setRxHeight={setRxHeight}
-            rxWeight={rxWeight}
-            setRxWeight={setRxWeight}
-            rxBmi={rxBmi}
-            currentRxPatient={currentRxPatient}
-            egfrScore={egfrScore}
-            setEgfrScore={setEgfrScore}
-            cvdRisk={cvdRisk}
-            setCvdRisk={setCvdRisk}
-            crclScore={crclScore}
-            setCrclScore={setCrclScore}
-            qriskScore={qriskScore}
-            setQriskScore={setQriskScore}
-            bsaScore={bsaScore}
-            setBsaScore={setBsaScore}
-          />
-
-          <MedicalHistoryCard
-            histNoKnown={histNoKnown}
-            setHistNoKnown={setHistNoKnown}
-            histDiabetes={histDiabetes}
-            setHistDiabetes={setHistDiabetes}
-            histDiabetesSince={histDiabetesSince}
-            setHistDiabetesSince={setHistDiabetesSince}
-            histHypothyroid={histHypothyroid}
-            setHistHypothyroid={setHistHypothyroid}
-            histHypertension={histHypertension}
-            setHistHypertension={setHistHypertension}
-            histAlcohol={histAlcohol}
-            setHistAlcohol={setHistAlcohol}
-            histTobacco={histTobacco}
-            setHistTobacco={setHistTobacco}
-            histSmoke={histSmoke}
-            setHistSmoke={setHistSmoke}
-            currentMeds={currentMeds}
-            setCurrentMeds={setCurrentMeds}
-            onOpenCurrentMeds={() => setIsCurrentMedsOpen(true)}
-            conditions={conditions}
-            setConditions={setConditions}
-            onOpenConditions={() => setIsConditionsOpen(true)}
-            procedures={procedures}
-            setProcedures={setProcedures}
-            onOpenProcedures={() => setIsProceduresOpen(true)}
-            familyItems={familyItems}
-            setFamilyItems={setFamilyItems}
-            onOpenFamily={() => setIsFamilyOpen(true)}
-            allergies={allergies}
-            setAllergies={setAllergies}
-            onOpenAllergies={() => setIsAllergiesOpen(true)}
-            habits={habits}
-            setHabits={setHabits}
-            onOpenHabits={() => setIsHabitsOpen(true)}
-            foodAllergies={foodAllergies}
-            setFoodAllergies={setFoodAllergies}
-            onOpenFoodAllergies={() => setIsFoodAllergyOpen(true)}
-            otherHistory={otherHistory}
-            setOtherHistory={setOtherHistory}
-            otherHistoryTitle={otherHistoryTitle}
-            setOtherHistoryTitle={setOtherHistoryTitle}
-            onOpenOtherHistory={() => setIsOtherHistoryOpen(true)}
-            travelHistory={travelHistory}
-            setTravelHistory={setTravelHistory}
-            onOpenTravelHistory={() => setIsTravelOpen(true)}
-          />
-
-          <CurrentMedicationsDrawer
-            isOpen={isCurrentMedsOpen}
-            onClose={() => setIsCurrentMedsOpen(false)}
-            currentMeds={currentMeds}
-            setCurrentMeds={setCurrentMeds}
-          />
-
-          <ExistingConditionsDrawer
-            isOpen={isConditionsOpen}
-            onClose={() => setIsConditionsOpen(false)}
-            conditions={conditions}
-            setConditions={setConditions}
-          />
-
-          <SurgicalProceduresDrawer
-            isOpen={isProceduresOpen}
-            onClose={() => setIsProceduresOpen(false)}
-            procedures={procedures}
-            setProcedures={setProcedures}
-          />
-
-          <FamilyHistoryDrawer
-            isOpen={isFamilyOpen}
-            onClose={() => setIsFamilyOpen(false)}
-            items={familyItems}
-            setItems={setFamilyItems}
-          />
-
-          <DrugAllergiesDrawer
-            isOpen={isAllergiesOpen}
-            onClose={() => setIsAllergiesOpen(false)}
-            allergies={allergies}
-            setAllergies={setAllergies}
-          />
-
-          <LifestyleHabitsDrawer
-            isOpen={isHabitsOpen}
-            onClose={() => setIsHabitsOpen(false)}
-            habits={habits}
-            setHabits={setHabits}
-          />
-
-          <FoodAllergyDrawer
-            isOpen={isFoodAllergyOpen}
-            onClose={() => setIsFoodAllergyOpen(false)}
-            items={foodAllergies}
-            setItems={setFoodAllergies}
-          />
-
-          <OtherMedHistoryDrawer
-            isOpen={isOtherHistoryOpen}
-            onClose={() => setIsOtherHistoryOpen(false)}
-            items={otherHistory}
-            setItems={setOtherHistory}
-            title={otherHistoryTitle}
-            setTitle={setOtherHistoryTitle}
-          />
-
-          <TravelHistoryDrawer
-            isOpen={isTravelOpen}
-            onClose={() => setIsTravelOpen(false)}
-            items={travelHistory}
-            setItems={setTravelHistory}
-          />
-
-          <SymptomsCard
-            symptoms={symptoms}
-            setSymptoms={setSymptoms}
-          />
-
-          <DiagnosisCard
-            diagnoses={diagnoses}
-            setDiagnoses={setDiagnoses}
-          />
-
-          <MedicationsCard
-            medications={medications}
-            setMedications={setMedications}
-          />
-
-          <LabsCard
-            labs={labs}
-            setLabs={setLabs}
-          />
-
-          <ResultsCard
-            labResults={labResults}
-            setLabResults={setLabResults}
-          />
-
-          {/* 6. ADVICES, NOTES, EXAMINATION, FOLLOW-UP */}
-          <NotesCard
-            notesForPatient={notesForPatient}
-            setNotesForPatient={setNotesForPatient}
-            privateNotes={privateNotes}
-            setPrivateNotes={setPrivateNotes}
-          />
- 
-          <ReferToDoctorCard
-            referrals={referrals}
-            setReferrals={setReferrals}
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full items-start">
-            <FollowUpCard
-              followUpVal={followUpVal}
-              setFollowUpVal={setFollowUpVal}
-              followUpNotes={followUpNotes}
-              setFollowUpNotes={setFollowUpNotes}
-            />
-   
-            <AdvicesCard
-              advicesInput={advicesInput}
-              setAdvicesInput={setAdvicesInput}
-              advRest={advRest}
-              setAdvRest={setAdvRest}
-              advWater={advWater}
-              setAdvWater={setAdvWater}
-            />
-          </div>
-
-          <ProceduresCard
-            procedures={rxProcedures}
-            setProcedures={setRxProcedures}
-          />
-
-        </main>
-
-        {/* BOTTOM PRESCRIPTION STICKY TOOLBAR (Screenshot #1 bottom bar) */}
-        <footer className="h-12 bg-[#1e293b] px-4 flex items-center justify-between shrink-0 select-none shadow-2xl border-t border-slate-800">
-          {/* Settings / Config toolbar */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                setRxSystolic("120"); setRxDiastolic("80"); setRxTemp("98.6"); setRxPulse("72");
-                setRxWeight("70"); setRxHeight("175"); setRxRespRate("16"); setRxSpo2("98");
-                setSymptoms([]); setDiagnoses([]); setMedications([]); setLabs([]); setLabResults([]);
-                setBsaScore(""); setCrclScore(""); setEgfrScore("");
-              }}
-              className="px-3 py-1 bg-slate-700/50 hover:bg-slate-700 text-white rounded text-[10px] font-bold border border-slate-700 transition-colors"
-            >
-              Clear
-            </button>
-            <button className="px-3 py-1 bg-slate-700/50 hover:bg-slate-700 text-white rounded text-[10px] font-bold border border-slate-700 transition-colors">
-              Print Settings
-            </button>
-            <button className="px-3 py-1 bg-slate-700/50 hover:bg-slate-700 text-white rounded text-[10px] font-bold border border-slate-700 transition-colors">
-              Select Language
-            </button>
-
-            {/* Voice assistant widget */}
-            <button className="px-3 py-1 bg-indigo-650 hover:bg-indigo-700 text-white rounded text-[10px] font-extrabold flex items-center gap-1.5 shadow-xs transition-colors bg-indigo-600">
-              <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse border border-white"></span>
-              Ask DocAssist AI
-            </button>
-          </div>
-
-          <div className="text-[10px] text-slate-400 font-bold tracking-wide">
-            Push Updates: Live
-          </div>
-
-          {/* Core finish buttons */}
-          <div className="flex items-center gap-2">
-            <button className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded text-[11px] font-bold flex items-center gap-1 transition-colors">
-              Preview
-            </button>
-            <button className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
-            </button>
-            <button
-              onClick={handleFinishPrescription}
-              className="px-5 py-1.5 bg-primary hover:bg-primary-hover text-white rounded text-[11px] font-extrabold shadow-md transition-colors"
-            >
-              Finish Prescription
-            </button>
-          </div>
-        </footer>
-
-      </div>
-    );
+          <script>
+            window.onload = function() {
+              window.print();
+              window.onafterprint = function() { window.close(); };
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   if (!sessionLoaded) {
@@ -1945,10 +1562,7 @@ function DashboardContent() {
     );
   }
 
-  // --- DASHBOARD SKELETON RENDER ---
-  if (activeView === "prescription" && currentRxPatient) {
-    return renderPrescriptionPad();
-  }
+
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#F5F6F8]">
@@ -2353,61 +1967,21 @@ function DashboardContent() {
                         </div>
                       )}
                     </div>
-
-                    <button className="px-2 py-0.5 border border-[#CBD5E0] hover:bg-gray-50 rounded text-[10px] font-bold text-[#4A5568] flex items-center gap-1 transition-colors">
-                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                      </svg>
-                      Walkin
-                    </button>
-
-                    <button className="px-2 py-0.5 border border-[#CBD5E0] hover:bg-gray-50 rounded text-[10px] font-bold text-[#4A5568] flex items-center gap-1.5 transition-colors">
-                      <svg className="w-2.5 h-2.5 text-orange-500 fill-orange-500/20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h45m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Assessment
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 border border-white"></span>
-                    </button>
                   </div>
 
                   <div className="flex items-center gap-1.5 w-full md:w-auto flex-wrap justify-end">
-                    <div className="flex items-center border border-[#CBD5E0] rounded overflow-hidden h-6">
-                      <span className="px-1 text-[10px] font-bold text-text-secondary select-none">₹</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={patient.billAmount}
-                        onWheel={(e) => e.currentTarget.blur()}
-                        onChange={(e) => handleBillAmountChange(patient.id, Number(e.target.value))}
-                        className="w-10 text-[10px] font-bold text-center focus:outline-none bg-transparent"
-                      />
-                      <div className="w-[1px] h-full bg-[#CBD5E0]"></div>
-                      <select
-                        value={patient.paymentMethod}
-                        onChange={(e) => handlePaymentMethodChange(patient.id, e.target.value)}
-                        className="text-[10px] font-bold bg-transparent px-1 focus:outline-none cursor-pointer"
-                      >
-                        <option value="Cash">Cash</option>
-                        <option value="Online">Online</option>
-                      </select>
-                      <span className="pr-1 text-[9px] text-[#A0AEC0] select-none">▶</span>
+                    {/* Non-editable Bill amount and Payment badge */}
+                    <div className="flex items-center border border-[#CBD5E0] bg-gray-50 rounded overflow-hidden h-6 select-none px-2 gap-1.5 shrink-0">
+                      <span className="text-[10px] font-bold text-[#4A5568]">₹ {patient.billAmount}</span>
+                      <div className="w-[1px] h-3 bg-[#CBD5E0]"></div>
+                      <span className="text-[9px] font-extrabold text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                        {patient.paymentMethod}
+                      </span>
                     </div>
 
                     <button
-                      onClick={() => handleCreateAbha(patient.id)}
-                      disabled={patient.isAbhaCreated}
-                      className={`px-2 h-6 border rounded text-[10px] font-bold transition-all ${
-                        patient.isAbhaCreated
-                          ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                          : "border-primary/30 text-primary hover:bg-primary/5 hover:border-primary/50"
-                      }`}
-                    >
-                      {patient.isAbhaCreated ? "✓ ABHA Card" : "+ Create Abha"}
-                    </button>
-
-                    <button
                       onClick={() => handleOpenVitalsModal(patient.id)}
-                      className="px-2 h-6 border border-[#CBD5E0] hover:bg-gray-50 rounded text-[10px] font-bold text-[#4A5568] flex items-center gap-1"
+                      className="px-2 h-6 border border-[#CBD5E0] hover:bg-gray-50 rounded text-[10px] font-bold text-[#4A5568] flex items-center gap-1 transition-colors shrink-0"
                     >
                       <svg className="w-2.5 h-2.5 text-text-secondary" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -2418,7 +1992,7 @@ function DashboardContent() {
                       )}
                     </button>
 
-                    <button className="w-6 h-6 border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 rounded flex items-center justify-center shrink-0">
+                    <button className="w-6 h-6 border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 rounded flex items-center justify-center shrink-0 transition-colors">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
                       </svg>
@@ -2429,7 +2003,7 @@ function DashboardContent() {
                         setSelectedBookingPatient(patient);
                         openBooking(patient.id);
                       }}
-                      className="w-6 h-6 border border-[#CBD5E0] hover:bg-gray-50 rounded flex items-center justify-center shrink-0 text-primary"
+                      className="w-6 h-6 border border-[#CBD5E0] hover:bg-gray-50 rounded flex items-center justify-center shrink-0 text-primary transition-colors"
                       title="Edit Patient Info"
                     >
                       <svg className="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -2437,7 +2011,6 @@ function DashboardContent() {
                       </svg>
                     </button>
 
-                    {/* Add Prescription Primary Action Button replacing Ongoing/Resume */}
                     <button
                       onClick={() => {
                         openPrescription(patient.id);
@@ -2448,6 +2021,30 @@ function DashboardContent() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                       </svg>
                       Add Rx
+                    </button>
+
+                    {/* Print Bill Button */}
+                    <button
+                      onClick={() => handlePrintBill(patient.id)}
+                      className="px-2 h-6 border border-[#CBD5E0] hover:bg-gray-50 rounded text-[10px] font-bold text-[#4A5568] flex items-center gap-1 transition-colors shrink-0"
+                      title="Print Bill"
+                    >
+                      <svg className="w-2.5 h-2.5 text-[#4A5568]" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      </svg>
+                      Print Bill
+                    </button>
+
+                    {/* Print Prescription Button */}
+                    <button
+                      onClick={() => handlePrintPrescription(patient.id)}
+                      className="px-2 h-6 border border-[#CBD5E0] hover:bg-gray-50 rounded text-[10px] font-bold text-[#4A5568] flex items-center gap-1 transition-colors shrink-0"
+                      title="Print Prescription"
+                    >
+                      <svg className="w-2.5 h-2.5 text-[#4A5568]" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Print Prescription
                     </button>
 
                     <button
@@ -3597,164 +3194,7 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* SYMPTOMS MORE OPTIONS MODAL */}
-        {activeMoreOptionsSymptomId && (() => {
-          const sym = symptoms.find(s => s.id === activeMoreOptionsSymptomId);
-          if (!sym) return null;
-          return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-in fade-in duration-150">
-              <div className="bg-white w-full max-w-lg rounded-lg border border-[#E5E7EB] shadow-xl overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
-                
-                {/* Header */}
-                <div className="p-4 border-b border-slate-100 flex items-center justify-between select-none">
-                  <h3 className="text-[13px] font-extrabold text-[#1e293b]">
-                    {sym.name || "Symptom Detail"} | {sym.duration || "No duration"} | {sym.severity || "No severity"}
-                  </h3>
-                  <button
-                    onClick={() => setActiveMoreOptionsSymptomId(null)}
-                    className="text-[#94A3B8] hover:text-slate-600 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
 
-                {/* Form fields */}
-                <div className="p-5 space-y-4 overflow-y-auto flex-1">
-                  
-                  {/* Select Headache site */}
-                  <div className="space-y-1 relative">
-                    <label className="block text-[10px] font-extrabold text-slate-500 uppercase select-none">
-                      Select Headache site
-                    </label>
-                    <input
-                      type="text"
-                      value={headacheSite}
-                      onChange={(e) => setHeadacheSite(e.target.value)}
-                      onFocus={() => setHeadacheSiteFocused(true)}
-                      onBlur={() => setTimeout(() => setHeadacheSiteFocused(false), 200)}
-                      placeholder="Select Headache site"
-                      className="w-full h-8 px-2.5 border border-[#CBD5E0] focus:border-primary rounded-md text-[11px] bg-white focus:outline-none"
-                    />
-                    {headacheSiteFocused && (
-                      <div className="absolute left-0 top-full mt-1 z-35 w-full bg-white border border-[#CBD5E0] rounded-md shadow-lg max-h-40 overflow-y-auto p-1 space-y-0.5">
-                        {SUGGESTED_HEADACHE_SITES.filter(h => !headacheSite || h.toLowerCase().includes(headacheSite.toLowerCase())).map(opt => (
-                          <div
-                            key={opt}
-                            onMouseDown={() => setHeadacheSite(opt)}
-                            className="p-1.5 hover:bg-slate-50 rounded cursor-pointer text-[11px] font-bold text-[#334155] border-b border-[#F1F5F9] last:border-b-0"
-                          >
-                            {opt}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Select Type of pain */}
-                  <div className="space-y-1 relative">
-                    <label className="block text-[10px] font-extrabold text-slate-500 uppercase select-none">
-                      Select Type of pain
-                    </label>
-                    <input
-                      type="text"
-                      value={typeOfPain}
-                      onChange={(e) => setTypeOfPain(e.target.value)}
-                      onFocus={() => setTypeOfPainFocused(true)}
-                      onBlur={() => setTimeout(() => setTypeOfPainFocused(false), 200)}
-                      placeholder="Select Type of pain"
-                      className="w-full h-8 px-2.5 border border-[#CBD5E0] focus:border-primary rounded-md text-[11px] bg-white focus:outline-none"
-                    />
-                    {typeOfPainFocused && (
-                      <div className="absolute left-0 top-full mt-1 z-35 w-full bg-white border border-[#CBD5E0] rounded-md shadow-lg max-h-40 overflow-y-auto p-1 space-y-0.5">
-                        {SUGGESTED_PAIN_TYPES.filter(p => !typeOfPain || p.toLowerCase().includes(typeOfPain.toLowerCase())).map(opt => (
-                          <div
-                            key={opt}
-                            onMouseDown={() => setTypeOfPain(opt)}
-                            className="p-1.5 hover:bg-slate-50 rounded cursor-pointer text-[11px] font-bold text-[#334155] border-b border-[#F1F5F9] last:border-b-0"
-                          >
-                            {opt}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Clinical course */}
-                  <div className="space-y-1">
-                    <label className="block text-[10px] font-extrabold text-slate-500 uppercase select-none">
-                      Clinical course
-                    </label>
-                    <select
-                      value={clinicalCourse}
-                      onChange={(e) => setClinicalCourse(e.target.value)}
-                      className="w-full h-8 px-2 border border-[#CBD5E0] focus:border-primary rounded-md text-[11px] bg-white focus:outline-none font-bold text-[#334155]"
-                    >
-                      <option value="Acute">Acute</option>
-                      <option value="Subacute">Subacute</option>
-                      <option value="Chronic">Chronic</option>
-                      <option value="Recurrent">Recurrent</option>
-                    </select>
-                  </div>
-
-                  {/* Note with mockup styling controls */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center select-none">
-                      <label className="block text-[10px] font-extrabold text-slate-500 uppercase">
-                        Note
-                      </label>
-                      <span className="text-[10px] text-slate-400">ⓘ Info</span>
-                    </div>
-                    <div className="border border-[#CBD5E0] rounded-md overflow-hidden bg-white">
-                      <div className="flex gap-2 text-[10.5px] font-extrabold text-[#718096] border-b pb-1.5 p-2 bg-slate-50 select-none">
-                        <button type="button" className="px-2 py-0.5 hover:bg-slate-200 rounded">B</button>
-                        <button type="button" className="px-2 py-0.5 hover:bg-slate-200 rounded italic">I</button>
-                        <button type="button" className="px-2 py-0.5 hover:bg-slate-200 rounded">Bullet List</button>
-                      </div>
-                      <textarea
-                        rows={4}
-                        value={moreOptionsNote}
-                        onChange={(e) => setMoreOptionsNote(e.target.value)}
-                        placeholder="Enter detailed symptom notes here..."
-                        className="w-full p-2.5 text-[11px] focus:outline-none bg-white font-medium text-[#334155] resize-none"
-                      />
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Footer buttons */}
-                <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-2.5 bg-slate-50 select-none">
-                  <button
-                    type="button"
-                    onClick={() => setActiveMoreOptionsSymptomId(null)}
-                    className="px-4 py-1.5 border border-[#CBD5E0] rounded-md text-[11px] font-bold text-[#4A5568] hover:bg-white transition-all"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSymptoms(symptoms.map(s => s.id === activeMoreOptionsSymptomId ? {
-                        ...s,
-                        headacheSite,
-                        typeOfPain,
-                        clinicalCourse,
-                        note: moreOptionsNote
-                      } : s));
-                      setActiveMoreOptionsSymptomId(null);
-                    }}
-                    className="px-4 py-1.5 bg-primary hover:bg-primary-hover rounded-md text-[11px] font-extrabold text-white transition-all shadow-xs"
-                  >
-                    Save
-                  </button>
-                </div>
-
-              </div>
-            </div>
-          );
-        })()}
       </div>
     </div>
   );

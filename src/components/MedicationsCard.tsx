@@ -58,6 +58,7 @@ async function incrementOption(categoryId: number, value: string) {
 }
 
 interface MedicineItem {
+  id?: number;
   name: string;
   generic: string;
   form?: string;
@@ -68,6 +69,7 @@ async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
     const q = query?.trim() ?? "";
 
     const toItem = (m: any): MedicineItem => ({
+      id: Number(m.id),
       name: m.name ?? "",
       generic: m.salt_composition || m.short_composition1 || "",
       form: m.type?.toLowerCase() || "tablet"
@@ -77,7 +79,7 @@ async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
     if (!q) {
       const { data } = await supabase
         .from("medicine")
-        .select("name, salt_composition, short_composition1, type")
+        .select("id, name, salt_composition, short_composition1, type")
         .order("name", { ascending: true })
         .limit(10);
       return (data || []).map(toItem);
@@ -86,7 +88,7 @@ async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
     // Tier 1: Name STARTS WITH query — uses btree index, very fast on 250k rows
     const { data: tier1 } = await supabase
       .from("medicine")
-      .select("name, salt_composition, short_composition1, type")
+      .select("id, name, salt_composition, short_composition1, type")
       .ilike("name", `${q}%`)
       .order("name", { ascending: true })
       .limit(12);
@@ -98,7 +100,7 @@ async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
     if (results.length < 15) {
       const { data: tier2 } = await supabase
         .from("medicine")
-        .select("name, salt_composition, short_composition1, type")
+        .select("id, name, salt_composition, short_composition1, type")
         .ilike("name", `%${q}%`)
         .not("name", "ilike", `${q}%`)   // exclude starts-with already fetched
         .order("name", { ascending: true })
@@ -115,7 +117,7 @@ async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
     if (results.length < 8) {
       const { data: tier3 } = await supabase
         .from("medicine")
-        .select("name, salt_composition, short_composition1, type")
+        .select("id, name, salt_composition, short_composition1, type")
         .or(`salt_composition.ilike.${q}%,short_composition1.ilike.${q}%`)
         .order("name", { ascending: true })
         .limit(8);
@@ -147,17 +149,18 @@ async function insertMedicineIntoDb(name: string, generic: string = "", type: st
         short_composition1: generic,
         type: type.charAt(0).toUpperCase() + type.slice(1)
       })
-      .select("name, salt_composition, short_composition1, type")
+      .select("id, name, salt_composition, short_composition1, type")
       .single();
     if (error) throw error;
     return {
+      id: Number(data.id),
       name: data.name ?? name,
       generic: data.salt_composition || data.short_composition1 || generic,
       form: data.type?.toLowerCase() || type
     };
   } catch (err) {
     console.error("Error inserting medicine:", err);
-    return { name, generic, form: type };
+    return { id: customId, name, generic, form: type };
   }
 }
 
@@ -178,6 +181,7 @@ async function updateMedicineGenericName(name: string, generic: string) {
 /* ─── Types ─────────────────────────────────────────────────── */
 interface Medication {
   id: string;
+  medicineId?: number;
   name: string;
   generic: string;
   form?: string;
@@ -214,6 +218,7 @@ function InlineAutoComplete({
 }) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const dropdownClicked = useRef(false);
+  const autoRef = useRef<any>(null);
 
   const search = (event: { query: string }) => {
     const query = event.query.trim();
@@ -274,12 +279,18 @@ function InlineAutoComplete({
   return (
     <div className="w-full h-full relative primereact-autocomplete-inline">
       <AutoComplete
+        ref={autoRef}
         value={value}
         suggestions={suggestions}
         completeMethod={search}
         onChange={(e) => onChange(e.value)}
         onSelect={handleSelect}
         onBlur={handleBlur}
+        minLength={0}
+        onFocus={(e) => {
+          search({ query: value || "" });
+          autoRef.current?.search(e, value || "", "dropdown");
+        }}
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
@@ -297,6 +308,7 @@ function InlineMedicineAutoComplete({
   value,
   onChange,
   onSelect,
+  onBlur,
   placeholder,
   onAfterSelect,
   onInputRef,
@@ -304,6 +316,7 @@ function InlineMedicineAutoComplete({
   value: string;
   onChange: (v: string) => void;
   onSelect: (med: MedicineItem) => void;
+  onBlur?: (v: string) => void;
   placeholder?: string;
   onAfterSelect?: () => void;
   onInputRef?: (el: HTMLInputElement | null) => void;
@@ -311,6 +324,7 @@ function InlineMedicineAutoComplete({
   const [suggestions, setSuggestions] = useState<MedicineItem[]>([]);
   const dropdownClicked = useRef(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const autoRef = useRef<any>(null);
 
   /* Debounce DB queries — avoids hitting Supabase on every keystroke */
   const search = (event: { query: string }) => {
@@ -337,6 +351,7 @@ function InlineMedicineAutoComplete({
         return;
       }
       onChange(val);
+      if (onBlur) onBlur(val);
     }, 180);
   };
 
@@ -352,6 +367,7 @@ function InlineMedicineAutoComplete({
   return (
     <div className="w-full h-full relative primereact-autocomplete-inline flex items-center">
       <AutoComplete
+        ref={autoRef}
         value={value}
         suggestions={suggestions}
         completeMethod={search}
@@ -365,6 +381,11 @@ function InlineMedicineAutoComplete({
         }}
         onSelect={handleSelect}
         onBlur={handleBlur}
+        minLength={0}
+        onFocus={(e) => {
+          search({ query: value || "" });
+          autoRef.current?.search(e, value || "", "dropdown");
+        }}
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
@@ -451,25 +472,30 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
     let generic = med.generic ? med.generic.trim() : "";
     let form = med.form ?? "tablet";
 
+    let medicineId: number | undefined;
+
     // If it's a new custom entry, insert it into public.medicine in Supabase
     const { data: existing } = await supabase
       .from("medicine")
-      .select("name, salt_composition, short_composition1, type")
+      .select("id, name, salt_composition, short_composition1, type")
       .eq("name", name)
       .maybeSingle();
 
     if (!existing) {
       const inserted = await insertMedicineIntoDb(name, generic, form);
+      medicineId = inserted.id;
       name = inserted.name;
       generic = inserted.generic;
       form = inserted.form ?? form;
     } else {
+      medicineId = Number(existing.id);
       generic = existing.salt_composition || existing.short_composition1 || generic;
       form = existing.type?.toLowerCase() || form;
     }
 
     const newMed = {
       id: Date.now().toString(),
+      medicineId,
       name,
       generic,
       form,
@@ -649,7 +675,33 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                         value={med.name}
                         onChange={(v) => patch(med.id, { name: v })}
                         onSelect={async (m) => {
-                          patch(med.id, { name: m.name, generic: m.generic, form: m.form });
+                          patch(med.id, { medicineId: m.id, name: m.name, generic: m.generic, form: m.form });
+                        }}
+                        onBlur={async (v) => {
+                          const cleanName = v.trim();
+                          if (!cleanName) return;
+                          
+                          const { data: existing } = await supabase
+                            .from("medicine")
+                            .select("id, name, salt_composition, short_composition1, type")
+                            .eq("name", cleanName)
+                            .maybeSingle();
+
+                          if (existing) {
+                            patch(med.id, { 
+                              medicineId: Number(existing.id), 
+                              generic: existing.salt_composition || existing.short_composition1 || med.generic, 
+                              form: existing.type?.toLowerCase() || med.form 
+                            });
+                          } else {
+                            const inserted = await insertMedicineIntoDb(cleanName, med.generic, med.form || "tablet");
+                            patch(med.id, { 
+                              medicineId: inserted.id, 
+                              name: inserted.name,
+                              generic: inserted.generic,
+                              form: inserted.form 
+                            });
+                          }
                         }}
                         onAfterSelect={() => focusField(med.id, 'dose')}
                         placeholder="Medicine"
