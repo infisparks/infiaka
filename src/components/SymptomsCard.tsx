@@ -425,7 +425,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
   const addSymptom = async (name: string) => {
     if (!name.trim()) return;
     const cleanName = name.trim();
-    setSymptoms((p) => [...p, { id: "temp_" + Date.now(), name: cleanName, duration: "1 Day", severity: "Mild" }]);
+    setSymptoms((p) => [...p, { id: "temp_" + Date.now(), name: cleanName, duration: "", severity: "" }]);
     setSearchVal("");
     setSearchOpen(false);
     setSearchHi(-1);

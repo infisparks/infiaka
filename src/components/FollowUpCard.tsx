@@ -31,6 +31,29 @@ export default function FollowUpCard({
 
   // Parse value to calculate target date
   useEffect(() => {
+    if (!followUpVal) {
+      setCalcDate("");
+      return;
+    }
+
+    // Check if it is a formatted date string YYYY-MM-DD
+    if (followUpVal.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const d = new Date(followUpVal);
+      if (!isNaN(d.getTime())) {
+        const options: Intl.DateTimeFormatOptions = {
+          weekday: "long",
+          day: "numeric",
+          month: "short",
+          year: "2-digit"
+        };
+        const formatted = d.toLocaleDateString("en-US", options);
+        const yearPart = d.getFullYear().toString().slice(-2);
+        const output = formatted.replace(new RegExp(d.getFullYear().toString(), "g"), `'${yearPart}`);
+        setCalcDate(output);
+        return;
+      }
+    }
+
     const parseDays = (val: string): number => {
       const match = val.match(/^(\d+)\s*(day|week|month|year)s?$/i);
       if (match) {
@@ -55,9 +78,7 @@ export default function FollowUpCard({
         month: "short",
         year: "2-digit"
       };
-      // Format as "Wednesday, 22 Jul'26"
       const formatted = d.toLocaleDateString("en-US", options);
-      // Replace "2026" with "'26"
       const yearPart = d.getFullYear().toString().slice(-2);
       const output = formatted.replace(new RegExp(d.getFullYear().toString(), "g"), `'${yearPart}`);
       setCalcDate(output);

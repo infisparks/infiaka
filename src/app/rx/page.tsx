@@ -27,6 +27,40 @@ import ProceduresCard, { ProcedureItem } from "@/components/ProceduresCard";
 import ReferToDoctorCard, { ReferralItem } from "@/components/ReferToDoctorCard";
 import PrintPrescription from "@/components/PrintPrescription";
 
+const getFollowUpDateValue = (val: string): string | null => {
+  if (!val || !val.trim()) return null;
+  const trimmed = val.trim();
+  
+  if (trimmed.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return trimmed;
+  }
+  
+  const match = trimmed.match(/^(\d+)\s*(day|week|month|year)s?$/i);
+  let days = 0;
+  if (match) {
+    const num = parseInt(match[1], 10);
+    const unit = match[2].toLowerCase();
+    if (unit.startsWith("day")) days = num;
+    else if (unit.startsWith("week")) days = num * 7;
+    else if (unit.startsWith("month")) days = num * 30;
+    else if (unit.startsWith("year")) days = num * 365;
+  } else {
+    const rawNum = parseInt(trimmed.replace(/[^\d]/g, ""), 10);
+    if (!isNaN(rawNum)) days = rawNum;
+  }
+  
+  if (days > 0) {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  
+  return null;
+};
+
 interface Patient {
   patient_id?: number;
   id: string;
@@ -164,7 +198,7 @@ function RxPageContent() {
   const [notesForPatient, setNotesForPatient] = useState("");
   const [privateNotes, setPrivateNotes] = useState("");
   const [refDoctorInput, setRefDoctorInput] = useState("");
-  const [followUpVal, setFollowUpVal] = useState("10 Days");
+  const [followUpVal, setFollowUpVal] = useState("");
   const [followUpNotes, setFollowUpNotes] = useState("");
   const [advicesInput, setAdvicesInput] = useState("");
   const [advRest, setAdvRest] = useState(false);
@@ -272,7 +306,7 @@ function RxPageContent() {
     setNotesForPatient("");
     setPrivateNotes("");
     setRefDoctorInput("");
-    setFollowUpVal("10 Days");
+    setFollowUpVal("");
     setFollowUpNotes("");
     setAdvicesInput("");
     setAdvRest(false);
@@ -615,7 +649,7 @@ function RxPageContent() {
         if (regData) {
           setNotesForPatient(regData.notes_for_patient || "");
           setPrivateNotes(regData.private_notes || "");
-          setFollowUpVal(regData.follow_up || "10 Days");
+          setFollowUpVal(regData.follow_up || "");
           setFollowUpNotes(regData.follow_up_notes || "");
           setAdvicesInput(regData.advice || "");
           setAdvRest(regData.advice_rest || false);
@@ -662,7 +696,7 @@ function RxPageContent() {
             setNotesForPatient("");
             setPrivateNotes("");
             setRefDoctorInput("");
-            setFollowUpVal("10 Days");
+            setFollowUpVal("");
             setFollowUpNotes("");
             setAdvicesInput("");
             setAdvRest(false);
@@ -704,7 +738,7 @@ function RxPageContent() {
             sugar,
             notes_for_patient: notesForPatient,
             private_notes: privateNotes,
-            follow_up: followUpVal,
+            follow_up: getFollowUpDateValue(followUpVal),
             follow_up_notes: followUpNotes,
             advice: advicesInput,
             advice_rest: advRest,
@@ -1478,7 +1512,7 @@ function RxPageContent() {
             sugar,
             notes_for_patient: notesForPatient,
             private_notes: privateNotes,
-            follow_up: followUpVal,
+            follow_up: getFollowUpDateValue(followUpVal),
             follow_up_notes: followUpNotes,
             advice: advicesInput,
             advice_rest: advRest,
