@@ -2076,45 +2076,6 @@ function DashboardContent() {
                 </div>
 
                 <div className="w-full md:w-auto flex flex-col items-end gap-1.5 shrink-0 self-stretch md:self-auto border-t md:border-t-0 border-[#E5E7EB] pt-2 md:pt-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {/* Add Tags */}
-                    <div className="relative">
-                      <button
-                        onClick={() =>
-                          setIsTagPopoverOpen(isTagPopoverOpen === patient.id ? null : patient.id)
-                        }
-                        className="px-2 py-0.5 border border-[#CBD5E0] hover:bg-gray-50 rounded text-[10px] font-bold text-[#4A5568] flex items-center gap-1 transition-colors"
-                      >
-                        Add Tags +
-                      </button>
-                      
-                      {isTagPopoverOpen === patient.id && (
-                        <div className="absolute right-0 bottom-full mb-1.5 z-20 w-44 bg-white border border-[#CBD5E0] rounded-md p-1.5 shadow-md">
-                          <input
-                            type="text"
-                            placeholder="Tag name (e.g. Fever)"
-                            value={newTagText}
-                            onChange={(e) => setNewTagText(e.target.value)}
-                            className="w-full p-1 border border-border rounded text-[11px] mb-1.5 focus:outline-none focus:border-primary"
-                          />
-                          <div className="flex justify-end gap-1.5">
-                            <button
-                              onClick={() => setIsTagPopoverOpen(null)}
-                              className="px-2 py-0.5 border border-border text-[9px] rounded hover:bg-gray-50 font-medium"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={() => handleAddTag(patient.id)}
-                              className="px-2 py-0.5 bg-primary text-white text-[9px] rounded hover:bg-primary-hover font-semibold"
-                            >
-                              Add
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
                   <div className="flex items-center gap-1.5 w-full md:w-auto flex-wrap justify-end">
                     {/* Non-editable Bill amount and Payment badge */}
@@ -2139,11 +2100,7 @@ function DashboardContent() {
                       )}
                     </button>
 
-                    <button className="w-6 h-6 border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 rounded flex items-center justify-center shrink-0 transition-colors">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
-                      </svg>
-                    </button>
+
 
                     <button
                       onClick={() => {
@@ -2194,19 +2151,7 @@ function DashboardContent() {
                       Print Prescription
                     </button>
 
-                    <button
-                      onClick={() => handleToggleCompleted(patient.id, patient.opdRegistration?.registration_id)}
-                      className="w-6 h-6 border border-red-200 text-red-500 bg-red-50/30 hover:bg-red-50 rounded flex items-center justify-center shrink-0 transition-colors"
-                      title={patient.isCompleted ? "Restore patient to queue" : "Checkout patient"}
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                        {patient.isCompleted ? (
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-                        ) : (
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        )}
-                      </svg>
-                    </button>
+
                   </div>
                 </div>
               </div>
