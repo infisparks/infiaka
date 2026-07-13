@@ -537,18 +537,28 @@ function DashboardContent() {
   const [initialSugar, setInitialSugar] = useState("100");
 
   // Tab counts
+  // Helper function to normalize strings for comparison (removes dots, handles whitespace)
+  const normalizeForFilter = (val: string) => {
+    if (!val) return "";
+    return val.toLowerCase().replace(/\./g, "").replace(/\s+/g, " ").trim();
+  };
+
   // Main Dashboard Filtered Patients List
   const filteredAllPatients = useMemo(() => {
     return patients.filter((p) => {
       // 1. Doctor Filter
       if (selectedDoctorFilter !== "All") {
-        if (p.opdRegistration?.treating_doctor?.toLowerCase() !== selectedDoctorFilter.toLowerCase()) {
+        const docReg = normalizeForFilter(p.opdRegistration?.treating_doctor || "");
+        const docSelect = normalizeForFilter(selectedDoctorFilter);
+        if (docReg !== docSelect) {
           return false;
         }
       }
       // 2. Clinic/Hospital Filter
       if (selectedClinicFilter !== "All") {
-        if (p.opdRegistration?.clinic_name?.toLowerCase() !== selectedClinicFilter.toLowerCase()) {
+        const clinicReg = normalizeForFilter(p.opdRegistration?.clinic_name || "");
+        const clinicSelect = normalizeForFilter(selectedClinicFilter);
+        if (clinicReg !== clinicSelect) {
           return false;
         }
       }
