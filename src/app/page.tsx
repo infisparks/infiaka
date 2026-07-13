@@ -1266,7 +1266,7 @@ function DashboardContent() {
       // Map values
       const servicesList = patient.opdRegistration?.services || [];
       const discount = Number(patient.opdRegistration?.discount_amount) || 0;
-      const totalFees = servicesList.reduce((acc: number, s: any) => acc + (Number(s.fee) || 0), 0);
+      const totalFees = servicesList.reduce((acc: number, s: any) => acc + (Number(s.fee) || 0) * (s.type === 'product' ? (Number(s.qty) || 1) : 1), 0);
       const paymentsList = patient.opdRegistration?.payments || [];
       const amountPaid = paymentsList.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
       const netAmount = totalFees - discount;
@@ -1279,10 +1279,16 @@ function DashboardContent() {
           total_fees: totalFees,
           discount_amount: discount,
           amount_paid: amountPaid,
-          opd_service: servicesList.map((s: any) => ({
-              service_name: s.name,
-              amount: Number(s.fee) || 0
-          })),
+          opd_service: servicesList.map((s: any) => {
+              const qty = Number(s.qty) || 1;
+              const isProduct = s.type === 'product';
+              const name = isProduct ? `${s.name} x ${qty}` : s.name;
+              const lineTotal = (Number(s.fee) || 0) * (isProduct ? qty : 1);
+              return {
+                  service_name: name,
+                  amount: lineTotal
+              };
+          }),
           payment_entries: paymentsList.map((p: any) => ({
               time: patient.arrivalTime || new Date().toISOString(),
               mode: p.mode,
@@ -1344,10 +1350,19 @@ function DashboardContent() {
       doc.roundedRect(MARGIN, cardY, CONTENT_W, 16, 0.5, 0.5, "FD");
 
       // Left — Patient info
+      const toTitleCase = (str: string) => {
+        if (!str) return "";
+        return str
+            .toLowerCase()
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+      };
+
       doc.setFont("Poppins", "bold").setFontSize(6).setTextColor(...textGray);
       doc.text("BILL TO", MARGIN + 4, cardY + 5);
       doc.setFont("Poppins", "bold").setFontSize(10).setTextColor(...primaryColor);
-      doc.text(p.name.toUpperCase(), MARGIN + 4, cardY + 9.5);
+      doc.text(toTitleCase(p.name), MARGIN + 4, cardY + 9.5);
       doc.setFont("Poppins", "normal").setFontSize(7.5).setTextColor(...textDark);
       doc.text(`${p.age || '0'} ${p.age_unit || 'Y'} / ${p.gender}   •   UHID: ${p.uhid}`, MARGIN + 4, cardY + 14);
 
