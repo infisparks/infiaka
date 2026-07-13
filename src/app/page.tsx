@@ -3,6 +3,9 @@
 import React, { useState, useMemo, Suspense, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import QRCode from "qrcode";
 
 
 
@@ -1240,106 +1243,300 @@ function DashboardContent() {
 
 
 
-  const handlePrintBill = (patientId: string) => {
+  const handlePrintBill = async (patientId: string) => {
     const patient = patients.find(p => p.id === patientId);
     if (!patient) return;
-    
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
 
-    const servicesList = patient.opdRegistration?.services || [];
-    const discount = patient.opdRegistration?.discount_amount || 0;
-    const totalFees = servicesList.reduce((acc: number, s: any) => acc + (Number(s.fee) || 0), 0);
-    const amountPaid = totalFees - discount;
+    try {
+      const isWhatsapp = false; // default print format is A5 Landscape
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Bill Receipt - ${patient.name}</title>
-          <style>
-            body { font-family: 'Inter', sans-serif; padding: 40px; color: #111827; max-width: 600px; margin: 0 auto; }
-            .header { border-bottom: 2px solid #E5E7EB; padding-bottom: 20px; margin-bottom: 20px; }
-            .title { font-size: 24px; font-weight: bold; color: #7C3AED; }
-            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 30px; font-size: 14px; }
-            .table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
-            .table th { border-bottom: 2px solid #E5E7EB; text-align: left; padding: 10px; font-size: 12px; text-transform: uppercase; color: #6B7280; }
-            .table td { border-bottom: 1px solid #E5E7EB; padding: 10px; font-size: 14px; }
-            .summary { margin-left: auto; width: 300px; font-size: 14px; }
-            .summary-row { display: flex; justify-content: space-between; padding: 5px 0; }
-            .total { font-weight: bold; border-top: 1px solid #E5E7EB; padding-top: 10px; font-size: 16px; color: #7C3AED; }
-            .footer { text-align: center; font-size: 12px; color: #9CA3AF; margin-top: 50px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="title">${patient.opdRegistration?.clinic_name || "OPD CLINIC"}</div>
-            <p style="margin: 5px 0 0 0; color: #6B7280; font-size: 14px;">Receipt of Payment</p>
-          </div>
-          <div class="info-grid">
-            <div>
-              <strong>Patient Name:</strong> ${patient.title || "Mr/Mrs"} ${patient.name}<br>
-              <strong>Age/Gender:</strong> ${patient.age}y / ${patient.gender}<br>
-              <strong>Phone:</strong> ${patient.phone}
-            </div>
-            <div style="text-align: right;">
-              <strong>Date:</strong> ${new Date().toLocaleDateString('en-IN')}<br>
-              <strong>Receipt No:</strong> REC-${patientId.slice(-6)}<br>
-              <strong>Treating Doctor:</strong> ${patient.opdRegistration?.treating_doctor || "N/A"}
-            </div>
-          </div>
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Service / Item</th>
-                <th>Type</th>
-                <th style="text-align: right;">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${servicesList.length > 0 ? servicesList.map((s: any) => `
-                <tr>
-                  <td>${s.name}</td>
-                  <td>${s.type === 'product' ? 'Product' : 'Service'}</td>
-                  <td style="text-align: right;">₹${s.fee}</td>
-                </tr>
-              `).join('') : `
-                <tr>
-                  <td>Consultation Fee</td>
-                  <td>Service</td>
-                  <td style="text-align: right;">₹${patient.billAmount}</td>
-                </tr>
-              `}
-            </tbody>
-          </table>
-          <div class="summary">
-            <div class="summary-row">
-              <span>Subtotal</span>
-              <span>₹${totalFees || patient.billAmount}</span>
-            </div>
-            ${discount > 0 ? `
-              <div class="summary-row">
-                <span>Discount</span>
-                <span>- ₹${discount}</span>
-              </div>
-            ` : ''}
-            <div class="summary-row total">
-              <span>Total Paid (${patient.paymentMethod})</span>
-              <span>₹${amountPaid || patient.billAmount}</span>
-            </div>
-          </div>
-          <div class="footer">
-            Thank you for visiting! Get well soon.
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              window.onafterprint = function() { window.close(); };
-            }
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+      // Page parameters
+      const PAGE_W = 210; // Width is 210mm for A4 Portrait and A5 Landscape
+      const PAGE_H = isWhatsapp ? 297 : 148; // Height is 297mm for A4 and 148mm for A5
+      const MARGIN = 12;
+      const CONTENT_W = PAGE_W - MARGIN * 2;
+
+      const doc = new jsPDF({
+          orientation: isWhatsapp ? 'p' : 'l', // Portrait for WhatsApp, Landscape for print
+          unit: 'mm',
+          format: isWhatsapp ? 'a4' : 'a5',
+          compress: true
+      });
+
+      // Map values
+      const servicesList = patient.opdRegistration?.services || [];
+      const discount = Number(patient.opdRegistration?.discount_amount) || 0;
+      const totalFees = servicesList.reduce((acc: number, s: any) => acc + (Number(s.fee) || 0), 0);
+      const paymentsList = patient.opdRegistration?.payments || [];
+      const amountPaid = paymentsList.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
+      const netAmount = totalFees - discount;
+      const balance = netAmount - amountPaid;
+
+      const opd = {
+          id: patient.opdRegistration?.registration_id || patientId,
+          uhid: patient.id,
+          created_at: patient.opdRegistration?.appointment_date_time || new Date().toISOString(),
+          total_fees: totalFees,
+          discount_amount: discount,
+          amount_paid: amountPaid,
+          opd_service: servicesList.map((s: any) => ({
+              service_name: s.name,
+              amount: Number(s.fee) || 0
+          })),
+          payment_entries: paymentsList.map((p: any) => ({
+              time: patient.arrivalTime || new Date().toISOString(),
+              mode: p.mode,
+              amount: Number(p.amount) || 0
+          }))
+      };
+
+      const p = { name: patient.name, uhid: patient.id || "N/A", gender: patient.gender || "N/A", age: patient.age, age_unit: patient.ageUnit };
+
+      // Generate QR code data URI
+      const qrData = await QRCode.toDataURL(`BILL_${opd.id}_${opd.uhid || 'N/A'}`, { margin: 1, width: 80, errorCorrectionLevel: 'L' });
+
+      // Load Poppins fonts from jsDelivr CDN
+      let fontName = "helvetica";
+      try {
+        const [regRes, boldRes] = await Promise.all([
+          fetch("https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Regular.ttf").then(res => res.arrayBuffer()),
+          fetch("https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf").then(res => res.arrayBuffer())
+        ]);
+
+        const toBase64 = (buffer: ArrayBuffer) => {
+          let binary = "";
+          const bytes = new Uint8Array(buffer);
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          return window.btoa(binary);
+        };
+
+        const regularBase64 = toBase64(regRes);
+        const boldBase64 = toBase64(boldRes);
+
+        doc.addFileToVFS("Poppins-Regular.ttf", regularBase64);
+        doc.addFont("Poppins-Regular.ttf", "Poppins", "normal");
+        doc.addFileToVFS("Poppins-Bold.ttf", boldBase64);
+        doc.addFont("Poppins-Bold.ttf", "Poppins", "bold");
+        fontName = "Poppins";
+      } catch (e) {
+        console.error("Failed to load Poppins web fonts, falling back to Helvetica:", e);
+      }
+
+      doc.setFont(fontName);
+
+      // ── Color Palette ──────────────────────────────────────────────
+      const primaryColor: [number, number, number]  = [107, 33, 168];   // Deep Purple
+      const primaryLight: [number, number, number]  = [243, 232, 255];  // Purple-100
+      const primaryDark: [number, number, number]   = [76, 29, 149];    // Purple-900
+      const textDark: [number, number, number]      = [15, 23, 42];
+      const textGray: [number, number, number]      = [100, 116, 139];
+      const borderColor: [number, number, number]   = [226, 232, 240];  // slate-200
+      const redColor: [number, number, number]      = [220, 38, 38];
+      const greenColor: [number, number, number]    = [22, 163, 74];
+
+      // ── Header branding when not WhatsApp ──────────────────────────
+      if (!isWhatsapp) {
+          doc.setFont("Poppins", "bold").setFontSize(14).setTextColor(...primaryColor);
+          doc.text((patient.opdRegistration?.clinic_name || "OPD CLINIC").toUpperCase(), MARGIN, 15);
+          
+          doc.setFont("Poppins", "normal").setFontSize(7.5).setTextColor(...textGray);
+          doc.text("Comprehensive & Advanced Healthcare Center", MARGIN, 19);
+          doc.text("Treating Doctor: " + (patient.opdRegistration?.treating_doctor || "DR. LAXMAN SALVE"), MARGIN, 23);
+          
+          doc.setFont("Poppins", "normal").setFontSize(7).setTextColor(...textGray);
+          doc.text("Receipt of Payment", PAGE_W - MARGIN, 15, { align: "right" });
+          doc.text("Reg No: 123456", PAGE_W - MARGIN, 19, { align: "right" });
+          
+          // Separator line
+          doc.setDrawColor(...borderColor).setLineWidth(0.3);
+          doc.line(MARGIN, 26, PAGE_W - MARGIN, 26);
+      }
+
+      // ── PATIENT PROFILE CARD ───────────────────────────────────────
+      const cardY = isWhatsapp ? 43 : 29;
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(...borderColor);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(MARGIN, cardY, CONTENT_W, 16, 0.5, 0.5, "FD");
+
+      // Left — Patient info
+      doc.setFont("Poppins", "bold").setFontSize(6).setTextColor(...textGray);
+      doc.text("BILL TO", MARGIN + 4, cardY + 5);
+      doc.setFont("Poppins", "bold").setFontSize(10).setTextColor(...primaryColor);
+      doc.text(p.name.toUpperCase(), MARGIN + 4, cardY + 9.5);
+      doc.setFont("Poppins", "normal").setFontSize(7.5).setTextColor(...textDark);
+      doc.text(`${p.age || '0'} ${p.age_unit || 'Y'} / ${p.gender}   •   UHID: ${p.uhid}`, MARGIN + 4, cardY + 14);
+
+      // QR Code on the far right of the card (small 8mm size)
+      doc.addImage(qrData, 'PNG', PAGE_W - MARGIN - 11, cardY + 4, 8, 8, undefined, 'FAST');
+
+      // Right — Invoice ID, Date, Badge (shifted left to make room for QR)
+      doc.setFont("Poppins", "bold").setFontSize(9).setTextColor(...textDark);
+      doc.text("INVOICE #" + opd.id, PAGE_W - MARGIN - 13, cardY + 6.5, { align: "right" });
+      
+      // Date offset alignment
+      doc.setFont("Poppins", "normal").setFontSize(7).setTextColor(...textGray);
+      doc.text("Date: " + new Date(opd.created_at).toLocaleDateString('en-GB'), PAGE_W - MARGIN - 35, cardY + 11.5, { align: "right" });
+
+      // Status Badge
+      const isPaid = (amountPaid >= netAmount);
+      const statusText = isPaid ? "PAID" : "PARTIAL";
+      const bgBadge   = isPaid ? [220, 252, 231] : [254, 243, 199];
+      const textBadge = isPaid ? [21, 128, 61]   : [180, 83, 9];
+      
+      doc.setFillColor(bgBadge[0], bgBadge[1], bgBadge[2]);
+      doc.roundedRect(PAGE_W - MARGIN - 31, cardY + 8.5, 18, 4.5, 0.5, 0.5, "F");
+      doc.setFont("Poppins", "bold").setFontSize(5.5).setTextColor(textBadge[0], textBadge[1], textBadge[2]);
+      doc.text(statusText, PAGE_W - MARGIN - 22, cardY + 11.8, { align: "center" });
+
+      const cardSpacing = isWhatsapp ? 19 : 17;
+      let currentY = cardY + cardSpacing;
+
+      // ── SUMMARY TABLE ──────────────────────────────────────────────
+      let tableBody = [];
+      if (opd.opd_service.length > 0) {
+          tableBody = opd.opd_service.map((s: any, index: number) => [
+              (index + 1).toString(),
+              s.service_name,
+              `₹${parseFloat(s.amount || 0).toFixed(2)}`
+          ]);
+      } else {
+          tableBody = [["1", "Outpatient Consultation / Visit Fees", `₹${totalFees.toFixed(2)}`]];
+      }
+
+      const headFontSize = isWhatsapp ? 7.5 : 7;
+      const bodyFontSize = isWhatsapp ? 8 : 7.5;
+      const headPadding = isWhatsapp ? { top: 2.2, bottom: 2.2, left: 3, right: 3 } : { top: 1.5, bottom: 1.5, left: 3, right: 3 };
+      const bodyPadding = isWhatsapp ? 3 : 1.8;
+
+      autoTable(doc, {
+          startY: currentY,
+          head: [['#', 'DESCRIPTION', 'AMOUNT']],
+          body: tableBody,
+          theme: 'plain',
+          headStyles: {
+              fillColor: primaryLight,
+              textColor: primaryColor,
+              fontSize: headFontSize,
+              font: 'Poppins',
+              fontStyle: 'bold',
+              lineWidth: { bottom: 0.3 },
+              lineColor: [216, 180, 254],
+              cellPadding: headPadding
+          },
+          bodyStyles: {
+              fontSize: bodyFontSize,
+              font: 'Poppins',
+              cellPadding: bodyPadding,
+              textColor: textDark,
+              lineWidth: 0.05,
+              lineColor: [241, 245, 249]
+          },
+          columnStyles: {
+              0: { cellWidth: 10, halign: 'center' },
+              2: { halign: 'right', fontStyle: 'bold', cellWidth: 30 }
+          },
+          margin: { left: MARGIN, right: MARGIN }
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + (isWhatsapp ? 2 : 1.5);
+      const totalsStartY = currentY;
+
+      // ── TOTALS SECTION ─────────────────────────────────────────────
+      const totalsLabelX = PAGE_W - MARGIN - 45;
+      const totalsValueX = PAGE_W - MARGIN;
+      const totalsBoxX = PAGE_W - MARGIN - 50;
+      const totalsBoxW = 50;
+
+      const rowGap = isWhatsapp ? 4.2 : 3.4;
+
+      const drawRow = (label: string, value: number, color: [number, number, number] = textDark, isBold = false, size = 7.5) => {
+          doc.setFont("Poppins", isBold ? "bold" : "normal")
+             .setFontSize(isWhatsapp ? size : size - 0.5)
+             .setTextColor(color[0], color[1], color[2]);
+          doc.text(label, totalsLabelX, currentY);
+          doc.text(`₹${value.toFixed(2)}`, totalsValueX, currentY, { align: "right" });
+          currentY += rowGap;
+      };
+
+      drawRow("Sub Total:", totalFees, textGray);
+      if (discount > 0) drawRow("Discount:", discount, greenColor);
+
+      currentY += isWhatsapp ? 1.0 : 0.5; // Ample spacing below Sub Total / Discount row
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]).setLineWidth(0.25).line(totalsBoxX, currentY, PAGE_W - MARGIN, currentY);
+      currentY += isWhatsapp ? 4.0 : 3.0; // Ample spacing below line before drawing bold Total Payable text
+      
+      drawRow("Total Payable:", netAmount, textDark, true, 8);
+      drawRow("Paid Amount:", amountPaid, textGray, false, 7.5);
+
+      // Balance Due Callout Box
+      const isDue = balance > 0;
+      const balanceBg   = isDue ? [254, 242, 242] : [240, 253, 244];
+      const balanceText = isDue ? redColor : greenColor;
+      const balanceBorderColor = isDue ? [254, 202, 202] : [187, 247, 208];
+
+      const balanceBoxH = isWhatsapp ? 6 : 5;
+      const balanceTextOffset = isWhatsapp ? 2.5 : 2.0;
+
+      doc.setFillColor(balanceBg[0], balanceBg[1], balanceBg[2]);
+      doc.setDrawColor(balanceBorderColor[0], balanceBorderColor[1], balanceBorderColor[2]);
+      doc.setLineWidth(0.25);
+      doc.roundedRect(totalsBoxX, currentY - 2, totalsBoxW, balanceBoxH, 0.5, 0.5, "FD");
+      doc.setFont("Poppins", "bold").setFontSize(isWhatsapp ? 8.5 : 8.0).setTextColor(balanceText[0], balanceText[1], balanceText[2]);
+      doc.text("BALANCE DUE:", totalsBoxX + 4, currentY - 2 + balanceTextOffset + 0.8);
+      doc.text(`₹${balance.toFixed(2)}`, totalsValueX - 2, currentY - 2 + balanceTextOffset + 0.8, { align: "right" });
+      currentY += isWhatsapp ? 8 : 5.5;
+
+      const paymentEntries = opd.payment_entries || [];
+      if (paymentEntries.length > 0) {
+          doc.setFont("Poppins", "bold").setFontSize(7).setTextColor(textGray[0], textGray[1], textGray[2]);
+          doc.text("PAYMENT HISTORY", MARGIN, totalsStartY + 3);
+          autoTable(doc, {
+              startY: totalsStartY + 4.5,
+              head: [['Date', 'Mode', 'Amount']],
+              body: paymentEntries.map((e: any) => {
+                  const amt = parseFloat(e.amount || 0);
+                  const mode = (e.mode || 'CASH').toUpperCase();
+                  const displayAmt = mode === 'REFUND' ? `- ₹${amt.toFixed(2)}` : `₹${amt.toFixed(2)}`;
+                  return [
+                      e.time ? new Date(e.time).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
+                      mode,
+                      displayAmt
+                  ];
+              }),
+              theme: 'grid',
+              headStyles: { fillColor: primaryLight, textColor: primaryColor, fontSize: 6.5, font: 'Poppins', fontStyle: 'bold', cellPadding: isWhatsapp ? 1.5 : 1.0 },
+              bodyStyles: { fontSize: isWhatsapp ? 7 : 6.5, font: 'Poppins', cellPadding: isWhatsapp ? 1.5 : 1.0 },
+              margin: { left: MARGIN, right: PAGE_W - totalsBoxX + 4 }
+          });
+      }
+
+      // ── STRICT A5 / A4 BOUNDARY FOOTER ──────────────────────────────
+      const contentEndY = Math.max(currentY, (paymentEntries.length > 0 && (doc as any).lastAutoTable) ? (doc as any).lastAutoTable.finalY : 0);
+      const minFooterY = isWhatsapp ? 120 : 112;
+      const footerY = Math.max(minFooterY, contentEndY + 2); // strictly dynamic positioning with safe minimum boundary
+
+      // Subtle separator line
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]).setLineWidth(0.25).line(MARGIN, footerY, PAGE_W - MARGIN, footerY);
+
+      doc.setFont("Poppins", "bold").setFontSize(6).setTextColor(textGray[0], textGray[1], textGray[2]);
+      doc.text("Scan QR on invoice to verify authenticity", MARGIN, footerY + (isWhatsapp ? 6 : 4.5));
+      doc.setFont("Poppins", "normal").setFontSize(5.5).setTextColor(textGray[0], textGray[1], textGray[2]);
+      doc.text("System generated invoice — No signature required.", MARGIN, footerY + (isWhatsapp ? 10 : 8.0));
+
+      // Signature line on the right
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]).setLineWidth(0.25).line(PAGE_W - MARGIN - 45, footerY + (isWhatsapp ? 9 : 7.0), PAGE_W - MARGIN, footerY + (isWhatsapp ? 9 : 7.0));
+      doc.setFont("Poppins", "bold").setFontSize(6.5).setTextColor(textGray[0], textGray[1], textGray[2]);
+      doc.text("AUTHORIZED SIGNATURE", PAGE_W - MARGIN, footerY + (isWhatsapp ? 13 : 10.5), { align: "right" });
+
+      const pdfBlob = doc.output("blob");
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      window.open(blobUrl, "_blank");
+    } catch (err) {
+      console.error("Error generating bill PDF:", err);
+    }
   };
 
   const handlePrintPrescription = (patientId: string) => {
