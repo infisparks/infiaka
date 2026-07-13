@@ -2778,7 +2778,7 @@ function DashboardContent() {
                   </div>
 
                   <div className="space-y-1 relative">
-                    <label className="text-[10px] font-bold text-[#4A5568]">Referring Doctor</label>
+                    <label className="text-[10px] font-bold text-[#4A5568]">Reference</label>
                     <input
                       type="text"
                       value={referringDoctor}
