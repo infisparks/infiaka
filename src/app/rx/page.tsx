@@ -257,6 +257,40 @@ function RxPageContent() {
       return;
     }
 
+    // Reset all patient-specific states to prevent leaking previous patient details while loading
+    setCurrentRxPatient(null);
+    setBp("");
+    setPulse("");
+    setWeight("");
+    setSpo2("");
+    setSugar("");
+    setSymptoms([]);
+    setDiagnoses([]);
+    setMedications([]);
+    setLabs([]);
+    setLabResults([]);
+    setNotesForPatient("");
+    setPrivateNotes("");
+    setRefDoctorInput("");
+    setFollowUpVal("10 Days");
+    setFollowUpNotes("");
+    setAdvicesInput("");
+    setAdvRest(false);
+    setAdvWater(false);
+    setRxProcedures([]);
+    setReferrals([]);
+    setFamilyItems([]);
+    setConditions([]);
+    setAllergies([]);
+    setProcedures([]);
+    setCurrentMeds([]);
+    setHabits([]);
+    setFoodAllergies([]);
+    setOtherHistory([]);
+    setOtherHistoryTitle("");
+    setTravelHistory([]);
+    setHistNoKnown(false);
+
     const loadPatientData = async () => {
       try {
         setLoading(true);
@@ -1887,7 +1921,7 @@ function RxPageContent() {
       <div className="flex h-screen w-screen items-center justify-center bg-[#F5F6F8] font-sans select-none">
         <div className="text-center space-y-2">
           <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Verifying Session...</p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Loading Patient Records...</p>
         </div>
       </div>
     );
