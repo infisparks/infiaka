@@ -429,10 +429,10 @@ function RxPageContent() {
             }));
             setLabResults(mappedResults);
           } else {
-            setLabResults([{ id: "1", name: "HbA1c (Glycosylated Hemoglobin)", unit: "%", reading: "23", interpretation: "High", date: "11 Jul 26", notes: "" }]);
+            setLabResults([]);
           }
         } else {
-          setLabResults([{ id: "1", name: "HbA1c (Glycosylated Hemoglobin)", unit: "%", reading: "23", interpretation: "High", date: "11 Jul 26", notes: "" }]);
+          setLabResults([]);
         }
 
         // Load vitals into state
@@ -444,6 +444,65 @@ function RxPageContent() {
           setSugar(mappedPatient.vitals.sugar || "");
         }
 
+        // Fetch referrals from aka_refer_to table
+        if (regData?.registration_id) {
+          const { data: refRows, error: refError } = await supabase
+            .from("aka_refer_to")
+            .select("*")
+            .eq("registration_id", regData.registration_id);
+
+          if (refError) {
+            console.error("Failed to load referrals:", refError);
+          } else if (refRows && refRows.length > 0) {
+            setReferrals(refRows.map((r: any) => ({
+              id: String(r.refer_id),
+              doctorName: r.doctor_name || "",
+              notes: r.notes || ""
+            })));
+          } else {
+            setReferrals([]);
+          }
+        } else {
+          setReferrals([{ id: "1", doctorName: "shaikh mudassir", notes: "" }]);
+        }
+
+        // Fetch procedures from aka_procedure table
+        if (regData?.registration_id) {
+          const { data: procRows, error: procError } = await supabase
+            .from("aka_procedure")
+            .select("*")
+            .eq("registration_id", regData.registration_id);
+
+          if (procError) {
+            console.error("Failed to load procedures:", procError);
+          } else if (procRows && procRows.length > 0) {
+            setRxProcedures(procRows.map((r: any) => ({
+              id: String(r.procedure_id),
+              name: r.name || "",
+              duration: r.duration || "",
+              note: r.note || ""
+            })));
+          } else {
+            setRxProcedures([]);
+          }
+        } else {
+          setRxProcedures([
+            { id: "1", name: "Actinotherapy", duration: "After 3 Days", note: "" },
+            { id: "2", name: "APTT", duration: "After 3 Days", note: "" }
+          ]);
+        }
+
+        // Load notes, follow-up and advice from aka_opd_registration if exists
+        if (regData) {
+          setNotesForPatient(regData.notes_for_patient || "");
+          setPrivateNotes(regData.private_notes || "");
+          setFollowUpVal(regData.follow_up || "10 Days");
+          setFollowUpNotes(regData.follow_up_notes || "");
+          setAdvicesInput(regData.advice || "");
+          setAdvRest(regData.advice_rest || false);
+          setAdvWater(regData.advice_water || false);
+        }
+
         // Try load from local storage
         const savedRx = localStorage.getItem(`saved_rx_${rxPatientId}`);
         if (savedRx) {
@@ -452,16 +511,16 @@ function RxPageContent() {
           if (parsed.symptoms && !regData?.registration_id) setSymptoms(parsed.symptoms);
           if (parsed.diagnoses && !regData?.registration_id) setDiagnoses(parsed.diagnoses);
           if (parsed.labs && !regData?.registration_id) setLabs(parsed.labs);
-          if (parsed.notesForPatient) setNotesForPatient(parsed.notesForPatient);
-          if (parsed.privateNotes) setPrivateNotes(parsed.privateNotes);
+          if (parsed.notesForPatient && !regData) setNotesForPatient(parsed.notesForPatient);
+          if (parsed.privateNotes && !regData) setPrivateNotes(parsed.privateNotes);
           if (parsed.refDoctorInput) setRefDoctorInput(parsed.refDoctorInput);
-          if (parsed.followUpVal) setFollowUpVal(parsed.followUpVal);
-          if (parsed.followUpNotes) setFollowUpNotes(parsed.followUpNotes);
-          if (parsed.advicesInput) setAdvicesInput(parsed.advicesInput);
-          if (parsed.advRest !== undefined) setAdvRest(parsed.advRest);
-          if (parsed.advWater !== undefined) setAdvWater(parsed.advWater);
-          if (parsed.rxProcedures) setRxProcedures(parsed.rxProcedures);
-          if (parsed.referrals) setReferrals(parsed.referrals);
+          if (parsed.followUpVal && !regData) setFollowUpVal(parsed.followUpVal);
+          if (parsed.followUpNotes && !regData) setFollowUpNotes(parsed.followUpNotes);
+          if (parsed.advicesInput && !regData) setAdvicesInput(parsed.advicesInput);
+          if (parsed.advRest !== undefined && !regData) setAdvRest(parsed.advRest);
+          if (parsed.advWater !== undefined && !regData) setAdvWater(parsed.advWater);
+          if (parsed.rxProcedures && !regData) setRxProcedures(parsed.rxProcedures);
+          if (parsed.referrals && !regData) setReferrals(parsed.referrals);
         } else {
           // Initialize defaults
           if (!regData?.registration_id) {
@@ -480,19 +539,21 @@ function RxPageContent() {
             setLabs([{ id: "1", name: "Liver Function Test (LFT)", testOn: "2026-07-11", repeatOn: "2026-07-25", remarks: "" }]);
           }
           setLabResults([]);
-          setNotesForPatient("");
-          setPrivateNotes("");
-          setRefDoctorInput("");
-          setFollowUpVal("10 Days");
-          setFollowUpNotes("");
-          setAdvicesInput("");
-          setAdvRest(false);
-          setAdvWater(false);
-          setRxProcedures([
-            { id: "1", name: "Actinotherapy", duration: "After 3 Days", note: "" },
-            { id: "2", name: "APTT", duration: "After 3 Days", note: "" }
-          ]);
-          setReferrals([{ id: "1", doctorName: "shaikh mudassir", notes: "" }]);
+          if (!regData) {
+            setNotesForPatient("");
+            setPrivateNotes("");
+            setRefDoctorInput("");
+            setFollowUpVal("10 Days");
+            setFollowUpNotes("");
+            setAdvicesInput("");
+            setAdvRest(false);
+            setAdvWater(false);
+            setRxProcedures([
+              { id: "1", name: "Actinotherapy", duration: "After 3 Days", note: "" },
+              { id: "2", name: "APTT", duration: "After 3 Days", note: "" }
+            ]);
+            setReferrals([{ id: "1", doctorName: "shaikh mudassir", notes: "" }]);
+          }
         }
 
       } catch (err) {
@@ -505,7 +566,7 @@ function RxPageContent() {
     loadPatientData();
   }, [rxPatientId]);
 
-  // Debounced auto-save effect for vitals directly updating Supabase columns
+  // Debounced auto-save effect for vitals and Rx metadata directly updating Supabase columns
   useEffect(() => {
     if (!currentRxPatient || loading) return;
 
@@ -521,19 +582,26 @@ function RxPageContent() {
             pulse,
             weight,
             spo2,
-            sugar
+            sugar,
+            notes_for_patient: notesForPatient,
+            private_notes: privateNotes,
+            follow_up: followUpVal,
+            follow_up_notes: followUpNotes,
+            advice: advicesInput,
+            advice_rest: advRest,
+            advice_water: advWater
           })
           .eq("registration_id", regId);
 
         if (error) throw error;
-        console.log("Vitals updated directly in DB via auto-save!");
+        console.log("Vitals and Rx metadata updated directly in DB via auto-save!");
       } catch (err) {
-        console.error("Failed to auto-save vitals:", err);
+        console.error("Failed to auto-save vitals and metadata:", err);
       }
     }, 1000); // 1-second debounce to throttle database requests
 
     return () => clearTimeout(timer);
-  }, [bp, pulse, weight, spo2, sugar, currentRxPatient, loading]);
+  }, [bp, pulse, weight, spo2, sugar, notesForPatient, privateNotes, followUpVal, followUpNotes, advicesInput, advRest, advWater, currentRxPatient, loading]);
 
   // Debounced auto-save effect for patient medical history
   useEffect(() => {
@@ -1070,6 +1138,182 @@ function RxPageContent() {
     return () => clearTimeout(timer);
   }, [labResults, currentRxPatient, loading]);
 
+  // Debounced auto-save effect for patient procedures
+  useEffect(() => {
+    if (!currentRxPatient || loading) return;
+
+    const regId = currentRxPatient.opdRegistration?.registration_id;
+    if (!regId) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        // 1. Delete rows from database that are no longer in our active list
+        const activeDbIds = rxProcedures
+          .map((p) => Number(p.id))
+          .filter((id) => !isNaN(id) && id > 0);
+
+        if (activeDbIds.length > 0) {
+          const { error: delError } = await supabase
+            .from("aka_procedure")
+            .delete()
+            .eq("registration_id", regId)
+            .not("procedure_id", "in", `(${activeDbIds.join(",")})`);
+          if (delError) throw delError;
+        } else {
+          const { error: delError } = await supabase
+            .from("aka_procedure")
+            .delete()
+            .eq("registration_id", regId);
+          if (delError) throw delError;
+        }
+
+        // 2. Separate into update and insert
+        const rowsToUpdate = rxProcedures
+          .filter((p) => !isNaN(Number(p.id)) && Number(p.id) > 0 && Number(p.id) < 10000000000)
+          .map((p) => ({
+            procedure_id: Number(p.id),
+            registration_id: regId,
+            patient_uhid: currentRxPatient.id,
+            name: p.name || "",
+            duration: p.duration || "",
+            note: p.note || ""
+          }));
+
+        const rowsToInsert = rxProcedures
+          .filter((p) => isNaN(Number(p.id)) || Number(p.id) >= 10000000000)
+          .map((p) => ({
+            registration_id: regId,
+            patient_uhid: currentRxPatient.id,
+            name: p.name || "",
+            duration: p.duration || "",
+            note: p.note || ""
+          }));
+
+        if (rowsToUpdate.length > 0) {
+          const { error: upsertError } = await supabase
+            .from("aka_procedure")
+            .upsert(rowsToUpdate, { onConflict: "procedure_id" });
+          if (upsertError) throw upsertError;
+        }
+
+        if (rowsToInsert.length > 0) {
+          const { data: insertedRows, error: insError } = await supabase
+            .from("aka_procedure")
+            .insert(rowsToInsert)
+            .select("procedure_id, name");
+
+          if (insError) throw insError;
+
+          // Update local state IDs for newly inserted procedures
+          if (insertedRows) {
+            setRxProcedures((prev) => {
+              return prev.map((item) => {
+                const matchingRow = insertedRows.find((r) => r.name === item.name);
+                if (matchingRow && (isNaN(Number(item.id)) || Number(item.id) >= 10000000000)) {
+                  return { ...item, id: String(matchingRow.procedure_id) };
+                }
+                return item;
+              });
+            });
+          }
+        }
+
+        console.log("Procedures auto-saved successfully!");
+      } catch (err) {
+        console.error("Failed to auto-save procedures:", err);
+      }
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [rxProcedures, currentRxPatient, loading]);
+
+  // Debounced auto-save effect for patient doctor referrals
+  useEffect(() => {
+    if (!currentRxPatient || loading) return;
+
+    const regId = currentRxPatient.opdRegistration?.registration_id;
+    if (!regId) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        // 1. Delete rows from database that are no longer in our active list
+        const activeDbIds = referrals
+          .map((r) => Number(r.id))
+          .filter((id) => !isNaN(id) && id > 0);
+
+        if (activeDbIds.length > 0) {
+          const { error: delError } = await supabase
+            .from("aka_refer_to")
+            .delete()
+            .eq("registration_id", regId)
+            .not("refer_id", "in", `(${activeDbIds.join(",")})`);
+          if (delError) throw delError;
+        } else {
+          const { error: delError } = await supabase
+            .from("aka_refer_to")
+            .delete()
+            .eq("registration_id", regId);
+          if (delError) throw delError;
+        }
+
+        // 2. Separate into update and insert
+        const rowsToUpdate = referrals
+          .filter((r) => !isNaN(Number(r.id)) && Number(r.id) > 0 && Number(r.id) < 10000000000)
+          .map((r) => ({
+            refer_id: Number(r.id),
+            registration_id: regId,
+            patient_uhid: currentRxPatient.id,
+            doctor_name: r.doctorName || "",
+            notes: r.notes || ""
+          }));
+
+        const rowsToInsert = referrals
+          .filter((r) => isNaN(Number(r.id)) || Number(r.id) >= 10000000000)
+          .map((r) => ({
+            registration_id: regId,
+            patient_uhid: currentRxPatient.id,
+            doctor_name: r.doctorName || "",
+            notes: r.notes || ""
+          }));
+
+        if (rowsToUpdate.length > 0) {
+          const { error: upsertError } = await supabase
+            .from("aka_refer_to")
+            .upsert(rowsToUpdate, { onConflict: "refer_id" });
+          if (upsertError) throw upsertError;
+        }
+
+        if (rowsToInsert.length > 0) {
+          const { data: insertedRows, error: insError } = await supabase
+            .from("aka_refer_to")
+            .insert(rowsToInsert)
+            .select("refer_id, doctor_name");
+
+          if (insError) throw insError;
+
+          // Update local state IDs for newly inserted referrals
+          if (insertedRows) {
+            setReferrals((prev) => {
+              return prev.map((item) => {
+                const matchingRow = insertedRows.find((r) => r.doctor_name === item.doctorName);
+                if (matchingRow && (isNaN(Number(item.id)) || Number(item.id) >= 10000000000)) {
+                  return { ...item, id: String(matchingRow.refer_id) };
+                }
+                return item;
+              });
+            });
+          }
+        }
+
+        console.log("Referrals auto-saved successfully!");
+      } catch (err) {
+        console.error("Failed to auto-save referrals:", err);
+      }
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [referrals, currentRxPatient, loading]);
+
   const handleFinishPrescription = async () => {
     if (!currentRxPatient) return;
     
@@ -1109,7 +1353,14 @@ function RxPageContent() {
             pulse,
             weight,
             spo2,
-            sugar
+            sugar,
+            notes_for_patient: notesForPatient,
+            private_notes: privateNotes,
+            follow_up: followUpVal,
+            follow_up_notes: followUpNotes,
+            advice: advicesInput,
+            advice_rest: advRest,
+            advice_water: advWater
           })
           .eq("registration_id", regId);
         
@@ -1418,6 +1669,114 @@ function RxPageContent() {
           const { error: insError } = await supabase
             .from("aka_lab_result")
             .insert(resultToInsert);
+          if (insError) throw insError;
+        }
+
+        // Save procedures to database aka_procedure
+        const procedureActiveIds = rxProcedures
+          .map((p) => Number(p.id))
+          .filter((id) => !isNaN(id) && id > 0);
+
+        if (procedureActiveIds.length > 0) {
+          const { error: delError } = await supabase
+            .from("aka_procedure")
+            .delete()
+            .eq("registration_id", regId)
+            .not("procedure_id", "in", `(${procedureActiveIds.join(",")})`);
+          if (delError) throw delError;
+        } else {
+          const { error: delError } = await supabase
+            .from("aka_procedure")
+            .delete()
+            .eq("registration_id", regId);
+          if (delError) throw delError;
+        }
+
+        const procToUpdate = rxProcedures
+          .filter((p) => !isNaN(Number(p.id)) && Number(p.id) > 0 && Number(p.id) < 10000000000)
+          .map((p) => ({
+            procedure_id: Number(p.id),
+            registration_id: regId,
+            patient_uhid: currentRxPatient.id,
+            name: p.name || "",
+            duration: p.duration || "",
+            note: p.note || ""
+          }));
+
+        const procToInsert = rxProcedures
+          .filter((p) => isNaN(Number(p.id)) || Number(p.id) >= 10000000000)
+          .map((p) => ({
+            registration_id: regId,
+            patient_uhid: currentRxPatient.id,
+            name: p.name || "",
+            duration: p.duration || "",
+            note: p.note || ""
+          }));
+
+        if (procToUpdate.length > 0) {
+          const { error: upsertError } = await supabase
+            .from("aka_procedure")
+            .upsert(procToUpdate, { onConflict: "procedure_id" });
+          if (upsertError) throw upsertError;
+        }
+
+        if (procToInsert.length > 0) {
+          const { error: insError } = await supabase
+            .from("aka_procedure")
+            .insert(procToInsert);
+          if (insError) throw insError;
+        }
+
+        // Save referrals to database aka_refer_to
+        const referActiveIds = referrals
+          .map((r) => Number(r.id))
+          .filter((id) => !isNaN(id) && id > 0);
+
+        if (referActiveIds.length > 0) {
+          const { error: delError } = await supabase
+            .from("aka_refer_to")
+            .delete()
+            .eq("registration_id", regId)
+            .not("refer_id", "in", `(${referActiveIds.join(",")})`);
+          if (delError) throw delError;
+        } else {
+          const { error: delError } = await supabase
+            .from("aka_refer_to")
+            .delete()
+            .eq("registration_id", regId);
+          if (delError) throw delError;
+        }
+
+        const referToUpdate = referrals
+          .filter((r) => !isNaN(Number(r.id)) && Number(r.id) > 0 && Number(r.id) < 10000000000)
+          .map((r) => ({
+            refer_id: Number(r.id),
+            registration_id: regId,
+            patient_uhid: currentRxPatient.id,
+            doctor_name: r.doctorName || "",
+            notes: r.notes || ""
+          }));
+
+        const referToInsert = referrals
+          .filter((r) => isNaN(Number(r.id)) || Number(r.id) >= 10000000000)
+          .map((r) => ({
+            registration_id: regId,
+            patient_uhid: currentRxPatient.id,
+            doctor_name: r.doctorName || "",
+            notes: r.notes || ""
+          }));
+
+        if (referToUpdate.length > 0) {
+          const { error: upsertError } = await supabase
+            .from("aka_refer_to")
+            .upsert(referToUpdate, { onConflict: "refer_id" });
+          if (upsertError) throw upsertError;
+        }
+
+        if (referToInsert.length > 0) {
+          const { error: insError } = await supabase
+            .from("aka_refer_to")
+            .insert(referToInsert);
           if (insError) throw insError;
         }
       }
