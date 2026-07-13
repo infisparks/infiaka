@@ -705,6 +705,10 @@ function DashboardContent() {
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, "0");
     const dd = String(today.getDate()).padStart(2, "0");
+    if (yyyy < 1800 || yyyy > 2100) {
+      setDob("");
+      return;
+    }
     setDob(`${yyyy}-${mm}-${dd}`);
   };
 
@@ -2007,7 +2011,7 @@ function DashboardContent() {
           ) : (
             filteredPatients.map((patient) => (
               <div
-                key={patient.id}
+                key={patient.opdRegistration?.registration_id || patient.id}
                 className="bg-white rounded-lg border border-[#E5E7EB] p-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 hover:shadow-xs transition-shadow w-full animate-in fade-in duration-100"
               >
                 <div className="flex items-start gap-3 flex-1 min-w-0">
