@@ -25,6 +25,7 @@ import OtherMedHistoryDrawer, { OtherMedHistory } from "@/components/OtherMedHis
 import TravelHistoryDrawer, { TravelHistoryItem } from "@/components/TravelHistoryDrawer";
 import ProceduresCard, { ProcedureItem } from "@/components/ProceduresCard";
 import ReferToDoctorCard, { ReferralItem } from "@/components/ReferToDoctorCard";
+import PrintPrescription from "@/components/PrintPrescription";
 
 interface Patient {
   patient_id?: number;
@@ -1791,138 +1792,7 @@ function RxPageContent() {
 
   const handlePrintPrescription = () => {
     if (!currentRxPatient) return;
-    
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Prescription - ${currentRxPatient.name}</title>
-          <style>
-            body { font-family: 'Inter', sans-serif; padding: 40px; color: #111827; max-width: 800px; margin: 0 auto; }
-            .header { border-bottom: 2px solid #7C3AED; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
-            .clinic-name { font-size: 24px; font-weight: bold; color: #7C3AED; }
-            .doc-info { text-align: right; font-size: 13px; color: #4A5568; line-height: 1.4; }
-            .info-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; background: #F8FAFC; padding: 15px; border-radius: 8px; margin-bottom: 25px; font-size: 13px; line-height: 1.5; border: 1px solid #E2E8F0; }
-            .rx-section { margin-bottom: 25px; }
-            .rx-title { font-size: 13px; font-weight: bold; color: #7C3AED; border-bottom: 1px solid #E2E8F0; padding-bottom: 4px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
-            .med-item { margin-bottom: 15px; padding-left: 10px; border-left: 2px solid #7C3AED; }
-            .med-name { font-size: 14px; font-weight: bold; color: #1F2937; }
-            .med-generic { font-size: 11px; color: #6B7280; text-transform: uppercase; margin-top: 1px; }
-            .med-instructions { font-size: 13px; color: #374151; font-weight: 500; margin-top: 4px; display: flex; gap: 15px; }
-            .vitals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; font-size: 13px; background: #F9FAFB; padding: 12px; border-radius: 6px; border: 1px dashed #CBD5E0; }
-            .rx-symbol { font-size: 36px; font-weight: bold; color: #7C3AED; font-family: Georgia, serif; margin: 15px 0; }
-            .footer { text-align: center; font-size: 11px; color: #9CA3AF; margin-top: 80px; border-top: 1px solid #E5E7EB; padding-top: 15px; }
-            .list-disc { padding-left: 20px; margin: 0; }
-            .list-disc li { margin-bottom: 5px; font-size: 13.5px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <div class="clinic-name">${currentRxPatient.opdRegistration?.clinic_name || "OPD CLINIC"}</div>
-              <p style="margin: 3px 0 0 0; color: #6B7280; font-size: 13px; font-weight: 500;">Comprehensive Care Clinic</p>
-            </div>
-            <div class="doc-info">
-              <strong>${currentRxPatient.opdRegistration?.treating_doctor || "Dr. Treating Doctor"}</strong><br>
-              MBBS, MD<br>
-              Reg No: 123456
-            </div>
-          </div>
-
-          <div class="info-grid">
-            <div>
-              <strong>Patient Name:</strong> ${currentRxPatient.title || "Mr/Mrs"} ${currentRxPatient.name}<br>
-              <strong>Age/Gender:</strong> ${currentRxPatient.age} ${currentRxPatient.ageUnit || 'Year'}(s) / ${currentRxPatient.gender}<br>
-              <strong>Phone:</strong> ${currentRxPatient.phone}
-            </div>
-            <div style="text-align: right;">
-              <strong>Date:</strong> ${new Date().toLocaleDateString('en-IN')}<br>
-              <strong>UHID / Queue No:</strong> ${currentRxPatient.id} / Q-${currentRxPatient.queueNo || "00"}<br>
-            </div>
-          </div>
-
-          <div class="rx-section">
-            <div class="rx-title">Vitals</div>
-            <div class="vitals-grid">
-              <div><strong>BP:</strong> ${bp} mmHg</div>
-              <div><strong>Pulse:</strong> ${pulse} bpm</div>
-              <div><strong>Weight:</strong> ${weight} kg</div>
-              <div><strong>SpO2:</strong> ${spo2}%</div>
-              <div><strong>Blood Sugar:</strong> ${sugar} mg/dL</div>
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-            ${symptoms.length > 0 ? `
-              <div class="rx-section">
-                <div class="rx-title">Symptoms / Complaints</div>
-                <ul class="list-disc">
-                  ${symptoms.map(s => `<li>${s.name} ${s.duration ? `(${s.duration})` : ''} - <span style="text-transform: capitalize; font-size: 11px; font-weight: bold; color: #4B5563;">${s.severity}</span></li>`).join('')}
-                </ul>
-              </div>
-            ` : ''}
-
-            ${diagnoses.length > 0 ? `
-              <div class="rx-section">
-                <div class="rx-title">Diagnoses</div>
-                <ul class="list-disc">
-                  ${diagnoses.map(d => `<li>${d.name} ${d.since ? `(since ${d.since})` : ''}</li>`).join('')}
-                </ul>
-              </div>
-            ` : ''}
-          </div>
-
-          <div class="rx-symbol">Rₓ</div>
-
-          <div class="rx-section">
-            <div class="rx-title">Medications (Rx)</div>
-            ${medications.map(m => `
-              <div class="med-item">
-                <div class="med-name">${m.name}</div>
-                ${m.generic ? `<div class="med-generic">${m.generic}</div>` : ''}
-                <div class="med-instructions">
-                  <span><strong>Dosage:</strong> ${m.dose}</span>
-                  <span><strong>Frequency:</strong> ${m.freq}</span>
-                  <span><strong>Timing:</strong> ${m.timing}</span>
-                  ${m.duration ? `<span><strong>Duration:</strong> ${m.duration}</span>` : ''}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-
-          ${labs.length > 0 ? `
-            <div class="rx-section">
-              <div class="rx-title">Lab Investigations Suggested</div>
-              <ul class="list-disc">
-                ${labs.map(l => `<li>${l.name}</li>`).join('')}
-              </ul>
-            </div>
-          ` : ''}
-
-          ${notesForPatient ? `
-            <div class="rx-section">
-              <div class="rx-title">Doctor Notes</div>
-              <div style="font-size: 13px; color: #374151; background: #F9FAFB; padding: 10px; border-radius: 6px; border: 1px solid #E5E7EB; white-space: pre-line;">
-                ${notesForPatient}
-              </div>
-            </div>
-          ` : ''}
-
-          <div class="footer">
-            Please follow the prescribed dosage carefully. Return for follow-up if symptoms persist.
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              window.onafterprint = function() { window.close(); };
-            }
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    window.print();
   };
 
   if (loading) {
@@ -1953,7 +1823,8 @@ function RxPageContent() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-white overflow-hidden font-sans select-none">
+    <>
+      <div id="main-rx-container" className="flex flex-col h-screen w-screen bg-white overflow-hidden font-sans select-none">
       
       {/* PRESCRIPTION HEADER */}
       <header className="h-12 bg-white border-b border-[#E2E8F0] px-4 flex items-center justify-between shrink-0 shadow-2xs">
@@ -2618,5 +2489,39 @@ function RxPageContent() {
       )}
 
     </div>
-  );
+
+    <PrintPrescription
+      patient={currentRxPatient}
+      bp={bp}
+      pulse={pulse}
+      weight={weight}
+      spo2={spo2}
+      sugar={sugar}
+      symptoms={symptoms}
+      diagnoses={diagnoses}
+      medications={medications}
+      labs={labs}
+      labResults={labResults}
+      rxProcedures={rxProcedures}
+      referrals={referrals}
+      notesForPatient={notesForPatient}
+      followUpVal={followUpVal}
+      followUpNotes={followUpNotes}
+      advicesInput={advicesInput}
+      advRest={advRest}
+      advWater={advWater}
+      histNoKnown={histNoKnown}
+      familyItems={familyItems}
+      conditions={conditions}
+      allergies={allergies}
+      procedures={procedures}
+      currentMeds={currentMeds}
+      habits={habits}
+      foodAllergies={foodAllergies}
+      otherHistory={otherHistory}
+      otherHistoryTitle={otherHistoryTitle}
+      travelHistory={travelHistory}
+    />
+  </>
+);
 }
