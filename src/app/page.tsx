@@ -516,6 +516,8 @@ function DashboardContent() {
     { id: "1", mode: "Cash", amount: 0 }
   ]);
 
+  const [registering, setRegistering] = useState(false);
+
   // DB Map: public.visit_vitals
   const [initialBp, setInitialBp] = useState("120/80");
   const [initialPulse, setInitialPulse] = useState("");
@@ -1131,6 +1133,7 @@ function DashboardContent() {
     });
 
     try {
+      setRegistering(true);
       // Async database increments
       if (treatingDoctor.trim()) incrementOption(160, treatingDoctor);
       if (permanentAddress.trim()) incrementOption(161, permanentAddress);
@@ -1236,6 +1239,8 @@ function DashboardContent() {
       closeBooking();
     } catch (err) {
       console.error("Failed to save registration:", err);
+    } finally {
+      setRegistering(false);
     }
   };
 
@@ -3228,9 +3233,17 @@ function DashboardContent() {
               </button>
               <button
                 type="submit"
-                className="px-6 py-1.5 bg-primary hover:bg-primary-hover rounded-md text-[11px] font-extrabold text-white transition-all shadow-xs"
+                disabled={registering}
+                className="px-6 py-1.5 bg-primary hover:bg-primary-hover rounded-md text-[11px] font-extrabold text-white transition-all shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-75 disabled:cursor-not-allowed min-w-[140px]"
               >
-                Complete Registration
+                {registering ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Registering...</span>
+                  </>
+                ) : (
+                  <span>Complete Registration</span>
+                )}
               </button>
             </div>
           </form>
