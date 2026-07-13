@@ -1167,7 +1167,6 @@ function DashboardContent() {
           .eq("uhid", targetUhid);
         if (pError) throw pError;
       } else {
-        const tempUhid = "TEMP-" + Date.now();
         const { data: newP, error: pError } = await supabase
           .from("patient_detail")
           .insert({
@@ -1181,8 +1180,7 @@ function DashboardContent() {
             title: title,
             state: state,
             local_address: localAddress,
-            country: country,
-            uhid: tempUhid
+            country: country
           })
           .select()
           .single();
