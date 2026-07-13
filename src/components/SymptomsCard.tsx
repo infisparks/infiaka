@@ -108,10 +108,12 @@ function ChipTagField({
         if (!aStarts && bStarts) return 1;
         return 0;
       });
+    const slicedResults = results.slice(0, 30);
     if (event.query.trim() && !options.some((o) => o.toLowerCase() === query)) {
-      results = [...results, `+ Create "${event.query.trim()}"`];
+      setSuggestions([...slicedResults, `+ Create "${event.query.trim()}"`]);
+    } else {
+      setSuggestions(slicedResults);
     }
-    setSuggestions(results);
   };
 
   const handleChange = (e: { value: string[] }) => {
@@ -209,10 +211,12 @@ function AutoInput({
     if (!query || options.some(opt => opt.toLowerCase() === query)) {
       results = options;
     }
+    const slicedResults = results.slice(0, 30);
     if (event.query.trim() && !options.some((o) => o.toLowerCase() === query)) {
-      results = [...results, `+ Create "${event.query.trim()}"`];
+      setSuggestions([...slicedResults, `+ Create "${event.query.trim()}"`]);
+    } else {
+      setSuggestions(slicedResults);
     }
-    setSuggestions(results);
   };
 
   const handleSelect = (e: { value: string }) => {
@@ -325,10 +329,12 @@ function InlineAutoComplete({
     if (!query || options.some(opt => opt.toLowerCase() === query)) {
       results = options;
     }
+    const slicedResults = results.slice(0, 30);
     if (event.query.trim() && !options.some((o) => o.toLowerCase() === query)) {
-      results = [...results, `+ Create "${event.query.trim()}"`];
+      setSuggestions([...slicedResults, `+ Create "${event.query.trim()}"`]);
+    } else {
+      setSuggestions(slicedResults);
     }
-    setSuggestions(results);
   };
 
   const handleSelect = (e: { value: string }) => {
@@ -701,7 +707,8 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
               if (aStarts && !bStarts) return -1;
               if (!aStarts && bStarts) return 1;
               return 0;
-            });
+            })
+            .slice(0, 30);
           const hasCustomVal = searchVal.trim() && !symptomOptions.some(o => o.toLowerCase() === searchVal.trim().toLowerCase());
           if (list.length === 0 && !hasCustomVal) return null;
           return (
