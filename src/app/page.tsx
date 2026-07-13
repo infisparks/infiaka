@@ -103,16 +103,9 @@ interface Patient {
 }
 
 // Initial suggestion caches
-const initialAddressCache = ["mumbra", "thane", "dadar", "mumbai", "bandra", "kalyan"];
-const initialDoctorCache = ["DR. LAXMAN SALVE", "DR. KABIR SHAH", "DR. POOJA SHARMA"];
-const initialServiceCache = [
-  { name: "First consultation", price: 2000, type: "service" as const },
-  { name: "Follow-up consultation", price: 1000, type: "service" as const },
-  { name: "Routine checkup", price: 500, type: "service" as const },
-  { name: "Injection", price: 100, type: "product" as const },
-  { name: "ECG Test", price: 800, type: "service" as const },
-  { name: "Blood Report Analysis", price: 1200, type: "service" as const }
-];
+const initialAddressCache: string[] = [];
+const initialDoctorCache: string[] = [];
+const initialServiceCache: { name: string; price: number; type: "service" | "product" }[] = [];
 
 const SUGGESTED_SYMPTOMS = [
   "Pain Radiating To Head",
@@ -168,59 +161,7 @@ const freqMedications = [
 ];
 
 // Initial Patients list
-const initialPatients: Patient[] = [
-  {
-    id: "1",
-    queueNo: "01",
-    title: "Mr",
-    name: "mudassir s",
-    phoneDialCode: "+91",
-    phone: "9958399157",
-    gender: "Male",
-    age: 23,
-    ageUnit: "Year",
-    dob: "2003-05-23",
-    permanentAddress: "mumbra",
-    localAddress: "mumbra",
-    country: "India",
-    state: "Maharashtra",
-    statusTags: ["Ongoing", "New Patient"],
-    billAmount: 2000,
-    paymentMethod: "Cash",
-    isAbhaCreated: false,
-    customTags: [],
-    isCompleted: false,
-    isOngoing: true,
-    arrivalTime: "07:15 pm",
-    arrivalMinutesAgo: 13,
-  },
-  {
-    id: "2",
-    queueNo: "02",
-    title: "Mr",
-    name: "Rahul Sharma",
-    phoneDialCode: "+91",
-    phone: "9876543210",
-    gender: "Male",
-    age: 32,
-    ageUnit: "Year",
-    dob: "1994-07-11",
-    permanentAddress: "dadar",
-    localAddress: "dadar",
-    country: "India",
-    state: "Maharashtra",
-    statusTags: ["New Patient"],
-    billAmount: 500,
-    paymentMethod: "Online",
-    isAbhaCreated: true,
-    vitals: { bp: "120/80", pulse: "72" },
-    customTags: ["Fever"],
-    isCompleted: false,
-    isOngoing: false,
-    arrivalTime: "07:30 pm",
-    arrivalMinutesAgo: 5,
-  },
-];
+const initialPatients: Patient[] = [];
 
 // Time slots list
 const timeSlots = [
@@ -511,10 +452,10 @@ function DashboardContent() {
   const [addressCache, setAddressCache] = useState(initialAddressCache);
   const [doctorCache, setDoctorCache] = useState(initialDoctorCache);
   const [serviceCache, setServiceCache] = useState(initialServiceCache);
-  const [countryCache, setCountryCache] = useState<string[]>(["India", "United States", "United Kingdom"]);
-  const [stateCache, setStateCache] = useState<string[]>(["Maharashtra", "Delhi", "Karnataka", "Gujarat", "Tamil Nadu"]);
-  const [clinicCache, setClinicCache] = useState<string[]>(["DLPC - Dadar", "DLPC - East", "DLPC - West"]);
-  const [referringDoctorCache, setReferringDoctorCache] = useState<string[]>(["Dadar East", "Dadar West"]);
+  const [countryCache, setCountryCache] = useState<string[]>([]);
+  const [stateCache, setStateCache] = useState<string[]>([]);
+  const [clinicCache, setClinicCache] = useState<string[]>([]);
+  const [referringDoctorCache, setReferringDoctorCache] = useState<string[]>([]);
 
   // Autocomplete focus states
   const [addressFocused, setAddressFocused] = useState(false);
