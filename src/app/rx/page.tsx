@@ -1940,8 +1940,12 @@ function RxPageContent() {
         }
       }
 
-      // 4. Redirect to home page
-      router.push("/");
+      // 4. Redirect to dynamic prescription print page
+      if (regId) {
+        router.push(`/prescription/${regId}`);
+      } else {
+        router.push("/");
+      }
     } catch (err) {
       console.error("Failed to save prescription:", err);
     }
@@ -2252,17 +2256,6 @@ function RxPageContent() {
           >
             Clear
           </button>
-          <button className="px-3 py-1 bg-slate-700/50 hover:bg-slate-700 text-white rounded text-[10px] font-bold border border-slate-700 transition-colors">
-            Print Settings
-          </button>
-          <button className="px-3 py-1 bg-slate-700/50 hover:bg-slate-700 text-white rounded text-[10px] font-bold border border-slate-700 transition-colors">
-            Select Language
-          </button>
-
-          <button className="px-3 py-1 bg-indigo-650 hover:bg-indigo-700 text-white rounded text-[10px] font-extrabold flex items-center gap-1.5 shadow-xs transition-colors bg-indigo-600">
-            <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse border border-white"></span>
-            Ask DocAssist AI
-          </button>
         </div>
 
         <div className="text-[10px] text-slate-400 font-bold tracking-wide">
@@ -2270,14 +2263,8 @@ function RxPageContent() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsPreviewOpen(true)}
-            className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded text-[11px] font-bold flex items-center gap-1 transition-colors"
-          >
-            Preview
-          </button>
           <button 
-            onClick={handlePrintPrescription}
+            onClick={handleFinishPrescription}
             className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
             title="Print Prescription"
           >
@@ -2308,7 +2295,7 @@ function RxPageContent() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handlePrintPrescription}
+                  onClick={handleFinishPrescription}
                   className="px-3.5 py-1.5 bg-primary hover:bg-primary-hover text-white text-[11px] font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">

@@ -5,8 +5,10 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import QRCode from "qrcode";
 import Link from "next/link";
+import PrintPrescription from "@/components/PrintPrescription";
+import { useRef } from "react";
+import QRCode from "qrcode";
 
 
 
@@ -183,6 +185,60 @@ function DashboardContent() {
 
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => getTodayLabel());
+
+  // PrintPrescription specific states & ref
+  const printPrescRef = useRef<any>(null);
+  const [activePrescPrintData, setActivePrescPrintData] = useState<any>(null);
+
+  // Print settings loaded from aka_setting
+  const [printShowHeader, setPrintShowHeader] = useState(true);
+  const [printShowHeaderPage2, setPrintShowHeaderPage2] = useState(false);
+  const [printShowLetterhead, setPrintShowLetterhead] = useState(true);
+  const [printShowLetterheadPage2, setPrintShowLetterheadPage2] = useState(false);
+  const [printShowFooter, setPrintShowFooter] = useState(true);
+  const [printShowFooterPage2, setPrintShowFooterPage2] = useState(true);
+  const [printHeaderHeight, setPrintHeaderHeight] = useState(0);
+  const [printHeaderHeightPage2, setPrintHeaderHeightPage2] = useState(15);
+  const [printFooterHeight, setPrintFooterHeight] = useState(0);
+  const [printFooterHeightPage2, setPrintFooterHeightPage2] = useState(15);
+
+  useEffect(() => {
+    const loadPrintSettings = async () => {
+      try {
+        const { data } = await supabase
+          .from("aka_setting")
+          .select("metadata")
+          .eq("setting_key", "prescription_settings")
+          .maybeSingle();
+        if (data && data.metadata) {
+          const meta = data.metadata;
+          if (meta.showLetterhead !== undefined) setPrintShowLetterhead(meta.showLetterhead);
+          if (meta.showHeader !== undefined) setPrintShowHeader(meta.showHeader);
+          if (meta.showFooter !== undefined) setPrintShowFooter(meta.showFooter);
+          if (meta.headerHeight !== undefined) setPrintHeaderHeight(meta.headerHeight);
+          if (meta.footerHeight !== undefined) setPrintFooterHeight(meta.footerHeight);
+
+          if (meta.showLetterheadPage2 !== undefined) setPrintShowLetterheadPage2(meta.showLetterheadPage2);
+          if (meta.showHeaderPage2 !== undefined) setPrintShowHeaderPage2(meta.showHeaderPage2);
+          if (meta.showFooterPage2 !== undefined) setPrintShowFooterPage2(meta.showFooterPage2);
+          if (meta.headerHeightPage2 !== undefined) setPrintHeaderHeightPage2(meta.headerHeightPage2);
+          if (meta.footerHeightPage2 !== undefined) setPrintFooterHeightPage2(meta.footerHeightPage2);
+        }
+      } catch (e) {
+        console.error("Failed to load prescription settings from DB:", e);
+      }
+    };
+    loadPrintSettings();
+  }, []);
+
+  useEffect(() => {
+    if (activePrescPrintData && printPrescRef.current) {
+      setTimeout(async () => {
+        await printPrescRef.current.generatePDF(true); // open in new tab
+        setActivePrescPrintData(null);
+      }, 200);
+    }
+  }, [activePrescPrintData]);
 
   const loadPatientsFromDb = async (dateLabel: string = "Tdy, 12 Jul") => {
     try {
@@ -1588,6 +1644,12 @@ function DashboardContent() {
     const patient = patients.find(p => p.id === patientId);
     if (!patient) return;
 
+    const regId = patient.opdRegistration?.registration_id;
+    if (regId) {
+      window.open(`/prescription/${regId}`, "_blank");
+      return;
+    }
+
     const saved = typeof window !== "undefined" ? JSON.parse(localStorage.getItem(`saved_rx_${patientId}`) || "null") : null;
     const medList: any[] = saved ? saved.medications : [
       { name: "Dolopar 650 Tablets", generic: "PARACETAMOL (650MG)", dose: "2 capsule", freq: "1-1-1", timing: "After Meal", duration: "10 Days", instr: "" },
@@ -1604,139 +1666,63 @@ function DashboardContent() {
     ];
     const notes = saved ? saved.notesForPatient : "";
 
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
+    const mappedSyms = symList.map((s, idx) => ({
+      id: String(idx),
+      name: s.name,
+      duration: s.duration,
+      severity: s.severity || "medium"
+    }));
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Prescription - ${patient.name}</title>
-          <style>
-            body { font-family: 'Inter', sans-serif; padding: 40px; color: #111827; max-width: 800px; margin: 0 auto; }
-            .header { border-bottom: 2px solid #7C3AED; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
-            .clinic-name { font-size: 24px; font-weight: bold; color: #7C3AED; }
-            .doc-info { text-align: right; font-size: 13px; color: #4A5568; line-height: 1.4; }
-            .info-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; background: #F8FAFC; padding: 15px; border-radius: 8px; margin-bottom: 25px; font-size: 13px; line-height: 1.5; border: 1px solid #E2E8F0; }
-            .rx-section { margin-bottom: 25px; }
-            .rx-title { font-size: 13px; font-weight: bold; color: #7C3AED; border-bottom: 1px solid #E2E8F0; padding-bottom: 4px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
-            .med-item { margin-bottom: 15px; padding-left: 10px; border-left: 2px solid #7C3AED; }
-            .med-name { font-size: 14px; font-weight: bold; color: #1F2937; }
-            .med-generic { font-size: 11px; color: #6B7280; text-transform: uppercase; margin-top: 1px; }
-            .med-instructions { font-size: 13px; color: #374151; font-weight: 500; margin-top: 4px; display: flex; gap: 15px; }
-            .vitals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; font-size: 13px; background: #F9FAFB; padding: 12px; border-radius: 6px; border: 1px dashed #CBD5E0; }
-            .rx-symbol { font-size: 36px; font-weight: bold; color: #7C3AED; font-family: Georgia, serif; margin: 15px 0; }
-            .footer { text-align: center; font-size: 11px; color: #9CA3AF; margin-top: 80px; border-top: 1px solid #E5E7EB; padding-top: 15px; }
-            .list-disc { padding-left: 20px; margin: 0; }
-            .list-disc li { margin-bottom: 5px; font-size: 13.5px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <div class="clinic-name">${patient.opdRegistration?.clinic_name || "OPD CLINIC"}</div>
-              <p style="margin: 3px 0 0 0; color: #6B7280; font-size: 13px; font-weight: 500;">Comprehensive Care Clinic</p>
-            </div>
-            <div class="doc-info">
-              <strong>${patient.opdRegistration?.treating_doctor || "Dr. Treating Doctor"}</strong><br>
-              MBBS, MD<br>
-              Reg No: 123456
-            </div>
-          </div>
+    const mappedDiags = diagList.map((d, idx) => ({
+      id: String(idx),
+      name: d.name,
+      since: d.since || d.duration
+    }));
 
-          <div class="info-grid">
-            <div>
-              <strong>Patient Name:</strong> ${patient.title || "Mr/Mrs"} ${patient.name}<br>
-              <strong>Age/Gender:</strong> ${patient.age} ${patient.ageUnit || 'Year'}(s) / ${patient.gender}<br>
-              <strong>Phone:</strong> ${patient.phone}
-            </div>
-            <div style="text-align: right;">
-              <strong>Date:</strong> ${new Date().toLocaleDateString('en-IN')}<br>
-              <strong>UHID / Queue No:</strong> ${patient.id} / Q-${patient.queueNo || "00"}<br>
-            </div>
-          </div>
+    const mappedMeds = medList.map((m, idx) => ({
+      id: String(idx),
+      name: m.name,
+      generic: m.generic,
+      dose: m.dose,
+      freq: m.freq,
+      timing: m.timing,
+      duration: m.duration,
+      instr: m.instr
+    }));
 
-          ${patient.vitals && (patient.vitals.bp || patient.vitals.pulse || patient.vitals.weight || patient.vitals.spo2 || patient.vitals.sugar) ? `
-            <div class="rx-section">
-              <div class="rx-title">Vitals</div>
-              <div class="vitals-grid">
-                ${patient.vitals.bp ? `<div><strong>BP:</strong> ${patient.vitals.bp} mmHg</div>` : ''}
-                ${patient.vitals.pulse ? `<div><strong>Pulse:</strong> ${patient.vitals.pulse} bpm</div>` : ''}
-                ${patient.vitals.weight ? `<div><strong>Weight:</strong> ${patient.vitals.weight} kg</div>` : ''}
-                ${patient.vitals.spo2 ? `<div><strong>SpO2:</strong> ${patient.vitals.spo2}%</div>` : ''}
-                ${patient.vitals.sugar ? `<div><strong>Sugar:</strong> ${patient.vitals.sugar} mg/dL</div>` : ''}
-              </div>
-            </div>
-          ` : ''}
+    const mappedLabs = labList.map((l, idx) => ({
+      id: String(idx),
+      name: l.name,
+      remarks: l.remarks
+    }));
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-            ${symList.length > 0 ? `
-              <div class="rx-section">
-                <div class="rx-title">Symptoms / Complaints</div>
-                <ul class="list-disc">
-                  ${symList.map(s => `<li>${s.name} ${s.duration ? `(${s.duration})` : ''} - <span style="text-transform: capitalize; font-size: 11px; font-weight: bold; color: #4B5563;">${s.severity}</span></li>`).join('')}
-                </ul>
-              </div>
-            ` : ''}
-
-            ${diagList.length > 0 ? `
-              <div class="rx-section">
-                <div class="rx-title">Diagnoses</div>
-                <ul class="list-disc">
-                  ${diagList.map(d => `<li>${d.name} ${d.since ? `(since ${d.since})` : ''}</li>`).join('')}
-                </ul>
-              </div>
-            ` : ''}
-          </div>
-
-          <div class="rx-symbol">Rₓ</div>
-
-          <div class="rx-section">
-            <div class="rx-title">Medications (Rx)</div>
-            ${medList.map(m => `
-              <div class="med-item">
-                <div class="med-name">${m.name}</div>
-                ${m.generic ? `<div class="med-generic">${m.generic}</div>` : ''}
-                <div class="med-instructions">
-                  <span><strong>Dosage:</strong> ${m.dose}</span>
-                  <span><strong>Frequency:</strong> ${m.freq}</span>
-                  <span><strong>Timing:</strong> ${m.timing}</span>
-                  ${m.duration ? `<span><strong>Duration:</strong> ${m.duration}</span>` : ''}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-
-          ${labList.length > 0 ? `
-            <div class="rx-section">
-              <div class="rx-title">Lab Investigations Suggested</div>
-              <ul class="list-disc">
-                ${labList.map(l => `<li>${l.name}</li>`).join('')}
-              </ul>
-            </div>
-          ` : ''}
-
-          ${notes ? `
-            <div class="rx-section">
-              <div class="rx-title">Doctor Notes</div>
-              <div style="font-size: 13px; color: #374151; background: #F9FAFB; padding: 10px; border-radius: 6px; border: 1px solid #E5E7EB; white-space: pre-line;">
-                ${notes}
-              </div>
-            </div>
-          ` : ''}
-
-          <div class="footer">
-            Please follow the prescribed dosage carefully. Return for follow-up if symptoms persist.
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              window.onafterprint = function() { window.close(); };
-            }
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    setActivePrescPrintData({
+      patient: {
+        id: patient.id,
+        title: patient.title || "Mr/Mrs",
+        name: patient.name,
+        age: Number(patient.age),
+        ageUnit: patient.ageUnit || "Year",
+        gender: patient.gender,
+        phone: patient.phone,
+        permanentAddress: patient.permanentAddress,
+        opdRegistration: {
+          clinic_name: patient.opdRegistration?.clinic_name,
+          treating_doctor: patient.opdRegistration?.treating_doctor,
+          referring_doctor: patient.opdRegistration?.referring_doctor
+        }
+      },
+      bp: patient.vitals?.bp || "",
+      pulse: patient.vitals?.pulse || "",
+      weight: patient.vitals?.weight || "",
+      spo2: patient.vitals?.spo2 || "",
+      sugar: patient.vitals?.sugar || "",
+      symptoms: mappedSyms,
+      diagnoses: mappedDiags,
+      medications: mappedMeds,
+      labs: mappedLabs,
+      notes_for_patient: notes
+    });
   };
 
   if (!sessionLoaded) {
@@ -3398,6 +3384,35 @@ function DashboardContent() {
           </div>
         )}
 
+        {/* Hidden PrintPrescription mount for direct queue print */}
+        {activePrescPrintData && (
+          <div className="hidden">
+            <PrintPrescription
+              ref={printPrescRef}
+              patient={activePrescPrintData.patient}
+              bp={activePrescPrintData.bp}
+              pulse={activePrescPrintData.pulse}
+              weight={activePrescPrintData.weight}
+              spo2={activePrescPrintData.spo2}
+              sugar={activePrescPrintData.sugar}
+              symptoms={activePrescPrintData.symptoms}
+              diagnoses={activePrescPrintData.diagnoses}
+              medications={activePrescPrintData.medications}
+              labs={activePrescPrintData.labs}
+              notesForPatient={activePrescPrintData.notes_for_patient}
+              showHeader={printShowHeader}
+              headerHeight={printHeaderHeight}
+              showFooter={printShowFooter}
+              footerHeight={printFooterHeight}
+              showLetterhead={printShowLetterhead}
+              showHeaderPage2={printShowHeaderPage2}
+              headerHeightPage2={printHeaderHeightPage2}
+              showFooterPage2={printShowFooterPage2}
+              footerHeightPage2={printFooterHeightPage2}
+              showLetterheadPage2={printShowLetterheadPage2}
+            />
+          </div>
+        )}
 
       </div>
     </div>

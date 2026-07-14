@@ -295,7 +295,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         const getPageParams = (pageNum: number) => {
           if (pageNum === 1) {
             return {
-              headerHeight: (showHeader && !showLetterhead) ? 20 : headerHeight,
+              headerHeight: headerHeight,
               maxContentY: pageHeight - footerHeight - 25,
               showFooter: showFooter,
               footerHeight: footerHeight,
@@ -303,11 +303,11 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
             };
           } else {
             return {
-              headerHeight: (showHeaderPage2 && !showLetterheadPage2) ? 20 : (headerHeightPage2 || 15),
+              headerHeight: headerHeightPage2 || 15,
               maxContentY: pageHeight - (footerHeightPage2 || 15) - 25,
               showFooter: showFooterPage2,
               footerHeight: footerHeightPage2 || 15,
-              drawBg: showLetterheadPage2
+              drawBg: showLetterhead || showLetterheadPage2
             };
           }
         };
@@ -320,32 +320,13 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         };
 
         const drawTextHeaderForPage = (pageNum: number) => {
-          if (pageNum > 1 && showHeaderPage2 && !showLetterheadPage2) {
-            // Draw secondary page clinic header
-            doc.setFont(fontName, "bold").setFontSize(9).setTextColor(99, 102, 241);
-            const clinicName = (patient?.opdRegistration?.clinic_name || "OPD CLINIC").toUpperCase();
-            doc.text(clinicName, 20, 10);
-            
-            doc.setFont(fontName, "normal").setFontSize(8).setTextColor(107, 114, 128);
-            doc.text("Page " + pageNum, pageWidth - 20, 10, { align: "right" });
-            
-            doc.setDrawColor(226, 232, 240).setLineWidth(0.2);
-            doc.line(20, 13, pageWidth - 20, 13);
-          }
+          // Spacing and margins are kept identical; no digital text header is drawn
         };
 
         // Draw background letterhead on first page
         drawBackgroundForPage(1);
 
-        // Draw background letterhead and text header on any new page automatically
-        const docAny = doc as any;
-        if (docAny.events && typeof docAny.events.on === 'function') {
-          docAny.events.on('addPage', () => {
-            pagesCount += 1;
-            drawBackgroundForPage(pagesCount);
-            drawTextHeaderForPage(pagesCount);
-          });
-        }
+        // Page addition is manually tracked and drawn at the call site.
 
         // Load Poppins fonts from jsDelivr CDN
         let fontName = "helvetica";
@@ -384,12 +365,15 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         const textDark = [17, 24, 39];
         const textGray = [107, 114, 128];
 
-        let currentY = (showHeader && !showLetterhead) ? 20 : headerHeight;
+        let currentY = headerHeight;
 
         const checkPageBreak = (neededHeight = 0) => {
             const currentParams = getPageParams(pagesCount);
             if (currentY + neededHeight > currentParams.maxContentY) {
                 doc.addPage();
+                pagesCount += 1;
+                drawBackgroundForPage(pagesCount);
+                drawTextHeaderForPage(pagesCount);
                 const nextParams = getPageParams(pagesCount);
                 currentY = nextParams.headerHeight;
                 return true;
@@ -487,7 +471,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         };
 
         // 1. Header Row
-        if (showHeader && !showLetterhead) {
+        if (false) {
           doc.setFontSize(18);
           doc.setFont(fontName, "bold");
           doc.setTextColor(99, 102, 241); // #4f46e5 (Indigo primary)
@@ -870,6 +854,9 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         const footerParams = getPageParams(pagesCount);
         if (currentY + 25 > footerParams.maxContentY) {
             doc.addPage();
+            pagesCount += 1;
+            drawBackgroundForPage(pagesCount);
+            drawTextHeaderForPage(pagesCount);
             const newParams = getPageParams(pagesCount);
             currentY = newParams.headerHeight;
         }
@@ -877,24 +864,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         const finalParams = getPageParams(pagesCount);
         const footerY = Math.max(currentY + 10, pageHeight - finalParams.footerHeight - 20);
 
-        if (finalParams.showFooter) {
-            doc.setDrawColor(241, 245, 249);
-            doc.setLineWidth(0.2);
-            doc.line(15, footerY, pageWidth - 15, footerY);
-
-            doc.setFont(fontName, "normal");
-            doc.setFontSize(8);
-            doc.setTextColor(148, 163, 184);
-            doc.text("Generated via DLPC Clinic Management System", 15, footerY + 6);
-
-            doc.setDrawColor(203, 213, 225);
-            doc.line(pageWidth - 55, footerY + 12, pageWidth - 15, footerY + 12);
-
-            doc.setFont(fontName, "bold");
-            doc.setFontSize(8);
-            doc.setTextColor(100, 116, 139);
-            doc.text("DOCTOR SIGNATURE", pageWidth - 35, footerY + 16, { align: "center" });
-        }
+     
 
         const pdfBlob = doc.output("blob");
         const blobURL = URL.createObjectURL(pdfBlob);
@@ -1347,20 +1317,8 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         </div>
       </div>
 
-      {/* ─── FOOTER SIGNATURE ROW ─── */}
-      {showFooter ? (
-        <div className="flex justify-between items-end pt-8 mt-12 border-t border-[#f1f5f9] text-[10px] font-semibold text-slate-400 avoid-break">
-          <div>
-            <span>Generated via DLPC Clinic Management System</span>
-          </div>
-          <div className="text-center w-40">
-            <div className="border-b border-[#cbd5e1] h-8"></div>
-            <div className="text-[9px] uppercase font-bold text-slate-500 mt-1">Doctor Signature</div>
-          </div>
-        </div>
-      ) : (
-        <div style={{ height: `${footerHeight}mm` }} className="w-full shrink-0" />
-      )}
+    
+  
 
     </div>
   );
