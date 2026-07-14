@@ -12,7 +12,7 @@ async function fetchOptions(categoryId: number): Promise<string[]> {
       .select("value")
       .eq("category_id", categoryId)
       .order("usage_count", { ascending: false })
-      .limit(40);
+      .limit(5000);
     if (error) throw error;
     return (data || []).map((d: any) => d.value);
   } catch (err) {
@@ -87,12 +87,21 @@ function InlineAutoComplete({
 
   const search = (event: { query: string }) => {
     const q = (event?.query || "").trim().toLowerCase();
-    let results = options.filter((o) => o.toLowerCase().includes(q));
-    if (!q) results = options;
+    let results = options
+      .filter((o) => o.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const aStarts = a.toLowerCase().startsWith(q);
+        const bStarts = b.toLowerCase().startsWith(q);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      });
+    const sliced = results.slice(0, 30);
     if (q && !options.some((o) => o.toLowerCase() === q)) {
-      results = [...results, `+ Create "${(event?.query || "").trim()}"`];
+      setSuggestions([...sliced, `+ Create "${(event?.query || "").trim()}"`]);
+    } else {
+      setSuggestions(sliced);
     }
-    setSuggestions(results);
   };
 
   const handleSelect = (e: { value: string }) => {
@@ -176,12 +185,21 @@ function InlineLabAutoComplete({
 
   const search = (event: { query: string }) => {
     const q = (event?.query || "").trim().toLowerCase();
-    let results = labOptions.filter((o) => o.toLowerCase().includes(q));
-    if (!q) results = labOptions;
+    let results = labOptions
+      .filter((o) => o.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const aStarts = a.toLowerCase().startsWith(q);
+        const bStarts = b.toLowerCase().startsWith(q);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      });
+    const sliced = results.slice(0, 30);
     if (q && !labOptions.some((o) => o.toLowerCase() === q)) {
-      results = [...results, `+ Create "${(event?.query || "").trim()}"`];
+      setSuggestions([...sliced, `+ Create "${(event?.query || "").trim()}"`]);
+    } else {
+      setSuggestions(sliced);
     }
-    setSuggestions(results);
   };
 
   const handleSelect = (e: { value: string }) => {
@@ -250,12 +268,65 @@ function InlineLabAutoComplete({
 /* ═══════════════════════════════════════════════════════════════════
    LabsCard Component
 ═══════════════════════════════════════════════════════════════════ */
+const fallbackPackages = [
+  {
+    id: 1,
+    name: "DLPC 1 (11 Items)",
+    items: [
+      "Serum Creatinine",
+      "Hepatitis B Surface Antigen HBsAg (ECLIA)",
+      "Human Anti HIV Antibodies (ECLIA)",
+      "CBC",
+      "ECG",
+      "Hepatitis C (HCV) Virus Total (ECLIA)",
+      "PT/INR",
+      "Random Blood Sugar (RBS)",
+      "Total Bilirubin",
+      "Urine Routine and Microscopy",
+      "X-Ray Chest - PA View"
+    ]
+  },
+  {
+    id: 2,
+    name: "DLPC 2 (13 Items)",
+    items: [
+      "Serum Creatinine",
+      "HbA1c",
+      "Hepatitis B Surface Antigen HBsAg (ECLIA)",
+      "Human Anti HIV Antibodies (ECLIA)",
+      "CBC",
+      "ECG",
+      "Fasting Blood Sugar",
+      "Hepatitis C (HCV) Virus Total (ECLIA)",
+      "PT/INR",
+      "Post Prandial Blood Sugar",
+      "Total Bilirubin",
+      "Urine Routine and Microscopy",
+      "X-Ray Chest - PA View"
+    ]
+  },
+  {
+    id: 3,
+    name: "DLPC 3 (3 Items)",
+    items: [
+      "Hepatitis B Surface Antigen HBsAg (ECLIA)",
+      "Human Anti HIV Antibodies (ECLIA)",
+      "Hepatitis C (HCV) Virus Total (ECLIA)"
+    ]
+  }
+];
+
 export default function LabsCard({ labs, setLabs }: LabsCardProps) {
   // Category IDs: 30=lab_name, 31=lab_test_on, 32=lab_repeat_on, 33=lab_remarks
   const [labNameOptions, setLabNameOptions] = useState<string[]>([]);
   const [testOnOptions, setTestOnOptions]   = useState<string[]>([]);
   const [repeatOnOptions, setRepeatOnOptions] = useState<string[]>([]);
   const [remarksOptions, setRemarksOptions] = useState<string[]>([]);
+
+  // Packages state
+  const [packages, setPackages] = useState(fallbackPackages);
+  const [showPkgDropdown, setShowPkgDropdown] = useState(false);
+  const pkgDropdownRef = useRef<HTMLDivElement>(null);
 
   const [medInput, setMedInput]             = useState("");
   const [medInputFocused, setMedInputFocused] = useState(false);
@@ -280,10 +351,22 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
     fieldInputRefs.current[labId][field] = el;
   };
 
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (pkgDropdownRef.current && !pkgDropdownRef.current.contains(e.target as Node)) {
+        setShowPkgDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
   /* Load all dropdown options from Supabase on mount */
   useEffect(() => {
     let active = true;
     const load = async () => {
+      // 1. Fetch autocomplete options
       const [names, testOn, repeatOn, remarks] = await Promise.all([
         fetchOptions(30),
         fetchOptions(31),
@@ -295,6 +378,30 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
       setTestOnOptions(testOn);
       setRepeatOnOptions(repeatOn);
       setRemarksOptions(remarks);
+
+      // 2. Fetch packages dynamically
+      try {
+        const { data: pkgData } = await supabase
+          .from("aka_lab_packages")
+          .select(`
+            id,
+            name,
+            items:aka_lab_package_items (
+              test_name
+            )
+          `);
+
+        if (pkgData && pkgData.length > 0) {
+          const mappedPkgs = pkgData.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            items: p.items?.map((item: any) => item.test_name) || []
+          }));
+          setPackages(mappedPkgs);
+        }
+      } catch (err) {
+        console.error("Error loading packages dynamically:", err);
+      }
     };
     load();
     return () => { active = false; };
@@ -310,14 +417,23 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
         return;
       }
       const qLower = q.toLowerCase();
-      let results = labNameOptions.filter((o) => o.toLowerCase().includes(qLower));
+      let results = labNameOptions
+        .filter((o) => o.toLowerCase().includes(qLower))
+        .sort((a, b) => {
+          const aStarts = a.toLowerCase().startsWith(qLower);
+          const bStarts = b.toLowerCase().startsWith(qLower);
+          if (aStarts && !bStarts) return -1;
+          if (!aStarts && bStarts) return 1;
+          return 0;
+        });
       
       const hasPerfectMatch = labNameOptions.some((o) => o.toLowerCase() === qLower);
+      const sliced = results.slice(0, 30);
       if (!hasPerfectMatch) {
-        results = [...results, `+ Create "${q}"`];
+        if (active) setSearchSuggestions([...sliced, `+ Create "${q}"`]);
+      } else {
+        if (active) setSearchSuggestions(sliced);
       }
-      
-      if (active) setSearchSuggestions(results);
     }, 200);
     return () => { active = false; clearTimeout(timer); };
   }, [medInput, labNameOptions]);
@@ -388,9 +504,57 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
               <path d="M224 256c-35.2 0-64 28.8-64 64s28.8 64 64 64 64-28.8 64-64-28.8-64-64-64zm209.1-127L349.2 45.1C341.1 37.1 328.8 32 316.1 32H64C28.7 32 0 60.7 0 96v320c0 35.3 28.7 64 64 64h320c35.3 0 64-28.7 64-64V163.9c0-12.7-5.1-25-14.9-34.9zM128 80h144v80H128V80zM400 416c0 8.8-7.2 16-16 16H64c-8.8 0-16-7.2-16-16V96c0-8.8 7.2-16 16-16h16v88c0 13.3 10.7 24 24 24h192c13.3 0 24-10.7 24-24V85.5l78.3 78.3c.8.8 1.7 2.4 1.7 4.1V416z"/>
             </svg>
           </button>
-          <button className="w-8 h-7 rounded-lg bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 flex flex-col items-center justify-center text-yellow-700 transition-colors">
-            <span className="text-[9px] font-extrabold">TPanel</span>
-          </button>
+          <div ref={pkgDropdownRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setShowPkgDropdown(!showPkgDropdown)}
+              className="w-16 h-7 rounded-lg bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 flex items-center justify-center gap-1 text-yellow-700 transition-colors cursor-pointer shadow-2xs"
+            >
+              <span className="text-[9px] font-extrabold uppercase">TPanel</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-2 h-2 shrink-0 text-yellow-600">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+            {showPkgDropdown && (
+              <div className="absolute right-0 top-full mt-1.5 z-[100] bg-white border-2 border-yellow-100 rounded-xl shadow-2xl py-1.5 min-w-[240px] max-w-[280px] text-left overflow-hidden">
+                <div className="px-3 py-1 bg-yellow-50/60 text-yellow-800 rounded-md text-[9px] font-extrabold uppercase tracking-wide mb-1 select-none mx-1">
+                  Select Lab Package
+                </div>
+                {packages.map((pkg) => (
+                  <button
+                    key={pkg.id}
+                    type="button"
+                    onClick={() => {
+                      const newLabs = [...labs];
+                      pkg.items.forEach((testName) => {
+                        const exists = newLabs.some(l => l.name.toLowerCase() === testName.toLowerCase());
+                        if (!exists) {
+                          newLabs.push({
+                            id: "temp_" + (Date.now() + Math.floor(Math.random() * 100000)),
+                            name: testName,
+                            testOn: "",
+                            repeatOn: "",
+                            remarks: ""
+                          });
+                        }
+                      });
+                      setLabs(newLabs);
+                      setShowPkgDropdown(false);
+                    }}
+                    className="w-full text-left px-3.5 py-2.5 text-[11px] font-bold text-slate-700 hover:bg-yellow-50/40 hover:text-yellow-800 transition-colors block border-b border-[#F8FAFC] last:border-0 cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-slate-800">{pkg.name}</span>
+                      <span className="text-[7.5px] bg-yellow-100 text-yellow-800 px-1 py-0.2 rounded font-extrabold uppercase">{pkg.items.length} tests</span>
+                    </div>
+                    <div className="text-[8.5px] text-slate-400 font-bold lowercase truncate mt-1">
+                      {pkg.items.join(", ")}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

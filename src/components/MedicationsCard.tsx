@@ -16,7 +16,7 @@ async function fetchOptions(categoryId: number, search: string = "") {
       .select("value")
       .eq("category_id", categoryId)
       .order("usage_count", { ascending: false })
-      .limit(40);
+      .limit(5000);
 
     if (search) {
       query = query.ilike("value", `%${search}%`);
@@ -178,6 +178,130 @@ async function updateMedicineGenericName(name: string, generic: string) {
   }
 }
 
+const DEFAULT_FORMS = [
+  "Tablet",
+  "Capsule",
+  "Syrup",
+  "Suspension",
+  "Drops",
+  "Injection",
+  "Cream",
+  "Ointment",
+  "Gel",
+  "Lotion",
+  "Powder",
+  "Sachet",
+  "Eye Drops",
+  "Ear Drops",
+  "Nasal Spray",
+  "Inhaler",
+  "Nebulizer Solution",
+  "Patch",
+  "Suppository",
+  "Mouthwash",
+  "Gargle"
+];
+
+const FULL_FORMS = [
+  "Tablet",
+  "Capsule",
+  "Caplet",
+  "Softgel Capsule",
+  "Chewable Tablet",
+  "Dispersible Tablet",
+  "Effervescent Tablet",
+  "Sublingual Tablet",
+  "Buccal Tablet",
+  "Orally Disintegrating Tablet (ODT)",
+  "Pill",
+
+  "Syrup",
+  "Suspension",
+  "Oral Solution",
+  "Oral Drops",
+  "Elixir",
+  "Linctus",
+  "Mixture",
+  "Emulsion",
+  "Tonic",
+
+  "Injection",
+  "IV Infusion",
+  "IM Injection",
+  "SC Injection",
+  "Prefilled Syringe",
+  "Vial",
+  "Ampoule",
+
+  "Powder",
+  "Powder for Suspension",
+  "Granules",
+  "Sachet",
+
+  "Ointment",
+  "Cream",
+  "Gel",
+  "Lotion",
+  "Paste",
+  "Liniment",
+  "Foam",
+  "Topical Solution",
+  "Topical Spray",
+
+  "Eye Drops",
+  "Eye Ointment",
+  "Eye Gel",
+
+  "Ear Drops",
+
+  "Nasal Drops",
+  "Nasal Spray",
+
+  "Mouthwash",
+  "Gargle",
+  "Oral Gel",
+  "Dental Gel",
+
+  "Inhaler",
+  "Rotacaps",
+  "Respules",
+  "Nebulizer Solution",
+  "Dry Powder Inhaler",
+
+  "Transdermal Patch",
+  "Medicated Patch",
+
+  "Suppository",
+  "Pessary",
+  "Enema",
+
+  "Lozenge",
+  "Troche",
+
+  "Medicated Shampoo",
+  "Soap",
+  "Dusting Powder",
+
+  "Implant",
+  "Pellet",
+
+  "Vaginal Cream",
+  "Vaginal Tablet",
+  "Vaginal Gel",
+
+  "Rectal Cream",
+  "Rectal Ointment",
+
+  "Liquid",
+  "Drops",
+  "Spray",
+  "Reconstitution Powder",
+
+  "Kit",
+  "Medical Device",
+  "Others"
+];
+
 /* ─── Types ─────────────────────────────────────────────────── */
 interface Medication {
   id: string;
@@ -221,17 +345,25 @@ function InlineAutoComplete({
   const autoRef = useRef<any>(null);
 
   const search = (event: { query: string }) => {
-    const query = event.query.trim();
-    let results = options.filter((o) =>
-      o.toLowerCase().includes(query.toLowerCase())
-    );
-    if (!query || options.some(opt => opt === query)) {
+    const query = event.query.trim().toLowerCase();
+    let results = options
+      .filter((o) => o.toLowerCase().includes(query))
+      .sort((a, b) => {
+        const aStarts = a.toLowerCase().startsWith(query);
+        const bStarts = b.toLowerCase().startsWith(query);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      });
+    if (!query || options.some(opt => opt.toLowerCase() === query)) {
       results = options;
     }
-    if (query && !options.some((o) => o.toLowerCase() === query.toLowerCase())) {
-      results = [...results, `+ Create "${query}"` ];
+    const sliced = results.slice(0, 30);
+    if (event.query.trim() && !options.some((o) => o.toLowerCase() === query)) {
+      setSuggestions([...sliced, `+ Create "${event.query.trim()}"`]);
+    } else {
+      setSuggestions(sliced);
     }
-    setSuggestions(results);
   };
 
   const handleSelect = (e: { value: string }) => {
@@ -408,6 +540,7 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
   const [durationOptions, setDurationOptions] = useState<string[]>([]);
   const [startOptions, setStartOptions] = useState<string[]>([]);
   const [instrOptions, setInstrOptions] = useState<string[]>([]);
+  const [expandedFormMeds, setExpandedFormMeds] = useState<Record<string, boolean>>({});
 
   // Fetch initial suggestion options from Supabase on mount
   const refreshAllOptions = async () => {
@@ -707,11 +840,50 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                         placeholder="Medicine"
                       />
                     </div>
-                    {med.form && (
-                      <span className="text-[7.5px] text-[#A0AEC0] border border-slate-200 px-0.5 rounded font-extrabold select-none bg-slate-50 uppercase leading-none shrink-0">
-                        {med.form}
-                      </span>
-                    )}
+                    {(() => {
+                      const isDefaultForm = (formName: string) => {
+                        if (!formName) return true;
+                        return DEFAULT_FORMS.some(f => f.toLowerCase() === formName.toLowerCase());
+                      };
+                      const showFullList = expandedFormMeds[med.id] || !isDefaultForm(med.form || "");
+                      const currentOptions = showFullList ? FULL_FORMS : DEFAULT_FORMS;
+
+                      return (
+                        <select
+                          value={med.form?.toLowerCase() || "tablet"}
+                          onChange={async (e) => {
+                            const newForm = e.target.value;
+                            if (newForm === "___more___") {
+                              setExpandedFormMeds((p) => ({ ...p, [med.id]: true }));
+                              return;
+                            }
+                            patch(med.id, { form: newForm });
+                            if (med.name) {
+                              try {
+                                await supabase
+                                  .from("medicine")
+                                  .update({ type: newForm.toUpperCase() })
+                                  .eq("name", med.name);
+                              } catch (err) {
+                                console.error("Error updating medicine type:", err);
+                              }
+                            }
+                          }}
+                          className="text-[8.5px] text-[#4A5568] border border-slate-200 px-1 py-0.5 rounded font-extrabold bg-slate-50 uppercase leading-none shrink-0 outline-none cursor-pointer focus:ring-1 focus:ring-indigo-300"
+                        >
+                          {currentOptions.map((opt) => (
+                            <option key={opt} value={opt.toLowerCase()}>
+                              {opt}
+                            </option>
+                          ))}
+                          {!showFullList && (
+                            <option value="___more___">
+                              + More Options...
+                            </option>
+                          )}
+                        </select>
+                      );
+                    })()}
                     {/* Pencil — always visible, inline right */}
                     {editingGenericId !== med.id && (
                       <span
@@ -860,21 +1032,24 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
       )}
 
       {/* Bottom Search Bar */}
-      <div className="relative px-3 py-2.5 border-t border-[#F8FAFC]">
+      <div className="relative px-4 py-3 border-t border-[#F1F5F9] bg-slate-50/30">
         <div className="relative flex items-center">
-          <svg className="absolute left-2.5 w-3 h-3 fill-[#CBD5E0] pointer-events-none" viewBox="0 0 512 512">
-            <path d="M505 442.7L405.3 343c-4.5-4.5-10.6-7-17-7H372c27.6-35.3 44-79.7 44-128C416 93.1 322.9 0 208 0S0 93.1 0 208s93.1 208 208 208c48.3 0 92.7-16.4 128-44v16.3c0 6.4 2.5 12.5 7 17l99.7 99.7c9.4 9.4 24.6 9.4 33.9 0l28.3-28.3c9.4-9.4 9.4-24.6.1-34zM208 336c-70.7 0-128-57.2-128-128 0-70.7 57.2-128 128-128 70.7 0 128 57.2 128 128 0 70.7-57.2 128-128 128z"/>
+          <svg className="absolute left-3.5 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
             type="text"
-            placeholder="Start typing Medicines"
+            placeholder="Search & Add Medicines (e.g. Paracetamol, Pantocid...)"
             value={medInput}
             onChange={(e) => { setMedInput(e.target.value); setSearchHi(-1); setMedInputFocused(true); }}
             onFocus={() => { setMedInputFocused(true); setSearchHi(-1); }}
             onBlur={() => setTimeout(() => setMedInputFocused(false), 200)}
             onKeyDown={handleSearchKey}
-            className="w-full h-8.5 pl-8 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-medium transition-all"
+            className="w-full h-11 pl-10 pr-16 border-2 border-[#E2E8F0] focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl text-[13px] bg-white focus:outline-none placeholder:text-slate-400 font-semibold transition-all shadow-xs"
           />
+          <div className="absolute right-3.5 flex items-center gap-1 text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded uppercase pointer-events-none select-none">
+            Enter ↵
+          </div>
         </div>
 
         {/* Medicines Dropdown Autocomplete */}
@@ -883,28 +1058,33 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
           const hasCustomVal = medInput.trim() && !medSuggestions.some(m => m.name.toLowerCase() === medInput.trim().toLowerCase());
           if (list.length === 0 && !hasCustomVal) return null;
           return (
-            <div className="absolute left-3 right-3 top-full mt-0.5 z-40 bg-white border border-[#CBD5E0] rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto p-1.5 space-y-1">
-              <div className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[9px] font-bold inline-block select-none mb-1">
-                SAMPLE MEDICINES
+            <div className="absolute left-4 right-4 bottom-full mb-1 z-50 bg-white border-2 border-indigo-100 rounded-xl shadow-2xl overflow-hidden max-h-72 overflow-y-auto p-1.5 space-y-0.5 animate-fade-in-up">
+              <div className="px-3 py-1 bg-indigo-50/60 text-indigo-700 rounded-lg text-[9px] font-extrabold uppercase tracking-wider mb-1.5 select-none inline-block">
+                Select Medicine to Add
               </div>
               {list.map((med, i) => (
                 <div
                   key={med.name}
                   onMouseDown={() => addMedicine(med)}
-                  className={`p-2 text-left rounded cursor-pointer transition-colors border-b border-[#F1F5F9] last:border-b-0
-                    ${i === searchHi ? "bg-blue-50" : "hover:bg-slate-50"}`}
+                  className={`p-2.5 px-3.5 text-left rounded-lg cursor-pointer transition-colors border-b border-[#F8FAFC] last:border-b-0 flex items-center justify-between
+                    ${i === searchHi ? "bg-indigo-50/80 text-indigo-950 font-black border-indigo-100" : "hover:bg-slate-50 text-slate-700"}`}
                 >
-                  <div className="text-[11px] font-bold text-[#1e293b]">{med.name}</div>
-                  {med.generic && <div className="text-[8px] text-[#A0AEC0] uppercase font-semibold">{med.generic}</div>}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] font-bold tracking-tight">{med.name}</div>
+                    {med.generic && <div className="text-[9.5px] text-[#A0AEC0] uppercase font-bold tracking-wide mt-0.5 truncate">{med.generic}</div>}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-bold shrink-0 bg-slate-100 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100">
+                    + Add
+                  </span>
                 </div>
               ))}
               {hasCustomVal && (
                 <div
                   onMouseDown={() => addMedicine({ name: medInput, generic: "" })}
-                  className="p-2 text-left rounded cursor-pointer text-blue-600 font-bold hover:bg-blue-50 border-t border-[#F1F5F9] flex items-center gap-1.5"
+                  className="p-2.5 px-3.5 text-left rounded-lg cursor-pointer text-indigo-650 font-extrabold hover:bg-indigo-50 border-t border-[#F8FAFC] flex items-center gap-1.5"
                 >
-                  <span>+ Create</span>
-                  <span className="italic">"{medInput.trim()}"</span>
+                  <span className="text-[12px]">+ Create new medicine</span>
+                  <span className="italic text-[12px] font-semibold text-slate-500">"{medInput.trim()}"</span>
                 </div>
               )}
             </div>

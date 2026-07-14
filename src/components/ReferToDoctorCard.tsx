@@ -22,7 +22,7 @@ async function fetchDoctors(): Promise<string[]> {
       .select("value")
       .eq("category_id", 50)
       .order("usage_count", { ascending: false })
-      .limit(40);
+      .limit(5000);
     if (error) throw error;
     
     // Ensure we always have "DR. LAXMAN SALVE" in the suggestions
@@ -92,14 +92,23 @@ export default function ReferToDoctorCard({ referrals, setReferrals }: ReferToDo
         return;
       }
       const qLower = q.toLowerCase();
-      let results = doctorOptions.filter((o) => o.toLowerCase().includes(qLower));
+      let results = doctorOptions
+        .filter((o) => o.toLowerCase().includes(qLower))
+        .sort((a, b) => {
+          const aStarts = a.toLowerCase().startsWith(qLower);
+          const bStarts = b.toLowerCase().startsWith(qLower);
+          if (aStarts && !bStarts) return -1;
+          if (!aStarts && bStarts) return 1;
+          return 0;
+        });
       
       const hasPerfectMatch = doctorOptions.some((o) => o.toLowerCase() === qLower);
+      const sliced = results.slice(0, 30);
       if (!hasPerfectMatch) {
-        results = [...results, `+ Create "${q}"`];
+        if (active) setDoctorSuggestions([...sliced, `+ Create "${q}"`]);
+      } else {
+        if (active) setDoctorSuggestions(sliced);
       }
-      
-      if (active) setDoctorSuggestions(results);
     }, 180);
     return () => { active = false; clearTimeout(timer); };
   }, [searchVal, doctorOptions]);

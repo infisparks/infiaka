@@ -9,6 +9,7 @@ interface AdvicesCardProps {
   setAdvRest: (v: boolean) => void;
   advWater: boolean;
   setAdvWater: (v: boolean) => void;
+  onOpenDrawer: () => void;
 }
 
 export default function AdvicesCard({
@@ -17,7 +18,8 @@ export default function AdvicesCard({
   advRest,
   setAdvRest,
   advWater,
-  setAdvWater
+  setAdvWater,
+  onOpenDrawer
 }: AdvicesCardProps) {
   // Local list of templates, allowing the doctor to dynamically add new ones ("create master")
   const [customTemplates, setCustomTemplates] = useState<string[]>([]);
@@ -75,6 +77,7 @@ export default function AdvicesCard({
           {/* Quick template button */}
           <button
             type="button"
+            onClick={onOpenDrawer}
             className="flex items-center gap-1 px-1.5 py-0.5 hover:bg-[#F1F5F9] rounded text-slate-500 hover:text-indigo-600 text-[10px] font-bold transition-colors"
             title="Advices Templates Quick-List"
           >
@@ -95,12 +98,15 @@ export default function AdvicesCard({
       </div>
 
       <div className="space-y-3">
-        {/* Formatting bar mockup */}
-        <div className="flex gap-2 text-[10px] font-extrabold text-[#718096] border-b pb-1 select-none items-center">
-          <button type="button" className="px-1.5 py-0.5 hover:bg-[#F1F5F9] rounded">B</button>
-          <button type="button" className="px-1.5 py-0.5 hover:bg-[#F1F5F9] rounded italic">I</button>
-          <button type="button" className="px-1.5 py-0.5 hover:bg-[#F1F5F9] rounded">
-            <svg className="w-3.5 h-3.5 inline-block text-slate-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+        {/* Toolbar with small list icon */}
+        <div className="flex gap-2 border-b pb-1 select-none items-center">
+          <button
+            type="button"
+            onClick={onOpenDrawer}
+            className="p-1 hover:bg-[#F1F5F9] rounded text-slate-500 hover:text-primary transition-colors flex items-center justify-center"
+            title="Open Select Advices Drawer"
+          >
+            <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
@@ -159,3 +165,4 @@ export default function AdvicesCard({
     </section>
   );
 }
+

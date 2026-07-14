@@ -12,7 +12,7 @@ async function fetchOptions(categoryId: number): Promise<string[]> {
       .select("value")
       .eq("category_id", categoryId)
       .order("usage_count", { ascending: false })
-      .limit(40);
+      .limit(5000);
     if (error) throw error;
     return (data || []).map((d: any) => d.value);
   } catch (err) {
@@ -129,15 +129,25 @@ function InlineAutoComplete({
 }) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const dropdownClicked = useRef(false);
+  const autoRef = useRef<any>(null);
 
   const search = (event: { query: string }) => {
     const q = event.query.trim().toLowerCase();
-    let results = options.filter((o) => o.toLowerCase().includes(q));
-    if (!q) results = options;
+    let results = options
+      .filter((o) => o.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const aStarts = a.toLowerCase().startsWith(q);
+        const bStarts = b.toLowerCase().startsWith(q);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      });
+    const sliced = results.slice(0, 30);
     if (q && !options.some((o) => o.toLowerCase() === q)) {
-      results = [...results, `+ Create "${event.query.trim()}"`];
+      setSuggestions([...sliced, `+ Create "${event.query.trim()}"`]);
+    } else {
+      setSuggestions(sliced);
     }
-    setSuggestions(results);
   };
 
   const handleSelect = (e: { value: string }) => {
@@ -177,12 +187,17 @@ function InlineAutoComplete({
   return (
     <div className="w-full h-full relative primereact-autocomplete-inline">
       <AutoComplete
+        ref={autoRef}
         value={value}
         suggestions={suggestions}
         completeMethod={search}
         onChange={(e) => onChange(e.value)}
         onSelect={handleSelect}
         onBlur={handleBlur}
+        minLength={0}
+        onFocus={(e) => {
+          autoRef.current?.search(e, value || "", "dropdown");
+        }}
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
@@ -212,15 +227,25 @@ function InlineParameterAutoComplete({
 }) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const dropdownClicked = useRef(false);
+  const autoRef = useRef<any>(null);
 
   const search = (event: { query: string }) => {
     const q = event.query.trim().toLowerCase();
-    let results = paramOptions.filter((o) => o.toLowerCase().includes(q));
-    if (!q) results = paramOptions;
+    let results = paramOptions
+      .filter((o) => o.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const aStarts = a.toLowerCase().startsWith(q);
+        const bStarts = b.toLowerCase().startsWith(q);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      });
+    const sliced = results.slice(0, 30);
     if (q && !paramOptions.some((o) => o.toLowerCase() === q)) {
-      results = [...results, `+ Create "${event.query.trim()}"`];
+      setSuggestions([...sliced, `+ Create "${event.query.trim()}"`]);
+    } else {
+      setSuggestions(sliced);
     }
-    setSuggestions(results);
   };
 
   const handleSelect = (e: { value: string }) => {
@@ -264,12 +289,17 @@ function InlineParameterAutoComplete({
   return (
     <div className="w-full h-full relative primereact-autocomplete-inline flex items-center">
       <AutoComplete
+        ref={autoRef}
         value={value}
         suggestions={suggestions}
         completeMethod={search}
         onChange={(e) => { if (typeof e.value === "string") onChange(e.value); }}
         onSelect={handleSelect}
         onBlur={handleBlur}
+        minLength={0}
+        onFocus={(e) => {
+          autoRef.current?.search(e, value || "", "dropdown");
+        }}
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
@@ -344,14 +374,23 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
         return;
       }
       const qLower = q.toLowerCase();
-      let results = paramOptions.filter((o) => o.toLowerCase().includes(qLower));
+      let results = paramOptions
+        .filter((o) => o.toLowerCase().includes(qLower))
+        .sort((a, b) => {
+          const aStarts = a.toLowerCase().startsWith(qLower);
+          const bStarts = b.toLowerCase().startsWith(qLower);
+          if (aStarts && !bStarts) return -1;
+          if (!aStarts && bStarts) return 1;
+          return 0;
+        });
       
       const hasPerfectMatch = paramOptions.some((o) => o.toLowerCase() === qLower);
+      const sliced = results.slice(0, 30);
       if (!hasPerfectMatch) {
-        results = [...results, `+ Create "${q}"`];
+        if (active) setSearchSuggestions([...sliced, `+ Create "${q}"`]);
+      } else {
+        if (active) setSearchSuggestions(sliced);
       }
-      
-      if (active) setSearchSuggestions(results);
     }, 200);
     return () => { active = false; clearTimeout(timer); };
   }, [searchVal, paramOptions]);

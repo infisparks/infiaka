@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 
 interface FollowUpCardProps {
   followUpVal: string;
@@ -28,6 +28,35 @@ export default function FollowUpCard({
 }: FollowUpCardProps) {
   const [showDD, setShowDD] = useState(false);
   const [calcDate, setCalcDate] = useState("");
+  const [focusedIdx, setFocusedIdx] = useState(-1);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showDD || dynamicSuggestions.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setFocusedIdx((prev) => {
+        const next = prev + 1;
+        return next >= dynamicSuggestions.length ? 0 : next;
+      });
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setFocusedIdx((prev) => {
+        const next = prev - 1;
+        return next < 0 ? dynamicSuggestions.length - 1 : next;
+      });
+    } else if (e.key === "Enter") {
+      if (focusedIdx >= 0 && focusedIdx < dynamicSuggestions.length) {
+        e.preventDefault();
+        setFollowUpVal(dynamicSuggestions[focusedIdx]);
+        setShowDD(false);
+        setFocusedIdx(-1);
+      }
+    } else if (e.key === "Escape") {
+      setShowDD(false);
+      setFocusedIdx(-1);
+    }
+  };
 
   // Parse value to calculate target date
   useEffect(() => {
@@ -87,6 +116,30 @@ export default function FollowUpCard({
     }
   }, [followUpVal]);
 
+  // Dynamically compute suggested intervals based on input value
+  const dynamicSuggestions = useMemo(() => {
+    if (!followUpVal || !followUpVal.trim()) {
+      return SUGGESTED_INTERVALS;
+    }
+
+    const trimmed = followUpVal.trim();
+    // Extract a number from the input
+    const matchNum = trimmed.match(/^(\d+)$/);
+    if (matchNum) {
+      const num = parseInt(matchNum[1], 10);
+      return [
+        `${num} ${num === 1 ? "Day" : "Days"}`,
+        `${num} ${num === 1 ? "Week" : "Weeks"}`,
+        `${num} ${num === 1 ? "Month" : "Months"}`,
+        `${num} ${num === 1 ? "Year" : "Years"}`
+      ];
+    }
+
+    return SUGGESTED_INTERVALS.filter(opt => 
+      opt.toLowerCase().includes(trimmed.toLowerCase())
+    );
+  }, [followUpVal]);
+
   return (
     <section className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-4 shadow-sm w-full relative">
       {/* Header */}
@@ -107,9 +160,19 @@ export default function FollowUpCard({
             <input
               type="text"
               value={followUpVal}
-              onChange={(e) => setFollowUpVal(e.target.value)}
-              onFocus={() => setShowDD(true)}
-              onBlur={() => setTimeout(() => setShowDD(false), 200)}
+              onChange={(e) => {
+                setFollowUpVal(e.target.value);
+                setFocusedIdx(-1);
+              }}
+              onFocus={() => {
+                setShowDD(true);
+                setFocusedIdx(-1);
+              }}
+              onBlur={() => setTimeout(() => {
+                setShowDD(false);
+                setFocusedIdx(-1);
+              }, 200)}
+              onKeyDown={handleKeyDown}
               placeholder="e.g. 10 Days"
               className="w-full h-10 px-3.5 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[12px] font-semibold text-[#1E293B] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] transition-all"
             />
@@ -124,16 +187,21 @@ export default function FollowUpCard({
             )}
 
             {/* Dropdown menu */}
-            {showDD && (
+            {showDD && dynamicSuggestions.length > 0 && (
               <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-48 overflow-y-auto">
-                {SUGGESTED_INTERVALS.map((opt) => (
+                {dynamicSuggestions.map((opt, index) => (
                   <div
                     key={opt}
                     onMouseDown={() => {
                       setFollowUpVal(opt);
                       setShowDD(false);
+                      setFocusedIdx(-1);
                     }}
-                    className="px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 text-[11.5px] font-semibold text-[#1E293B] hover:bg-[#F8FAFC] transition-colors text-left"
+                    className={`px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 text-[11.5px] font-semibold text-left transition-colors ${
+                      index === focusedIdx
+                        ? "bg-[#EFF6FF] text-[#1D4ED8]"
+                        : "text-[#1E293B] hover:bg-[#F8FAFC]"
+                    }`}
                   >
                     {opt}
                   </div>
@@ -142,15 +210,28 @@ export default function FollowUpCard({
             )}
           </div>
 
-          {/* Calendar icon button */}
-          <button
-            type="button"
-            className="w-10 h-10 rounded-lg border border-[#E2E8F0] hover:bg-slate-50 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shrink-0"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </button>
+          {/* Calendar selector icon button wrapper */}
+          <div className="relative w-10 h-10 shrink-0">
+            <input
+              type="date"
+              value={followUpVal.match(/^\d{4}-\d{2}-\d{2}$/) ? followUpVal : ""}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setFollowUpVal(e.target.value);
+                }
+              }}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              title="Select follow up date"
+            />
+            <button
+              type="button"
+              className="w-full h-full rounded-lg border border-[#E2E8F0] hover:bg-slate-50 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </button>
+          </div>
 
           {/* Auto fill check right aligned */}
           <label className="flex items-center gap-1.5 text-[10.5px] font-extrabold text-[#64748B] cursor-pointer shrink-0">

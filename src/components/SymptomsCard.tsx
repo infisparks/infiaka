@@ -23,7 +23,7 @@ async function fetchOptions(categoryId: number, search: string = "") {
       .select("value")
       .eq("category_id", categoryId)
       .order("usage_count", { ascending: false })
-      .limit(1000);
+      .limit(5000);
 
     if (search) {
       query = query.ilike("value", `%${search}%`);
@@ -528,7 +528,18 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
 
   /* search bar keyboard nav */
   const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const list = symptomOptions.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+    const query = searchVal.trim().toLowerCase();
+    const list = symptomOptions
+      .filter((o) => !query || o.toLowerCase().includes(query))
+      .sort((a, b) => {
+        if (!query) return 0;
+        const aStarts = a.toLowerCase().startsWith(query);
+        const bStarts = b.toLowerCase().startsWith(query);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      })
+      .slice(0, 30);
     if (e.key === "ArrowDown") { e.preventDefault(); setSearchHi((p) => Math.min(p + 1, list.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setSearchHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {

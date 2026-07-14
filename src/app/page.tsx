@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
+import Link from "next/link";
 
 
 
@@ -286,8 +287,8 @@ function DashboardContent() {
         }
 
 
-        let isComp = false;
-        if (typeof window !== "undefined") {
+        let isComp = reg.is_completed || false;
+        if (typeof window !== "undefined" && !isComp) {
           const completedList = JSON.parse(localStorage.getItem("completed_appointments") || "[]");
           isComp = completedList.includes(String(reg.registration_id));
         }
@@ -1793,6 +1794,19 @@ function DashboardContent() {
               Book Appt
             </span>
           </button>
+
+          <Link
+            href="/upcoming"
+            className="w-11 py-1.5 rounded-lg flex flex-col items-center justify-center text-[#718096] hover:bg-gray-100 hover:text-foreground transition-colors"
+            title="Upcoming Appointments & Follow-ups"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90 leading-none text-center">
+              Upcoming
+            </span>
+          </Link>
 
           <a
             href="#"

@@ -14,6 +14,7 @@ import ResultsCard from "@/components/ResultsCard";
 import NotesCard from "@/components/NotesCard";
 import FollowUpCard from "@/components/FollowUpCard";
 import AdvicesCard from "@/components/AdvicesCard";
+import AdvicesDrawer from "@/components/AdvicesDrawer";
 import CurrentMedicationsDrawer from "@/components/CurrentMedicationsDrawer";
 import ExistingConditionsDrawer from "@/components/ExistingConditionsDrawer";
 import SurgicalProceduresDrawer from "@/components/SurgicalProceduresDrawer";
@@ -187,6 +188,7 @@ function RxPageContent() {
 
   const [isTravelOpen, setIsTravelOpen] = useState(false);
   const [travelHistory, setTravelHistory] = useState<TravelHistoryItem[]>([]);
+  const [isAdvicesDrawerOpen, setIsAdvicesDrawerOpen] = useState(false);
 
   // Prescription cards data states
   const [symptoms, setSymptoms] = useState<any[]>([]);
@@ -1516,7 +1518,8 @@ function RxPageContent() {
             follow_up_notes: followUpNotes,
             advice: advicesInput,
             advice_rest: advRest,
-            advice_water: advWater
+            advice_water: advWater,
+            is_completed: true
           })
           .eq("registration_id", regId);
         
@@ -2009,7 +2012,12 @@ function RxPageContent() {
 
         {/* Navigation tab bar in the center */}
         <div className="flex items-center h-full">
-          <button className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground">Overview</button>
+          <button 
+            onClick={() => router.push(`/rx/overview?rx=${rxPatientId}`)}
+            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+          >
+            Overview
+          </button>
           <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">Pad</button>
           <button className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground">Canvas</button>
           <button className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground">Medical Records</button>
@@ -2164,6 +2172,13 @@ function RxPageContent() {
           setItems={setTravelHistory}
         />
 
+        <AdvicesDrawer
+          isOpen={isAdvicesDrawerOpen}
+          onClose={() => setIsAdvicesDrawerOpen(false)}
+          advicesInput={advicesInput}
+          setAdvicesInput={setAdvicesInput}
+        />
+
         <SymptomsCard
           symptoms={symptoms}
           setSymptoms={setSymptoms}
@@ -2216,6 +2231,7 @@ function RxPageContent() {
             setAdvRest={setAdvRest}
             advWater={advWater}
             setAdvWater={setAdvWater}
+            onOpenDrawer={() => setIsAdvicesDrawerOpen(true)}
           />
         </div>
 

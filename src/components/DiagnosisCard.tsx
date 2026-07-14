@@ -16,7 +16,7 @@ async function fetchOptions(categoryId: number, search: string = "") {
       .select("value")
       .eq("category_id", categoryId)
       .order("usage_count", { ascending: false })
-      .limit(40);
+      .limit(5000);
 
     if (search) {
       query = query.ilike("value", `%${search}%`);
@@ -95,14 +95,23 @@ function ChipTagField({
   const autoRef = useRef<any>(null);
 
   const search = (event: { query: string }) => {
-    const query = event.query.trim();
-    let results = options.filter((o) =>
-      o.toLowerCase().includes(query.toLowerCase())
-    );
-    if (query && !options.some((o) => o.toLowerCase() === query.toLowerCase())) {
-      results = [...results, `+ Create "${query}"`];
+    const query = event.query.trim().toLowerCase();
+    let results = options
+      .filter((o) => o.toLowerCase().includes(query))
+      .sort((a, b) => {
+        if (!query) return 0;
+        const aStarts = a.toLowerCase().startsWith(query);
+        const bStarts = b.toLowerCase().startsWith(query);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      });
+    const sliced = results.slice(0, 30);
+    if (event.query.trim() && !options.some((o) => o.toLowerCase() === query)) {
+      setSuggestions([...sliced, `+ Create "${event.query.trim()}"`]);
+    } else {
+      setSuggestions(sliced);
     }
-    setSuggestions(results);
   };
 
   const handleChange = (e: { value: string[] }) => {
@@ -186,17 +195,26 @@ function AutoInput({
   const autoRef = useRef<any>(null);
 
   const search = (event: { query: string }) => {
-    const query = event.query.trim();
-    let results = options.filter((o) =>
-      o.toLowerCase().includes(query.toLowerCase())
-    );
-    if (!query || options.some(opt => opt === query)) {
+    const query = event.query.trim().toLowerCase();
+    let results = options
+      .filter((o) => o.toLowerCase().includes(query))
+      .sort((a, b) => {
+        if (!query) return 0;
+        const aStarts = a.toLowerCase().startsWith(query);
+        const bStarts = b.toLowerCase().startsWith(query);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      });
+    if (!query || options.some(opt => opt.toLowerCase() === query)) {
       results = options;
     }
-    if (query && !options.some((o) => o.toLowerCase() === query.toLowerCase())) {
-      results = [...results, `+ Create "${query}"`];
+    const sliced = results.slice(0, 30);
+    if (event.query.trim() && !options.some((o) => o.toLowerCase() === query)) {
+      setSuggestions([...sliced, `+ Create "${event.query.trim()}"`]);
+    } else {
+      setSuggestions(sliced);
     }
-    setSuggestions(results);
   };
 
   const handleSelect = (e: { value: string }) => {
@@ -295,17 +313,26 @@ function InlineAutoComplete({
   const autoRef = useRef<any>(null);
 
   const search = (event: { query: string }) => {
-    const query = event.query.trim();
-    let results = options.filter((o) =>
-      o.toLowerCase().includes(query.toLowerCase())
-    );
-    if (!query || options.some(opt => opt === query)) {
+    const query = event.query.trim().toLowerCase();
+    let results = options
+      .filter((o) => o.toLowerCase().includes(query))
+      .sort((a, b) => {
+        if (!query) return 0;
+        const aStarts = a.toLowerCase().startsWith(query);
+        const bStarts = b.toLowerCase().startsWith(query);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      });
+    if (!query || options.some(opt => opt.toLowerCase() === query)) {
       results = options;
     }
-    if (query && !options.some((o) => o.toLowerCase() === query.toLowerCase())) {
-      results = [...results, `+ Create "${query}"`];
+    const sliced = results.slice(0, 30);
+    if (event.query.trim() && !options.some((o) => o.toLowerCase() === query)) {
+      setSuggestions([...sliced, `+ Create "${event.query.trim()}"`]);
+    } else {
+      setSuggestions(sliced);
     }
-    setSuggestions(results);
   };
 
   const handleSelect = (e: { value: string }) => {
@@ -506,7 +533,18 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
 
   /* search key actions */
   const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const list = diagnosisOptions.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+    const query = searchVal.trim().toLowerCase();
+    const list = diagnosisOptions
+      .filter((o) => !query || o.toLowerCase().includes(query))
+      .sort((a, b) => {
+        if (!query) return 0;
+        const aStarts = a.toLowerCase().startsWith(query);
+        const bStarts = b.toLowerCase().startsWith(query);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      })
+      .slice(0, 30);
     if (e.key === "ArrowDown") { e.preventDefault(); setSearchHi((p) => Math.min(p + 1, list.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setSearchHi((p) => Math.max(p - 1, 0)); }
     else if (e.key === "Enter") {
@@ -677,7 +715,18 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
         </div>
 
         {searchOpen && (() => {
-          const list = diagnosisOptions.filter((o) => !searchVal || o.toLowerCase().includes(searchVal.toLowerCase()));
+          const query = searchVal.trim().toLowerCase();
+          const list = diagnosisOptions
+            .filter((o) => !query || o.toLowerCase().includes(query))
+            .sort((a, b) => {
+              if (!query) return 0;
+              const aStarts = a.toLowerCase().startsWith(query);
+              const bStarts = b.toLowerCase().startsWith(query);
+              if (aStarts && !bStarts) return -1;
+              if (!aStarts && bStarts) return 1;
+              return 0;
+            })
+            .slice(0, 30);
           const hasCustomVal = searchVal.trim() && !diagnosisOptions.some(o => o.toLowerCase() === searchVal.trim().toLowerCase());
           if (list.length === 0 && !hasCustomVal) return null;
           return (

@@ -24,7 +24,7 @@ async function fetchOptions(categoryId: number): Promise<string[]> {
       .select("value")
       .eq("category_id", categoryId)
       .order("usage_count", { ascending: false })
-      .limit(40);
+      .limit(5000);
     if (error) throw error;
     return (data || []).map((d: any) => d.value);
   } catch (err) {
@@ -84,12 +84,21 @@ function InlineAutoComplete({
 
   const search = (event: { query: string }) => {
     const q = event.query.trim().toLowerCase();
-    let results = options.filter((o) => o.toLowerCase().includes(q));
-    if (!q) results = options;
+    let results = options
+      .filter((o) => o.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const aStarts = a.toLowerCase().startsWith(q);
+        const bStarts = b.toLowerCase().startsWith(q);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      });
+    const sliced = results.slice(0, 30);
     if (q && !options.some((o) => o.toLowerCase() === q)) {
-      results = [...results, `+ Create "${event.query.trim()}"`];
+      setSuggestions([...sliced, `+ Create "${event.query.trim()}"`]);
+    } else {
+      setSuggestions(sliced);
     }
-    setSuggestions(results);
   };
 
   const handleSelect = (e: { value: string }) => {
@@ -167,12 +176,21 @@ function InlineProcedureAutoComplete({
 
   const search = (event: { query: string }) => {
     const q = event.query.trim().toLowerCase();
-    let results = procOptions.filter((o) => o.toLowerCase().includes(q));
-    if (!q) results = procOptions;
+    let results = procOptions
+      .filter((o) => o.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const aStarts = a.toLowerCase().startsWith(q);
+        const bStarts = b.toLowerCase().startsWith(q);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      });
+    const sliced = results.slice(0, 30);
     if (q && !procOptions.some((o) => o.toLowerCase() === q)) {
-      results = [...results, `+ Create "${event.query.trim()}"`];
+      setSuggestions([...sliced, `+ Create "${event.query.trim()}"`]);
+    } else {
+      setSuggestions(sliced);
     }
-    setSuggestions(results);
   };
 
   const handleSelect = (e: { value: string }) => {
@@ -286,14 +304,23 @@ export default function ProceduresCard({ procedures, setProcedures }: Procedures
         return;
       }
       const qLower = q.toLowerCase();
-      let results = procedureOptions.filter((o) => o.toLowerCase().includes(qLower));
+      let results = procedureOptions
+        .filter((o) => o.toLowerCase().includes(qLower))
+        .sort((a, b) => {
+          const aStarts = a.toLowerCase().startsWith(qLower);
+          const bStarts = b.toLowerCase().startsWith(qLower);
+          if (aStarts && !bStarts) return -1;
+          if (!aStarts && bStarts) return 1;
+          return 0;
+        });
       
       const hasPerfectMatch = procedureOptions.some((o) => o.toLowerCase() === qLower);
+      const sliced = results.slice(0, 30);
       if (!hasPerfectMatch) {
-        results = [...results, `+ Create "${q}"`];
+        if (active) setSearchSuggestions([...sliced, `+ Create "${q}"`]);
+      } else {
+        if (active) setSearchSuggestions(sliced);
       }
-      
-      if (active) setSearchSuggestions(results);
     }, 200);
     return () => { active = false; clearTimeout(timer); };
   }, [searchVal, procedureOptions]);
