@@ -7,6 +7,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import Link from "next/link";
 import PrintPrescription from "@/components/PrintPrescription";
+import Sidebar from "@/components/Sidebar";
 import { useRef } from "react";
 import QRCode from "qrcode";
 
@@ -273,6 +274,7 @@ function DashboardContent() {
         .select("*")
         .gte("appointment_date_time", startRange)
         .lte("appointment_date_time", endRange)
+        .or("is_deleted.is.null,is_deleted.eq.false")
         .order("registration_id", { ascending: false });
 
       if (rError) throw rError;
@@ -505,6 +507,12 @@ function DashboardContent() {
     setSelectedBookingPatient(null);
     resetForm();
   };
+
+  // Delete Appointment state variables
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletingRegId, setDeletingRegId] = useState<string | number | null>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+
   const [activeTab, setActiveTab] = useState<"MY_OPD" | "COMPLETED">("MY_OPD");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDoctorFilter, setSelectedDoctorFilter] = useState<string>(() => {
@@ -1253,6 +1261,35 @@ function DashboardContent() {
     }
   };
 
+  // Delete Confirmation Handler
+  const handleDeleteConfirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deletingRegId) return;
+
+    try {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const { error } = await supabase
+        .from("aka_opd_registration")
+        .update({
+          is_deleted: true,
+          deleted_reason: deleteReason || "No reason specified",
+          deleted_date: todayStr
+        })
+        .eq("registration_id", Number(deletingRegId));
+
+      if (error) throw error;
+
+      setIsDeleteModalOpen(false);
+      setDeletingRegId(null);
+      setDeleteReason("");
+
+      await loadPatientsFromDb(selectedDate);
+    } catch (err) {
+      console.error("Failed to delete appointment:", err);
+      alert("Failed to delete appointment. Please try again.");
+    }
+  };
+
   const handleSaveVitals = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPatientId) return;
@@ -1876,124 +1913,17 @@ function DashboardContent() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#F5F6F8]">
       {/* LEFT SIDEBAR */}
-      <aside className="w-14 bg-white border-r border-[#E5E7EB] flex flex-col items-center py-2 select-none shrink-0 h-full">
-        <div className="mb-4 flex flex-col items-center">
-          <div className="w-9 h-9 rounded-full bg-[#1e293b] flex items-center justify-center border border-[#CBD5E0] shadow-xs cursor-pointer">
-            <span className="text-white text-base font-bold">C</span>
-          </div>
-          <span className="text-[7px] text-[#A0AEC0] font-semibold mt-1">E-HMS</span>
-        </div>
-
-        <nav className="flex-1 w-full flex flex-col gap-1.5 px-1 items-center">
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              closeBooking();
-            }}
-            className={`w-11 py-1.5 rounded-lg flex flex-col items-center justify-center transition-colors ${
-              !isBookOpen ? "text-primary bg-primary/10" : "text-[#718096] hover:bg-gray-100"
-            }`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            <span className="text-[9px] font-bold mt-0.5 tracking-tight scale-90">Queue</span>
-          </a>
-
-          <button
-            onClick={openBooking}
-            className={`w-11 py-1.5 rounded-lg flex flex-col items-center justify-center transition-colors ${
-              isBookOpen ? "text-primary bg-primary/10" : "text-[#718096] hover:bg-gray-100"
-            }`}
-            title="Book Appointment"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90 leading-none text-center">
-              Book Appt
-            </span>
-          </button>
-
-          <Link
-            href="/upcoming"
-            className="w-11 py-1.5 rounded-lg flex flex-col items-center justify-center text-[#718096] hover:bg-gray-100 hover:text-foreground transition-colors"
-            title="Upcoming Appointments & Follow-ups"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90 leading-none text-center">
-              Upcoming
-            </span>
-          </Link>
-
-          <a
-            href="#"
-            className="w-11 py-1.5 rounded-lg flex flex-col items-center justify-center text-[#718096] hover:bg-gray-100 hover:text-foreground transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-            </svg>
-            <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90">Payments</span>
-          </a>
-
-          <a
-            href="#"
-            className="w-11 py-1.5 rounded-lg flex flex-col items-center justify-center text-[#718096] hover:bg-gray-100 hover:text-foreground transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-            </svg>
-            <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90">Orders</span>
-          </a>
-
-          <a
-            href="#"
-            className="w-11 py-1.5 rounded-lg flex flex-col items-center justify-center text-[#718096] hover:bg-gray-100 hover:text-foreground transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-            </svg>
-            <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90">More</span>
-          </a>
-        </nav>
-
-        <div className="w-full flex flex-col items-center gap-3 border-t border-[#E5E7EB] pt-2">
-          <button className="relative w-8 h-8 rounded-lg flex items-center justify-center text-[#718096] hover:bg-gray-100">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-            </svg>
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-          </button>
-
-          <button className="w-8 h-8 rounded-lg flex items-center justify-center text-[#718096] hover:bg-gray-100">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-          </button>
-
-          <img
-            src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=150"
-            alt="Doctor profile"
-            className="w-7 h-7 rounded-full object-cover border border-[#CBD5E0] cursor-pointer"
-          />
-
-          <button
-            onClick={async () => {
-              await supabase.auth.signOut();
-              router.push("/login");
-            }}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors"
-            title="Sign Out"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-          </button>
-        </div>
-      </aside>
+      <Sidebar
+        active={isBookOpen ? "book" : "queue"}
+        onQueueClick={(e) => {
+          e.preventDefault();
+          closeBooking();
+        }}
+        onBookClick={(e) => {
+          e.preventDefault();
+          openBooking();
+        }}
+      />
 
       {/* MAIN CONTAINER */}
       <div className="flex-1 flex flex-col overflow-hidden h-full relative">
@@ -2365,6 +2295,26 @@ function DashboardContent() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                       Print Prescription
+                    </button>
+
+                    {/* Delete Appointment Button */}
+                    <button
+                      onClick={() => {
+                        if (patient.opdRegistration?.registration_id) {
+                          setDeletingRegId(patient.opdRegistration.registration_id);
+                          setDeleteReason("");
+                          setIsDeleteModalOpen(true);
+                        } else {
+                          alert("Cannot delete: OPD registration ID not found.");
+                        }
+                      }}
+                      className="px-2 h-6 border border-red-200 hover:bg-red-50 hover:text-red-700 rounded text-[10px] font-bold text-red-600 flex items-center gap-1 transition-colors shrink-0"
+                      title="Delete Appointment"
+                    >
+                      <svg className="w-2.5 h-2.5 text-red-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete
                     </button>
 
 
@@ -3521,6 +3471,69 @@ function DashboardContent() {
                     className="px-3 py-1.5 bg-primary hover:bg-primary-hover text-[11px] font-bold text-white rounded-md"
                   >
                     Save Vitals
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* STANDALONE DELETE APPOINTMENT CONFIRMATION MODAL */}
+        {isDeleteModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-in fade-in duration-150">
+            <div className="bg-white w-full max-w-sm rounded-lg border border-[#E5E7EB] shadow-xl overflow-hidden animate-in zoom-in-95 duration-150">
+              <div className="p-3 bg-red-600 text-white flex items-center justify-between">
+                <h3 className="text-[12px] font-bold">Delete Appointment</h3>
+                <button
+                  onClick={() => {
+                    setIsDeleteModalOpen(false);
+                    setDeletingRegId(null);
+                    setDeleteReason("");
+                  }}
+                  className="p-1 hover:bg-red-700 rounded text-white"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <form onSubmit={handleDeleteConfirm} className="p-4 space-y-3">
+                <p className="text-[11px] text-[#718096]">
+                  Are you sure you want to delete this appointment? This action will remove it from the active queue and billing reports.
+                </p>
+
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                    Reason for Deletion *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={deleteReason}
+                    onChange={(e) => setDeleteReason(e.target.value)}
+                    placeholder="Enter reason (e.g. Patient did not show up)"
+                    className="w-full px-2.5 py-1.5 border border-[#E5E7EB] rounded-md text-[11px] bg-[#F9FAFB] focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#E5E7EB]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDeleteModalOpen(false);
+                      setDeletingRegId(null);
+                      setDeleteReason("");
+                    }}
+                    className="px-3 py-1.5 border border-border text-[11px] font-semibold hover:bg-gray-50 rounded-md text-foreground"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-[11px] font-bold text-white rounded-md"
+                  >
+                    Delete Appointment
                   </button>
                 </div>
               </form>

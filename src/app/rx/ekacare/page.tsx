@@ -127,11 +127,11 @@ function EkaCarePageContent() {
     const loadPatientData = async () => {
       try {
         setLoading(true);
-        // Fetch OPD registration details first
         const { data: regData, error: rError } = await supabase
           .from("aka_opd_registration")
           .select("*")
           .eq("registration_id", rxPatientId)
+          .or("is_deleted.is.null,is_deleted.eq.false")
           .maybeSingle();
 
         if (rError) throw rError;

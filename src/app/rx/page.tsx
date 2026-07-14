@@ -335,6 +335,7 @@ function RxPageContent() {
           .from("aka_opd_registration")
           .select("*")
           .eq("registration_id", rxPatientId)
+          .or("is_deleted.is.null,is_deleted.eq.false")
           .maybeSingle();
 
         if (rError) throw rError;

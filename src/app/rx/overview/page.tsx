@@ -192,6 +192,7 @@ function OverviewContent() {
         .from("aka_opd_registration")
         .select("*")
         .eq("patient_uhid", patientUhid)
+        .or("is_deleted.is.null,is_deleted.eq.false")
         .order("appointment_date_time", { ascending: false });
 
       if (regErr) throw regErr;

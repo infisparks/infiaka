@@ -156,6 +156,7 @@ export default function PrescriptionDetailPage() {
           .from("aka_opd_registration")
           .select("*")
           .eq("registration_id", Number(registrationId))
+          .or("is_deleted.is.null,is_deleted.eq.false")
           .maybeSingle();
 
         if (regErr) throw regErr;
