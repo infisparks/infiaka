@@ -327,6 +327,93 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
   const [packages, setPackages] = useState(fallbackPackages);
   const [showPkgDropdown, setShowPkgDropdown] = useState(false);
   const pkgDropdownRef = useRef<HTMLDivElement>(null);
+  // Create Package state
+  const [showCreatePkgModal, setShowCreatePkgModal] = useState(false);
+  const [newPkgName, setNewPkgName]                 = useState("");
+  const [isCreatingPkg, setIsCreatingPkg]             = useState(false);
+  const [toast, setToast]                             = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleCreatePackage = async () => {
+    const name = newPkgName.trim();
+    if (!name) return;
+    if (labs.length === 0) {
+      showToast("Cannot create package: Active list is empty.", "error");
+      return;
+    }
+    setIsCreatingPkg(true);
+
+    try {
+      const { data: existingPkg } = await supabase
+        .from("aka_lab_packages")
+        .select("id")
+        .eq("name", name)
+        .maybeSingle();
+
+      let packageId: number;
+
+      if (existingPkg) {
+        packageId = existingPkg.id;
+        await supabase
+          .from("aka_lab_package_items")
+          .delete()
+          .eq("package_id", packageId);
+      } else {
+        const { data: newPkg, error: pkgErr } = await supabase
+          .from("aka_lab_packages")
+          .insert({ name })
+          .select("id")
+          .single();
+
+        if (pkgErr) throw pkgErr;
+        packageId = newPkg.id;
+      }
+
+      const itemsToInsert = labs.map((l) => ({
+        package_id: packageId,
+        test_name: l.name.trim()
+      }));
+
+      const { error: itemsErr } = await supabase
+        .from("aka_lab_package_items")
+        .insert(itemsToInsert);
+
+      if (itemsErr) throw itemsErr;
+
+      showToast(`Package "${name}" saved successfully!`, "success");
+
+      const { data: pkgData } = await supabase
+        .from("aka_lab_packages")
+        .select(`
+          id,
+          name,
+          items:aka_lab_package_items (
+            test_name
+          )
+        `);
+
+      if (pkgData) {
+        const mappedPkgs = pkgData.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          items: p.items?.map((item: any) => item.test_name) || []
+        }));
+        setPackages(mappedPkgs);
+      }
+
+      setNewPkgName("");
+      setShowCreatePkgModal(false);
+    } catch (err) {
+      console.error("Error creating lab package:", err);
+      showToast("Failed to save lab package.", "error");
+    } finally {
+      setIsCreatingPkg(false);
+    }
+  };
 
   const [medInput, setMedInput]             = useState("");
   const [medInputFocused, setMedInputFocused] = useState(false);
@@ -552,6 +639,22 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
                     </div>
                   </button>
                 ))}
+                <div className="border-t border-slate-100 mt-1 pt-1.5 px-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (labs.length === 0) {
+                        showToast("Add some tests to the list first to save as a package!", "error");
+                        return;
+                      }
+                      setShowCreatePkgModal(true);
+                      setShowPkgDropdown(false);
+                    }}
+                    className="w-full text-center px-3 py-2 text-[10px] font-extrabold text-yellow-800 bg-yellow-50/50 hover:bg-yellow-100/60 rounded-lg transition-colors cursor-pointer block border border-yellow-200"
+                  >
+                    + Save Active List as Package
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -715,6 +818,92 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
           </div>
         )}
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-5 right-5 z-[200] bg-slate-900 text-white rounded-xl shadow-2xl p-3.5 px-4 flex items-center gap-2.5 max-w-sm transition-all animate-fade-in-up border border-slate-800">
+          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0
+            ${toast.type === "success" ? "bg-emerald-500 text-white" : "bg-red-500 text-white"}`}>
+            {toast.type === "success" ? "✓" : "✕"}
+          </div>
+          <span className="text-[11.5px] font-extrabold tracking-tight">{toast.message}</span>
+        </div>
+      )}
+
+      {/* Save Current as Package Modal */}
+      {showCreatePkgModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-[150] p-4 select-none animate-fade-in">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl p-5 w-full max-w-sm text-left">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center text-yellow-800 text-xs font-bold shadow-sm">
+                📦
+              </div>
+              <div>
+                <h3 className="text-[13px] font-bold text-slate-800 leading-tight">Create Lab Package</h3>
+                <p className="text-[9.5px] text-slate-400 font-bold leading-normal mt-0.5">
+                  Save active list as a reusable package template.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[9.5px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                  Package Name *
+                </label>
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="e.g. Pre-Op Profile, Cardiac Panel"
+                  value={newPkgName}
+                  onChange={(e) => setNewPkgName(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === "Enter") {
+                      await handleCreatePackage();
+                    } else if (e.key === "Escape") {
+                      setShowCreatePkgModal(false);
+                    }
+                  }}
+                  className="w-full text-[12px] px-3 py-2 border border-slate-200 focus:outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-100 rounded-lg font-semibold placeholder:text-slate-350"
+                />
+              </div>
+
+              {/* Items included */}
+              <div>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-1">
+                  Tests Included ({labs.length}):
+                </span>
+                <div className="bg-slate-50 border border-slate-150 rounded-lg p-2 max-h-24 overflow-y-auto space-y-1">
+                  {labs.map((l) => (
+                    <div key={l.id} className="text-[10px] font-semibold text-slate-650 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 shrink-0" />
+                      <span className="truncate">{l.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePkgModal(false)}
+                  className="px-3 py-1.5 text-[10px] font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreatePackage}
+                  disabled={!newPkgName.trim() || isCreatingPkg}
+                  className="px-3.5 py-1.5 text-[10px] font-extrabold text-white bg-yellow-600 hover:bg-yellow-750 disabled:bg-slate-200 disabled:text-slate-400 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  {isCreatingPkg ? "Saving..." : "Save Package"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

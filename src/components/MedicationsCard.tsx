@@ -85,35 +85,37 @@ async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
       return (data || []).map(toItem);
     }
 
-    // Tier 1: Name STARTS WITH query — uses btree index, very fast on 250k rows
-    const { data: tier1 } = await supabase
-      .from("medicine")
-      .select("id, name, salt_composition, short_composition1, type")
-      .ilike("name", `${q}%`)
-      .order("name", { ascending: true })
-      .limit(12);
-
-    const seen = new Set<string>((tier1 || []).map((m: any) => m.name));
-    const results: MedicineItem[] = (tier1 || []).map(toItem);
-
-    // Tier 2: Name CONTAINS query (but doesn't start with — avoids duplicates)
-    if (results.length < 15) {
-      const { data: tier2 } = await supabase
+    // Run Tier 1 (starts with) and Tier 2 (contains) queries in parallel to reduce network latency
+    const [tier1Result, tier2Result] = await Promise.all([
+      supabase
+        .from("medicine")
+        .select("id, name, salt_composition, short_composition1, type")
+        .ilike("name", `${q}%`)
+        .order("name", { ascending: true })
+        .limit(12),
+      supabase
         .from("medicine")
         .select("id, name, salt_composition, short_composition1, type")
         .ilike("name", `%${q}%`)
-        .not("name", "ilike", `${q}%`)   // exclude starts-with already fetched
+        .not("name", "ilike", `${q}%`)   // exclude starts-with results
         .order("name", { ascending: true })
-        .limit(10);
-      for (const m of (tier2 || [])) {
-        if (!seen.has(m.name)) {
-          seen.add(m.name);
-          results.push(toItem(m));
-        }
+        .limit(10)
+    ]);
+
+    const tier1 = tier1Result.data || [];
+    const tier2 = tier2Result.data || [];
+
+    const seen = new Set<string>(tier1.map((m: any) => m.name));
+    const results: MedicineItem[] = tier1.map(toItem);
+
+    for (const m of tier2) {
+      if (!seen.has(m.name)) {
+        seen.add(m.name);
+        results.push(toItem(m));
       }
     }
 
-    // Tier 3: Composition match only if we have very few name results
+    // Tier 3: Composition / Salt matches (only requested if we have very few name results)
     if (results.length < 8) {
       const { data: tier3 } = await supabase
         .from("medicine")
@@ -134,7 +136,6 @@ async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
     console.error("Error searching medicines:", err);
     return [];
   }
-
 }
 
 async function insertMedicineIntoDb(name: string, generic: string = "", type: string = "tablet"): Promise<MedicineItem> {
@@ -540,7 +541,6 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
   const [durationOptions, setDurationOptions] = useState<string[]>([]);
   const [startOptions, setStartOptions] = useState<string[]>([]);
   const [instrOptions, setInstrOptions] = useState<string[]>([]);
-  const [expandedFormMeds, setExpandedFormMeds] = useState<Record<string, boolean>>({});
 
   // Fetch initial suggestion options from Supabase on mount
   const refreshAllOptions = async () => {
@@ -840,50 +840,22 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                         placeholder="Medicine"
                       />
                     </div>
-                    {(() => {
-                      const isDefaultForm = (formName: string) => {
-                        if (!formName) return true;
-                        return DEFAULT_FORMS.some(f => f.toLowerCase() === formName.toLowerCase());
-                      };
-                      const showFullList = expandedFormMeds[med.id] || !isDefaultForm(med.form || "");
-                      const currentOptions = showFullList ? FULL_FORMS : DEFAULT_FORMS;
-
-                      return (
-                        <select
-                          value={med.form?.toLowerCase() || "tablet"}
-                          onChange={async (e) => {
-                            const newForm = e.target.value;
-                            if (newForm === "___more___") {
-                              setExpandedFormMeds((p) => ({ ...p, [med.id]: true }));
-                              return;
-                            }
-                            patch(med.id, { form: newForm });
-                            if (med.name) {
-                              try {
-                                await supabase
-                                  .from("medicine")
-                                  .update({ type: newForm.toUpperCase() })
-                                  .eq("name", med.name);
-                              } catch (err) {
-                                console.error("Error updating medicine type:", err);
-                              }
-                            }
-                          }}
-                          className="text-[8.5px] text-[#4A5568] border border-slate-200 px-1 py-0.5 rounded font-extrabold bg-slate-50 uppercase leading-none shrink-0 outline-none cursor-pointer focus:ring-1 focus:ring-indigo-300"
-                        >
-                          {currentOptions.map((opt) => (
-                            <option key={opt} value={opt.toLowerCase()}>
-                              {opt}
-                            </option>
-                          ))}
-                          {!showFullList && (
-                            <option value="___more___">
-                              + More Options...
-                            </option>
-                          )}
-                        </select>
-                      );
-                    })()}
+                    <FormSelectDropdown
+                      value={med.form || "tablet"}
+                      onChange={async (newForm) => {
+                        patch(med.id, { form: newForm });
+                        if (med.name) {
+                          try {
+                            await supabase
+                              .from("medicine")
+                              .update({ type: newForm.toUpperCase() })
+                              .eq("name", med.name);
+                          } catch (err) {
+                            console.error("Error updating medicine type:", err);
+                          }
+                        }
+                      }}
+                    />
                     {/* Pencil — always visible, inline right */}
                     {editingGenericId !== med.id && (
                       <span
@@ -1092,5 +1064,130 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
         })()}
       </div>
     </section>
+  );
+}
+
+/* ─── Custom Searchable Select Badge Dropdown for Medicine Form ─── */
+function FormSelectDropdown({
+  value,
+  onChange,
+  onAfterSelect
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onAfterSelect?: () => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isExpanded, setIsExpanded] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener("mousedown", handleOutsideClick);
+    }
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [isOpen]);
+
+  const displayValue = value || "tablet";
+
+  // Check if current value is in default forms
+  const isDefaultForm = (formName: string) => {
+    if (!formName) return true;
+    return DEFAULT_FORMS.some(f => f.toLowerCase() === formName.toLowerCase());
+  };
+
+  const showFullList = isExpanded || !isDefaultForm(displayValue);
+  const activeList = showFullList ? FULL_FORMS : DEFAULT_FORMS;
+
+  // Filter options based on search query
+  const filteredOptions = activeList.filter(opt =>
+    opt.toLowerCase().includes(searchQuery.trim().toLowerCase())
+  );
+
+  return (
+    <div ref={dropdownRef} className="relative inline-block shrink-0">
+      {/* Clickable Badge Trigger */}
+      <div
+        onClick={() => {
+          setIsOpen(!isOpen);
+          setSearchQuery("");
+        }}
+        className="flex items-center gap-1 text-[8px] text-slate-600 border border-slate-200 px-2 py-0.5 rounded font-extrabold bg-slate-50 hover:bg-slate-100/80 transition-all cursor-pointer uppercase select-none leading-normal shrink-0"
+      >
+        <span>{displayValue}</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" className="w-2.5 h-2.5 text-slate-400">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+        </svg>
+      </div>
+
+      {/* Floating Popover Dropdown Panel */}
+      {isOpen && (
+        <div className="absolute left-0 mt-1 z-[120] bg-white border-2 border-indigo-100 rounded-xl shadow-2xl p-1.5 w-[160px] text-left">
+          {/* Small Search Box inside Dropdown */}
+          <div className="relative mb-1">
+            <input
+              autoFocus
+              type="text"
+              placeholder="Search form..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full text-[10px] px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 font-semibold placeholder:text-slate-350 bg-slate-50/50"
+            />
+          </div>
+
+          {/* Options List */}
+          <div className="max-h-44 overflow-y-auto space-y-0.5 pr-0.5">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((opt) => (
+                <div
+                  key={opt}
+                  onClick={() => {
+                    onChange(opt.toLowerCase());
+                    setIsOpen(false);
+                    onAfterSelect?.();
+                  }}
+                  className={`px-2 py-1 text-[10.5px] font-bold rounded-lg cursor-pointer transition-colors flex items-center justify-between
+                    ${opt.toLowerCase() === displayValue.toLowerCase() 
+                      ? "bg-indigo-50 text-indigo-700" 
+                      : "hover:bg-slate-50 text-slate-700"
+                    }`}
+                >
+                  <span>{opt}</span>
+                  {opt.toLowerCase() === displayValue.toLowerCase() && (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="w-2.5 h-2.5 text-indigo-650">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="px-2 py-1.5 text-[9px] font-bold text-slate-400 italic">
+                No match found
+              </div>
+            )}
+
+            {/* More Options toggle */}
+            {!showFullList && !searchQuery.trim() && (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsExpanded(true);
+                }}
+                className="px-2 py-1 text-[9px] text-indigo-600 font-extrabold rounded-lg hover:bg-indigo-50 cursor-pointer border-t border-slate-100 mt-1 select-none"
+              >
+                + More Options...
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

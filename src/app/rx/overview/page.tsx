@@ -711,6 +711,9 @@ function OverviewContent() {
     });
   };
 
+  // Filter registrations to show past ones
+  const pastRegistrations = registrations.filter((r) => r.registration_id !== Number(rxPatientId));
+
   useEffect(() => {
     if (activePrintData && printRef.current) {
       setTimeout(async () => {
@@ -720,10 +723,14 @@ function OverviewContent() {
         }
       }, 100);
     }
-  }, [activePrintData]);
+  }, [activePrintData, printShowLetterhead]);
 
-  // Filter registrations to show past ones
-  const pastRegistrations = registrations.filter((r) => r.registration_id !== Number(rxPatientId));
+  // Load latest visit preview by default on mount when registrations data becomes available
+  useEffect(() => {
+    if (pastRegistrations.length > 0 && !activePrintData) {
+      handlePrintPastVisit(pastRegistrations[0]);
+    }
+  }, [pastRegistrations, activePrintData]);
 
   // Helper to extract doctor initials (e.g. "DR. LAXMAN SALVE" -> "LS")
   const getInitials = (docName: string): string => {
@@ -822,8 +829,6 @@ function OverviewContent() {
           >
             Pad
           </button>
-          <button className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground">Canvas</button>
-          <button className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground">Medical Records</button>
         </div>
 
         {/* Right Header Controls */}
@@ -846,8 +851,11 @@ function OverviewContent() {
         </div>
       </header>
 
-      {/* MAIN SCREEN CONTENT (VERTICAL SCROLLING FOR ALL SECTION CARDS) */}
-      <main className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#F5F6F8]">
+      {/* MAIN SPLIT VIEW (TIMELINE LEFT | PREVIEW RIGHT) */}
+      <div className="flex-1 flex overflow-hidden bg-[#F5F6F8]">
+        
+        {/* Left Side: Timeline of Past Visits & Trends (Scrollable) */}
+        <div className="w-[45%] flex flex-col border-r border-[#E2E8F0] overflow-y-auto p-6 space-y-6 shrink-0">
         
         {/* PAST VISITS CONTAINER: SCROLLABLE HORIZONTALLY, LATEST ONE ON THE LEFT */}
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-4.5 flex flex-col shadow-2xs text-left shrink-0">
@@ -1341,7 +1349,115 @@ function OverviewContent() {
 
         </div>
 
-      </main>
+        </div>
+
+        {/* Right Side: PDF Preview Pane & Controls */}
+        <div className="flex-1 flex flex-col bg-slate-100 overflow-hidden relative border-l border-slate-200">
+          
+          {/* Preview Header / Controls */}
+          <div className="bg-white border-b border-[#E2E8F0] px-4 py-2.5 flex items-center justify-between shrink-0 shadow-2xs">
+            <span className="text-[11px] font-extrabold text-[#1E293B] uppercase tracking-wider flex items-center gap-1.5 select-none">
+              📄 Prescription Preview
+            </span>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-[#4A5568] font-bold text-[10.5px]">
+                <input
+                  type="checkbox"
+                  checked={printShowLetterhead}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setPrintShowLetterhead(checked);
+                    setPrintShowLetterheadPage2(checked);
+                  }}
+                  className="w-3.5 h-3.5 text-indigo-650 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
+                />
+                <span>Print with Letterhead</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Preview Body (Iframe) */}
+          <div className="flex-1 p-4 bg-slate-100/50">
+            {previewBlobUrl ? (
+              <iframe src={previewBlobUrl} className="w-full h-full rounded-xl border border-slate-250 shadow-sm bg-white" />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm">
+                <svg className="w-8 h-8 text-indigo-500 animate-spin mb-2" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                  <path fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" className="opacity-75" />
+                </svg>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 select-none">Generating PDF Preview...</span>
+              </div>
+            )}
+          </div>
+
+          {/* Action Footer for Preview Pane */}
+          {activePrintData && (
+            <div className="bg-white border-t border-[#E2E8F0] px-4 py-3 flex items-center justify-between shrink-0 shadow-sm">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    showToast("Prescription saved as template successfully!", "success");
+                  }}
+                  className="px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10px] font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                >
+                  📂 Save as Template
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activePrintData?.registration_id) {
+                      reassignFullVisit(activePrintData.registration_id);
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10px] font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                >
+                  📋 Use as Template
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    router.push(`/rx?rx=${rxPatientId}`);
+                  }}
+                  className="px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10px] font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                >
+                  ✏️ Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const phone = currentRxPatient.phone || "";
+                    const text = `Hello, here is your prescription from Dr. ${activePrintData?.treating_doctor || "Doctor"}. Please access it here: ${previewBlobUrl}`;
+                    window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(text)}`, "_blank");
+                    showToast("Redirecting to WhatsApp to send prescription...", "success");
+                  }}
+                  className="px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10px] font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                >
+                  💬 Send SMS/WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (previewBlobUrl) {
+                      const printWindow = window.open(previewBlobUrl);
+                      if (printWindow) {
+                        printWindow.print();
+                      }
+                    }
+                  }}
+                  className="px-4 py-1.5 bg-indigo-650 hover:bg-indigo-750 text-[10.5px] font-extrabold text-white rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+                >
+                  🖨️ Print
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* FOOTER */}
       <footer className="h-12 bg-[#1e293b] px-4 flex items-center justify-between shrink-0 select-none shadow-2xl border-t border-slate-800 z-10">
@@ -1436,49 +1552,7 @@ function OverviewContent() {
         </div>
       )}
 
-      {/* PRINT PREVIEW POPUP MODAL */}
-      {previewBlobUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-text">
-          <div className="bg-[#F8FAFC] w-full max-w-5xl h-[85vh] rounded-xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
-            {/* Modal Header */}
-            <div className="bg-white border-b border-[#E2E8F0] px-5 py-3 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-extrabold text-[#1E293B]">Prescription Preview</span>
-                <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Past Visit Layout
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  setPreviewBlobUrl(null);
-                  setActivePrintData(null);
-                }}
-                className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 transition-colors border border-slate-250 bg-white"
-              >
-                ✕
-              </button>
-            </div>
 
-            {/* Modal Body (Iframe) */}
-            <div className="flex-1 bg-slate-100 p-4">
-              <iframe src={previewBlobUrl} className="w-full h-full rounded-lg border border-slate-300 shadow-inner" />
-            </div>
-
-            {/* Modal Footer */}
-            <div className="bg-white border-t border-[#E2E8F0] px-5 py-3 flex justify-end shrink-0">
-              <button
-                onClick={() => {
-                  setPreviewBlobUrl(null);
-                  setActivePrintData(null);
-                }}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-[11px] font-extrabold text-white rounded-lg transition-all shadow-md"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );
