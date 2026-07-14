@@ -2023,6 +2023,12 @@ function RxPageContent() {
             Overview
           </button>
           <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">Pad</button>
+          <button 
+            onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
+            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+          >
+            EkaCare Old Data
+          </button>
         </div>
 
         {/* Right Header Controls */}

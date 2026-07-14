@@ -95,6 +95,7 @@ interface Patient {
   isOngoing: boolean;
   arrivalTime: string;
   arrivalMinutesAgo: number;
+  isLegacy?: boolean;
   opdRegistration?: {
     registration_id: string;
     appointment_date_time?: string;
@@ -553,7 +554,9 @@ function DashboardContent() {
 
   // --- OPD REGISTRATION PANEL STATES ---
   const [bookingSearch, setBookingSearch] = useState("");
-  const [selectedBookingPatient, setSelectedBookingPatient] = useState<Patient | null>(null);
+  const [selectedBookingPatient, setSelectedBookingPatient] = useState<any | null>(null);
+  const [asyncBookingSearchResults, setAsyncBookingSearchResults] = useState<Patient[]>([]);
+  const [searchingBooking, setSearchingBooking] = useState(false);
 
   // DB Map: public.patients
   const [title, setTitle] = useState("Mr");
@@ -645,13 +648,7 @@ function DashboardContent() {
   }, [filteredAllPatients, activeTab]);
 
   // Right Sidebar Booking Patient Search Match
-  const bookingSearchResults = useMemo(() => {
-    if (!bookingSearch.trim()) return [];
-    const query = bookingSearch.toLowerCase();
-    return patientDirectory.filter(
-      (p) => p.name.toLowerCase().includes(query) || p.phone.includes(query)
-    );
-  }, [patientDirectory, bookingSearch]);
+  const bookingSearchResults = asyncBookingSearchResults;
 
 
 
@@ -769,6 +766,132 @@ function DashboardContent() {
       }
     }
   }, [selectedBookingPatient]);
+
+  // Async Search Effect for Registration/Booking Directory (patient_detail + legacy_patients)
+  useEffect(() => {
+    if (!bookingSearch.trim()) {
+      setAsyncBookingSearchResults([]);
+      return;
+    }
+    const delayDebounceFn = setTimeout(async () => {
+      setSearchingBooking(true);
+      try {
+        const queryStr = bookingSearch.trim();
+
+        // 1. Fetch from patient_detail table (active patients)
+        let activeQuery = supabase.from("patient_detail").select("*");
+        const isNumeric = /^\d+$/.test(queryStr);
+        if (isNumeric) {
+          activeQuery = activeQuery.or(`number.eq.${queryStr},uhid.ilike.*${queryStr}*`);
+        } else {
+          activeQuery = activeQuery.or(`name.ilike.*${queryStr}*,uhid.ilike.*${queryStr}*`);
+        }
+        const { data: activeData } = await activeQuery.limit(10);
+
+        // 2. Fetch from legacy_patients table (legacy patients)
+        let legacyQuery = supabase.from("legacy_patients").select("*");
+        if (isNumeric) {
+          legacyQuery = legacyQuery.or(`phone.eq.${queryStr},uhid.ilike.*${queryStr}*`);
+        } else {
+          legacyQuery = legacyQuery.or(`name.ilike.*${queryStr}*,uhid.ilike.*${queryStr}*`);
+        }
+        const { data: legacyData } = await legacyQuery.limit(10);
+
+        // Map active patients
+        const mappedActive: Patient[] = (activeData || []).map((p) => ({
+          id: p.uhid,
+          queueNo: "",
+          title: p.title || "Mr",
+          name: p.name,
+          phoneDialCode: "+91",
+          phone: String(p.number || ""),
+          gender: p.gender || "Male",
+          age: p.age || 25,
+          ageUnit: p.age_unit || "Year",
+          dob: p.dob || "",
+          permanentAddress: p.address || "",
+          localAddress: p.local_address || "",
+          country: p.country || "India",
+          state: p.state || "Maharashtra",
+          statusTags: [],
+          billAmount: 0,
+          paymentMethod: "Cash",
+          isAbhaCreated: false,
+          customTags: [],
+          isCompleted: false,
+          isOngoing: false,
+          arrivalTime: "",
+          arrivalMinutesAgo: 0,
+          isLegacy: false
+        }));
+
+        // Map legacy patients
+        const mappedLegacy: Patient[] = (legacyData || []).map((p) => {
+          let computedAge = 25;
+          if (p.dob) {
+            try {
+              const dobDate = new Date(p.dob);
+              const ageDifMs = Date.now() - dobDate.getTime();
+              const ageDate = new Date(ageDifMs);
+              computedAge = Math.abs(ageDate.getUTCFullYear() - 1970);
+            } catch (e) {}
+          }
+          return {
+            id: p.uhid,
+            queueNo: "",
+            title: "Mr/Mrs",
+            name: p.name,
+            phoneDialCode: "+91",
+            phone: p.phone || "",
+            gender: "Male",
+            age: computedAge,
+            ageUnit: "Year",
+            dob: p.dob || "",
+            permanentAddress: "",
+            localAddress: "",
+            country: "India",
+            state: "Maharashtra",
+            statusTags: ["Legacy"],
+            billAmount: 0,
+            paymentMethod: "Cash",
+            isAbhaCreated: false,
+            customTags: [],
+            isCompleted: false,
+            isOngoing: false,
+            arrivalTime: "",
+            arrivalMinutesAgo: 0,
+            isLegacy: true
+          };
+        });
+
+        // Combine unique by UHID
+        const seenUhids = new Set<string>();
+        const combined: Patient[] = [];
+
+        mappedActive.forEach((p) => {
+          if (p.id && !seenUhids.has(p.id)) {
+            seenUhids.add(p.id);
+            combined.push(p);
+          }
+        });
+
+        mappedLegacy.forEach((p) => {
+          if (p.id && !seenUhids.has(p.id)) {
+            seenUhids.add(p.id);
+            combined.push(p);
+          }
+        });
+
+        setAsyncBookingSearchResults(combined);
+      } catch (err) {
+        console.error("Error searching patients:", err);
+      } finally {
+        setSearchingBooking(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [bookingSearch]);
 
   // Keep Edit Patient loaded in drawer if page is refreshed while editing (ID is in book param)
   useEffect(() => {
@@ -1247,7 +1370,8 @@ function DashboardContent() {
         }
       });
 
-      const isUpdate = !!selectedBookingPatient && selectedBookingPatient.id.startsWith("DLPC");
+      const isLegacySelect = !!selectedBookingPatient?.isLegacy;
+      const isUpdate = !!selectedBookingPatient && !selectedBookingPatient.isLegacy && selectedBookingPatient.id.startsWith("DLPC");
       let targetUhid = "";
 
       if (isUpdate) {
@@ -1271,21 +1395,27 @@ function DashboardContent() {
           .eq("uhid", targetUhid);
         if (pError) throw pError;
       } else {
+        const insertData: any = {
+          name: fullName,
+          number: Number(phone) || null,
+          age: Number(age) || null,
+          gender: gender,
+          address: permanentAddress,
+          age_unit: ageUnit,
+          dob: dob || null,
+          title: title,
+          state: state,
+          local_address: localAddress,
+          country: country
+        };
+        
+        if (isLegacySelect && selectedBookingPatient?.id) {
+          insertData.uhid = selectedBookingPatient.id;
+        }
+
         const { data: newP, error: pError } = await supabase
           .from("patient_detail")
-          .insert({
-            name: fullName,
-            number: Number(phone) || null,
-            age: Number(age) || null,
-            gender: gender,
-            address: permanentAddress,
-            age_unit: ageUnit,
-            dob: dob || null,
-            title: title,
-            state: state,
-            local_address: localAddress,
-            country: country
-          })
+          .insert(insertData)
           .select()
           .single();
         if (pError) throw pError;
@@ -1640,7 +1770,12 @@ function DashboardContent() {
     }
   };
 
-  const handlePrintPrescription = (patientId: string) => {
+  const handlePrintPrescription = (patientId: string, registrationId?: string | number) => {
+    if (registrationId) {
+      window.open(`/prescription/${registrationId}`, "_blank");
+      return;
+    }
+
     const patient = patients.find(p => p.id === patientId);
     if (!patient) return;
 
@@ -2222,7 +2357,7 @@ function DashboardContent() {
 
                     {/* Print Prescription Button */}
                     <button
-                      onClick={() => handlePrintPrescription(patient.id)}
+                      onClick={() => handlePrintPrescription(patient.id, patient.opdRegistration?.registration_id)}
                       className="px-2 h-6 border border-[#CBD5E0] hover:bg-gray-50 rounded text-[10px] font-bold text-[#4A5568] flex items-center gap-1 transition-colors shrink-0"
                       title="Print Prescription"
                     >
@@ -2317,12 +2452,16 @@ function DashboardContent() {
                       onChange={(e) => setBookingSearch(e.target.value)}
                       className="text-[11px] text-foreground focus:outline-none w-full bg-transparent placeholder:text-[#A0AEC0]"
                     />
+                    {searchingBooking && (
+                      <div className="w-3.5 h-3.5 border-2 border-indigo-650 border-t-transparent rounded-full animate-spin shrink-0 ml-1"></div>
+                    )}
                   </div>
 
                   {bookingSearch.trim() && (
                     <div className="space-y-1.5 pt-1">
-                      <div className="text-[9px] font-bold text-text-secondary">
-                        {bookingSearchResults.length} Matches Found
+                      <div className="text-[9px] font-bold text-text-secondary flex items-center justify-between">
+                        <span>{bookingSearchResults.length} Matches Found</span>
+                        {searchingBooking && <span className="text-[8px] animate-pulse">Searching...</span>}
                       </div>
                       
                       {bookingSearchResults.map((patient) => (
@@ -2332,11 +2471,16 @@ function DashboardContent() {
                           className="p-1.5 border border-[#E2E8F0] rounded-md bg-white hover:border-primary/50 hover:bg-primary/5 cursor-pointer flex items-center justify-between transition-colors"
                         >
                           <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px]">
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] ${patient.isLegacy ? "bg-amber-100 text-amber-800" : "bg-primary/10 text-primary"}`}>
                               {patient.name.charAt(0).toUpperCase()}
                             </div>
                             <span className="text-[10px] font-bold text-foreground">
                               {patient.name} ({patient.gender}, {patient.age}y) - {patient.phone}
+                              {patient.isLegacy && (
+                                <span className="ml-2 bg-amber-100 text-amber-800 text-[8.5px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                                  Legacy Data
+                                </span>
+                              )}
                             </span>
                           </div>
                           <span className="text-[9px] font-semibold text-primary">Select →</span>

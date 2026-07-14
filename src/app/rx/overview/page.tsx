@@ -130,8 +130,19 @@ function OverviewContent() {
 
   // PrintPrescription specific states & ref
   const printRef = useRef<any>(null);
+  const visitsScrollRef = useRef<HTMLDivElement>(null);
   const [activePrintData, setActivePrintData] = useState<any>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+
+  const scrollVisits = (direction: "left" | "right") => {
+    if (visitsScrollRef.current) {
+      const scrollAmount = 360;
+      visitsScrollRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth"
+      });
+    }
+  };
 
   // Print settings loaded from aka_setting
   const [printShowHeader, setPrintShowHeader] = useState(true);
@@ -868,7 +879,35 @@ function OverviewContent() {
             </span>
           </div>
 
-          <div className="flex flex-row gap-4.5 overflow-x-auto pb-3 w-full">
+          <div className="relative w-full group">
+            {/* Scroll Left Button */}
+            <button
+              type="button"
+              onClick={() => scrollVisits("left")}
+              className="absolute left-[-16px] top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white border border-[#E2E8F0] shadow-md hover:bg-slate-50 flex items-center justify-center text-slate-650 active:scale-95 transition-all opacity-0 group-hover:opacity-100 duration-200"
+              title="Scroll Left"
+            >
+              <svg className="w-5 h-5 stroke-current" fill="none" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+              </svg>
+            </button>
+
+            {/* Scroll Right Button */}
+            <button
+              type="button"
+              onClick={() => scrollVisits("right")}
+              className="absolute right-[-16px] top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white border border-[#E2E8F0] shadow-md hover:bg-slate-50 flex items-center justify-center text-slate-650 active:scale-95 transition-all opacity-0 group-hover:opacity-100 duration-200"
+              title="Scroll Right"
+            >
+              <svg className="w-5 h-5 stroke-current" fill="none" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+
+            <div 
+              ref={visitsScrollRef}
+              className="flex flex-row gap-4.5 overflow-x-auto pb-3 w-full scroll-smooth"
+            >
             {pastRegistrations.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 w-full text-slate-350 bg-[#FAFBFC] rounded-xl border border-dashed border-[#E2E8F0] p-4">
                 <span className="text-3xl mb-1.5">📋</span>
@@ -890,8 +929,15 @@ function OverviewContent() {
                   year: 'numeric'
                 });
 
+                const isSelected = activePrintData?.registration_id === reg.registration_id;
+
                 return (
-                  <div key={reg.registration_id} className="w-[340px] shrink-0 border border-[#E5E7EB] rounded-xl bg-white overflow-hidden shadow-2xs hover:shadow-xs transition-shadow flex flex-col h-[460px]">
+                  <div 
+                    key={reg.registration_id} 
+                    className={`w-[340px] shrink-0 border rounded-xl bg-white overflow-hidden shadow-2xs hover:shadow-xs transition-all flex flex-col h-[460px] ${
+                      isSelected ? "border-primary ring-2 ring-primary/20 shadow-md scale-[1.01]" : "border-[#E5E7EB]"
+                    }`}
+                  >
                     
                     {/* Card Header */}
                     <div className="px-3.5 py-2.5 border-b border-[#E5E7EB] bg-slate-50/50 flex items-center justify-between shrink-0">
@@ -1210,6 +1256,7 @@ function OverviewContent() {
                 );
               })
             )}
+          </div>
           </div>
         </div>
 
