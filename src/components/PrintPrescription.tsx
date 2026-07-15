@@ -795,16 +795,19 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
 
         // --- ADVICE ---
         const advList = [];
+        let adviceLines = [];
         if (advicesInput) {
-            advList.push({ main: advicesInput, sub: '' });
+            const lines = advicesInput.split('\n').filter(line => line.trim() !== '');
+            adviceLines.push(...lines.map(line => `• ${line.trim()}`));
         }
         if (advRest) {
-            advList.push({ main: "Please take some rest.", sub: '' });
+            adviceLines.push("• Please take some rest.");
         }
         if (advWater) {
-            advList.push({ main: "Drink plenty of water.", sub: '' });
+            adviceLines.push("• Drink plenty of water.");
         }
-        if (advList.length > 0) {
+        if (adviceLines.length > 0) {
+            advList.push({ main: adviceLines.join('\n'), sub: '' });
             drawInlineSection("ADVICE", advList);
         }
 
@@ -1314,12 +1317,14 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
           {(advicesInput || advRest || advWater) && (
             <div>
               <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5">General Advice</strong>
-              <div className="space-y-1.5 text-[#0f172a]">
-                {advicesInput && <div>{advicesInput}</div>}
-                <div className="flex gap-3 text-[10px] font-bold text-slate-500">
-                  {advRest && <span className="bg-slate-100 px-2 py-0.5 rounded">🛌 Rest Recommended</span>}
-                  {advWater && <span className="bg-slate-100 px-2 py-0.5 rounded">💧 Drink Plentiful Water</span>}
-                </div>
+              <div className="space-y-1.5 text-[#0f172a] text-[10px] font-semibold text-slate-750">
+                <ul className="list-disc pl-4 space-y-0.5">
+                  {advicesInput && advicesInput.split('\n').filter(line => line.trim() !== '').map((line, idx) => (
+                    <li key={idx}>{line.trim()}</li>
+                  ))}
+                  {advRest && <li>Please take some rest.</li>}
+                  {advWater && <li>Drink plenty of water.</li>}
+                </ul>
               </div>
             </div>
           )}

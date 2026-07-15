@@ -123,31 +123,6 @@ export default function AdvicesCard({
 
         {/* Checkbox Templates Section */}
         <div className="flex flex-col gap-2 select-none text-[11px] font-bold text-[#4A5568] pt-1">
-          {/* Default templates */}
-          <label className="flex items-center gap-2 cursor-pointer w-fit">
-            <input
-              type="checkbox"
-              checked={advRest}
-              onChange={(e) => {
-                setAdvRest(e.target.checked);
-                handleToggleTemplate("Please take some rest.", e.target.checked);
-              }}
-              className="rounded text-primary border-gray-300 w-4 h-4 cursor-pointer focus:ring-0"
-            />
-            Please take some rest.
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer w-fit">
-            <input
-              type="checkbox"
-              checked={advWater}
-              onChange={(e) => {
-                setAdvWater(e.target.checked);
-                handleToggleTemplate("Drink plenty of water.", e.target.checked);
-              }}
-              className="rounded text-primary border-gray-300 w-4 h-4 cursor-pointer focus:ring-0"
-            />
-            Drink plenty of water.
-          </label>
 
           {/* Dynamically created templates (Masters) */}
           {customTemplates.map((text, idx) => (
