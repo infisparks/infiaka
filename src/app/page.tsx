@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, Suspense, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase, getUserRole } from "@/lib/supabase";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import Link from "next/link";
@@ -186,6 +186,7 @@ function DashboardContent() {
   const searchParams = useSearchParams();
 
   const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => getTodayLabel());
 
   // PrintPrescription specific states & ref
@@ -407,18 +408,22 @@ function DashboardContent() {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
         router.push("/login");
       } else {
+        const role = await getUserRole(session.user?.email || "");
+        setUserRole(role);
         setSessionLoaded(true);
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session) {
         router.push("/login");
       } else {
+        const role = await getUserRole(session.user?.email || "");
+        setUserRole(role);
         setSessionLoaded(true);
       }
     });
@@ -2261,17 +2266,19 @@ function DashboardContent() {
                       </svg>
                     </button>
 
-                    <button
-                      onClick={() => {
-                        openPrescription(patient.opdRegistration?.registration_id || patient.id);
-                      }}
-                      className="px-3 h-6 bg-primary hover:bg-primary-hover text-white rounded text-[10px] font-extrabold shadow-xs transition-colors flex items-center justify-center gap-1.5 shrink-0"
-                    >
-                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                      </svg>
-                      Add Rx
-                    </button>
+                    {userRole !== "staff" && (
+                      <button
+                        onClick={() => {
+                          openPrescription(patient.opdRegistration?.registration_id || patient.id);
+                        }}
+                        className="px-3 h-6 bg-primary hover:bg-primary-hover text-white rounded text-[10px] font-extrabold shadow-xs transition-colors flex items-center justify-center gap-1.5 shrink-0"
+                      >
+                        <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Add Rx
+                      </button>
+                    )}
 
                     {/* Print Bill Button */}
                     <button
@@ -2286,16 +2293,18 @@ function DashboardContent() {
                     </button>
 
                     {/* Print Prescription Button */}
-                    <button
-                      onClick={() => handlePrintPrescription(patient.id, patient.opdRegistration?.registration_id)}
-                      className="px-2 h-6 border border-[#CBD5E0] hover:bg-gray-50 rounded text-[10px] font-bold text-[#4A5568] flex items-center gap-1 transition-colors shrink-0"
-                      title="Print Prescription"
-                    >
-                      <svg className="w-2.5 h-2.5 text-[#4A5568]" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Print Prescription
-                    </button>
+                    {userRole !== "staff" && (
+                      <button
+                        onClick={() => handlePrintPrescription(patient.id, patient.opdRegistration?.registration_id)}
+                        className="px-2 h-6 border border-[#CBD5E0] hover:bg-gray-50 rounded text-[10px] font-bold text-[#4A5568] flex items-center gap-1 transition-colors shrink-0"
+                        title="Print Prescription"
+                      >
+                        <svg className="w-2.5 h-2.5 text-[#4A5568]" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Print Prescription
+                      </button>
+                    )}
 
                     {/* Delete Appointment Button */}
                     <button
@@ -2338,12 +2347,14 @@ function DashboardContent() {
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
               Meet DocAssist AI
             </button>
-            <button className="px-2 py-0.5 bg-[#F5F3FF] border border-[#DDD6FE] text-[#7C3AED] hover:bg-[#ECE9FE] rounded text-[9px] font-bold flex items-center gap-1 shadow-xs transition-colors">
-              <svg className="w-2.5 h-2.5 text-[#7C3AED] animate-pulse" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-              </svg>
-              Generate prescription from voice
-            </button>
+            {userRole !== "staff" && (
+              <button className="px-2 py-0.5 bg-[#F5F3FF] border border-[#DDD6FE] text-[#7C3AED] hover:bg-[#ECE9FE] rounded text-[9px] font-bold flex items-center gap-1 shadow-xs transition-colors">
+                <svg className="w-2.5 h-2.5 text-[#7C3AED] animate-pulse" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+                Generate prescription from voice
+              </button>
+            )}
           </div>
         </footer>
 

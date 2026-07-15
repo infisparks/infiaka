@@ -2,18 +2,54 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase, getUserRole } from "@/lib/supabase";
 import PrintPrescription from "@/components/PrintPrescription";
 
 export default function PrescriptionDetailPage() {
   const { id: registrationId } = useParams();
   const router = useRouter();
 
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activePrintData, setActivePrintData] = useState<any>(null);
+
+  // Auth session check
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) {
+        router.push("/login");
+      } else {
+        const role = await getUserRole(session.user?.email || "");
+        if (role === "staff") {
+          router.push("/");
+        } else {
+          setUserRole(role);
+          setSessionLoaded(true);
+        }
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session) {
+        router.push("/login");
+      } else {
+        const role = await getUserRole(session.user?.email || "");
+        if (role === "staff") {
+          router.push("/");
+        } else {
+          setUserRole(role);
+          setSessionLoaded(true);
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
 
   // Initial loaded settings to support reset/cancel
   const [initialSettings, setInitialSettings] = useState<any>(null);
@@ -39,6 +75,7 @@ export default function PrescriptionDetailPage() {
 
   // ─── LOAD PRINT SETTINGS FROM DB ───────────────────────────────────
   useEffect(() => {
+    if (!sessionLoaded) return;
     const loadPrintSettings = async () => {
       try {
         const { data } = await supabase
@@ -80,7 +117,7 @@ export default function PrescriptionDetailPage() {
       }
     };
     loadPrintSettings();
-  }, []);
+  }, [sessionLoaded]);
 
   // ─── SAVE SETTINGS TO DB ───────────────────────────────────────────
   const handleSaveSettings = async () => {
@@ -143,8 +180,137 @@ export default function PrescriptionDetailPage() {
     showToast("Settings reset to default.", "success");
   };
 
+  const handleSendWhatsApp = async () => {
+    if (!activePrintData) return;
+    try {
+      setSendingWhatsapp(true);
+      const apiKey = process.env.NEXT_PUBLIC_WHATSAPP_API_KEY || "";
+      if (!apiKey) {
+        showToast("WhatsApp API key configuration is missing.", "error");
+        return;
+      }
+
+      // Generate the PDF
+      if (!printRef.current) {
+        showToast("PDF generator ref not ready.", "error");
+        return;
+      }
+      const blobUrl = await printRef.current.generatePDF(false);
+      if (!blobUrl) {
+        showToast("Failed to generate PDF.", "error");
+        return;
+      }
+
+      // Convert blob url to raw blob
+      const blobRes = await fetch(blobUrl);
+      const blob = await blobRes.blob();
+
+      // Upload PDF to Supabase Storage in "reports" bucket
+      const friendlyFileName = `report-${activePrintData.patient.name.replace(/\s+/g, "_")}.pdf`;
+      const filename = `reports/${activePrintData.registration_id}_${Date.now()}.pdf`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("reports")
+        .upload(filename, blob, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: "application/pdf",
+        });
+
+      if (uploadError) {
+        throw new Error(uploadError.message);
+      }
+
+      // Get Public URL
+      const { data: publicUrlData } = supabase.storage
+        .from("reports")
+        .getPublicUrl(filename);
+
+      const url = publicUrlData.publicUrl;
+
+      // Caption
+      const doctorName = activePrintData.treating_doctor || activePrintData.patient.opdRegistration?.treating_doctor || "Doctor";
+      const clinicName = activePrintData.clinic_name || activePrintData.patient.opdRegistration?.clinic_name || "Clinic";
+      
+      let dateString = "";
+      const rawDate = activePrintData.appointment_date_time;
+      if (rawDate) {
+        try {
+          dateString = new Date(rawDate).toLocaleDateString("en-IN", {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+          });
+        } catch (e) {
+          dateString = String(rawDate).split("T")[0];
+        }
+      } else {
+        dateString = new Date().toLocaleDateString("en-IN", {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
+        });
+      }
+
+      const caption = `Dear ${activePrintData.patient.name},
+
+Your prescription from Dr. ${doctorName} is now available.
+
+Clinic: ${clinicName}
+Date: ${dateString}
+
+Regards,
+${clinicName}`;
+
+      // Format number to prevent double 91 prefixes
+      let cleanedPhone = (activePrintData.patient.phone || "").replace(/\D/g, "");
+      if (cleanedPhone.length === 10) {
+        cleanedPhone = "91" + cleanedPhone;
+      } else if (cleanedPhone.length > 10 && !cleanedPhone.startsWith("91")) {
+        cleanedPhone = "91" + cleanedPhone.slice(-10);
+      }
+
+      // WhatsApp Payload
+      const payload = {
+        number: cleanedPhone,
+        mediatype: "document",
+        mimetype: "application/pdf",
+        caption: caption,
+        media: url,
+        fileName: friendlyFileName,
+      };
+
+      // Send WhatsApp Message
+      const res = await fetch(
+        "https://evo.infispark.in/message/sendMedia/proctology",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: apiKey,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        console.error("WhatsApp EVO API Error Response Body:", errText);
+        showToast(`Failed to send (Status: ${res.status}). Error logged to console.`, "error");
+      } else {
+        showToast("Report sent on WhatsApp!", "success");
+      }
+    } catch (err: any) {
+      console.error("WhatsApp sending error:", err);
+      showToast(`Error: ${err.message || "Failed to send report."}`, "error");
+    } finally {
+      setSendingWhatsapp(false);
+    }
+  };
+
   // ─── LOAD DATA FOR THE GIVEN REGISTRATION ID ──────────────────────
   useEffect(() => {
+    if (!sessionLoaded) return;
     if (!registrationId) return;
 
     const fetchPrescriptionData = async () => {
@@ -221,7 +387,16 @@ export default function PrescriptionDetailPage() {
         const mappedDiags = (diags || []).map(d => ({
           id: String(d.diagnosis_id),
           name: d.name,
-          since: d.duration,
+          since: d.since,
+          status: d.status,
+          severity: d.severity,
+          abdominalRegions: d.abdominal_regions || [],
+          painTypes: d.pain_types || [],
+          relievedBy: d.relieved_by || [],
+          abdominalTenderness: d.abdominal_tenderness,
+          palpations: d.palpations || [],
+          auscultations: d.auscultations || [],
+          clinicalCourse: d.clinical_course,
           note: d.note
         }));
 
@@ -233,11 +408,11 @@ export default function PrescriptionDetailPage() {
             name: medName,
             generic: medGeneric,
             form: m.medicine?.type || "Tablet",
-            dose: m.dose || "1 Tablet",
-            freq: m.freq || "1-0-1",
-            timing: m.timing || "After Meal",
-            duration: m.duration || "5 Days",
-            start: m.start_from || "Today",
+            dose: m.dose || "",
+            freq: m.freq || "",
+            timing: m.timing || "",
+            duration: m.duration || "",
+            start: m.start_from || "",
             instr: m.instruction || ""
           };
         });
@@ -252,12 +427,12 @@ export default function PrescriptionDetailPage() {
 
         const mappedResults = (results || []).map(r => ({
           id: String(r.lab_result_id),
-          name: r.test_name,
+          name: r.name,
           unit: r.unit,
           reading: r.reading,
           interpretation: r.interpretation,
-          date: r.test_date,
-          notes: r.remarks
+          date: r.result_date,
+          notes: r.notes
         }));
 
         const mappedProcs = (procs || []).map(p => ({
@@ -274,6 +449,10 @@ export default function PrescriptionDetailPage() {
         }));
 
         setActivePrintData({
+          registration_id: reg.registration_id,
+          appointment_date_time: reg.appointment_date_time,
+          treating_doctor: reg.treating_doctor,
+          clinic_name: reg.clinic_name,
           patient: {
             id: patient.uhid,
             title: patient.title || "Mr/Mrs",
@@ -319,7 +498,7 @@ export default function PrescriptionDetailPage() {
     };
 
     fetchPrescriptionData();
-  }, [registrationId]);
+  }, [registrationId, sessionLoaded]);
 
   // ─── GENERATE PDF BLOB RE-EXECUTION ON SETTINGS CHANGE ──────────────
   useEffect(() => {
@@ -345,6 +524,17 @@ export default function PrescriptionDetailPage() {
     printHeaderHeightPage2,
     printFooterHeightPage2
   ]);
+
+  if (!sessionLoaded) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#F5F6F8] font-sans select-none">
+        <div className="text-center space-y-2">
+          <div className="w-8 h-8 border-4 border-indigo-650 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Verifying Session...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -598,6 +788,15 @@ export default function PrescriptionDetailPage() {
           >
             📂 Save as Template
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              router.push(`/rx?rx=${registrationId}`);
+            }}
+            className="px-3.5 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10.5px] font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+          >
+            ✏️ Edit
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -615,15 +814,21 @@ export default function PrescriptionDetailPage() {
           </button>
           <button
             type="button"
-            onClick={() => {
-              const phone = activePrintData.patient.phone || "";
-              const text = `Hello, here is your prescription from Dr. ${activePrintData?.treating_doctor || "Doctor"}. Please access it here: ${previewBlobUrl}`;
-              window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(text)}`, "_blank");
-              showToast("Redirecting to WhatsApp...", "success");
-            }}
-            className="px-3.5 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10.5px] font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            disabled={sendingWhatsapp}
+            onClick={handleSendWhatsApp}
+            className="px-3.5 py-1.5 bg-white border border-green-200 hover:bg-green-50 disabled:bg-slate-100 disabled:text-slate-400 text-[10.5px] font-bold text-green-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
           >
-            💬 Send SMS/WhatsApp
+            {sendingWhatsapp ? (
+              <>
+                <svg className="w-3.5 h-3.5 animate-spin text-green-600" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                  <path fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" className="opacity-75" />
+                </svg>
+                <span>Sending PDF...</span>
+              </>
+            ) : (
+              <>💬 Send PDF on WhatsApp</>
+            )}
           </button>
           <button
             type="button"

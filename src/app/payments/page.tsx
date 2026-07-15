@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase, getUserRole } from "@/lib/supabase";
 import Sidebar from "@/components/Sidebar";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -34,6 +34,7 @@ interface Registration {
 function PaymentsContent() {
   const router = useRouter();
   const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Filter dates state
@@ -49,20 +50,33 @@ function PaymentsContent() {
   const [endDate, setEndDate] = useState(getTodayDateStr());
   const [registrations, setRegistrations] = useState<Registration[]>([]);
 
+  // Force today's date if user is staff
+  useEffect(() => {
+    if (userRole === "staff") {
+      const today = getTodayDateStr();
+      setStartDate(today);
+      setEndDate(today);
+    }
+  }, [userRole]);
+
   // Auth session check
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
         router.push("/login");
       } else {
+        const role = await getUserRole(session.user?.email || "");
+        setUserRole(role);
         setSessionLoaded(true);
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session) {
         router.push("/login");
       } else {
+        const role = await getUserRole(session.user?.email || "");
+        setUserRole(role);
         setSessionLoaded(true);
       }
     });
@@ -77,8 +91,12 @@ function PaymentsContent() {
       setLoading(true);
       
       // Query registrations within selected date bounds
-      const startIso = `${startDate}T00:00:00.000Z`;
-      const endIso = `${endDate}T23:59:59.999Z`;
+      const todayStr = getTodayDateStr();
+      const start = userRole === "staff" ? todayStr : startDate;
+      const end = userRole === "staff" ? todayStr : endDate;
+
+      const startIso = `${start}T00:00:00.000Z`;
+      const endIso = `${end}T23:59:59.999Z`;
 
       const { data: regData, error: regError } = await supabase
         .from("aka_opd_registration")
@@ -106,7 +124,15 @@ function PaymentsContent() {
       if (patError) throw patError;
 
       // Join registrations with patient details
-      const mappedRegs: Registration[] = regData.map((reg) => {
+      const mappedRegs = regData.map((reg) => {
+        const paymentsList = Array.isArray(reg.payments) ? reg.payments : [];
+        const isPaidOnlyCash = paymentsList.length === 0 || paymentsList.every((p: any) => p.mode?.toLowerCase() === "cash");
+
+        // If user is adminnocash, hide appointments paid only in cash
+        if (userRole === "adminnocash" && isPaidOnlyCash) {
+          return null;
+        }
+
         const p = (patientsData || []).find((pat) => pat.uhid === reg.patient_uhid);
         const patientObj: Patient | undefined = p
           ? {
@@ -119,7 +145,6 @@ function PaymentsContent() {
           : undefined;
 
         const servicesList = Array.isArray(reg.services) ? reg.services : [];
-        const paymentsList = Array.isArray(reg.payments) ? reg.payments : [];
 
         // 1. Calculate Gross Total (sum of all services fees * quantity if product)
         const grossTotal = servicesList.reduce((acc: number, s: any) => {
@@ -155,8 +180,8 @@ function PaymentsContent() {
           patient: patientObj,
           services: reg.services,
           payments: reg.payments,
-        };
-      });
+        } as Registration;
+      }).filter((r): r is Registration => r !== null);
 
       setRegistrations(mappedRegs);
     } catch (err) {
@@ -168,7 +193,7 @@ function PaymentsContent() {
 
   useEffect(() => {
     fetchBillingData();
-  }, [sessionLoaded, startDate, endDate]);
+  }, [sessionLoaded, startDate, endDate, userRole]);
 
   // Aggregate totals
   const totals = useMemo(() => {
@@ -317,7 +342,8 @@ function PaymentsContent() {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent cursor-pointer"
+                disabled={userRole === "staff"}
+                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -328,7 +354,8 @@ function PaymentsContent() {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent cursor-pointer"
+                disabled={userRole === "staff"}
+                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase, getUserRole } from "@/lib/supabase";
 import PrintPrescription from "@/components/PrintPrescription";
 
 interface Patient {
@@ -104,9 +104,71 @@ function OverviewContent() {
   const searchParams = useSearchParams();
   const rxPatientId = searchParams.get("rx") || "";
 
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentRxPatient, setCurrentRxPatient] = useState<Patient | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+  const [legacyVisitsCount, setLegacyVisitsCount] = useState<number>(0);
+
+  const fetchLegacyCount = async (name: string, phone: any) => {
+    if (!name && !phone) return;
+    try {
+      const cleanPhone = String(phone || "").replace(/\D/g, "");
+      let query = supabase.from("legacy_patients").select("*", { count: "exact", head: true });
+      
+      let orClause = "";
+      if (name) orClause += `name.ilike.*${name.trim()}*`;
+      if (cleanPhone) {
+        if (orClause) orClause += ",";
+        orClause += `phone.ilike.*${cleanPhone}*`;
+      }
+      
+      if (orClause) {
+        query = query.or(orClause);
+      }
+      
+      const { count, error } = await query;
+      if (!error && count !== null) {
+        setLegacyVisitsCount(count);
+      }
+    } catch (e) {
+      console.error("Error fetching legacy count:", e);
+    }
+  };
+
+  // Auth session check
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) {
+        router.push("/login");
+      } else {
+        const role = await getUserRole(session.user?.email || "");
+        if (role === "staff") {
+          router.push("/");
+        } else {
+          setUserRole(role);
+          setSessionLoaded(true);
+        }
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session) {
+        router.push("/login");
+      } else {
+        const role = await getUserRole(session.user?.email || "");
+        if (role === "staff") {
+          router.push("/");
+        } else {
+          setUserRole(role);
+          setSessionLoaded(true);
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type });
@@ -130,9 +192,16 @@ function OverviewContent() {
 
   // PrintPrescription specific states & ref
   const printRef = useRef<any>(null);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const visitsScrollRef = useRef<HTMLDivElement>(null);
   const [activePrintData, setActivePrintData] = useState<any>(null);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [lastActiveId, setLastActiveId] = useState<any>(null);
+
+  if (activePrintData && activePrintData.registration_id !== lastActiveId) {
+    setLastActiveId(activePrintData.registration_id);
+    setPreviewBlobUrl(null);
+  }
 
   const scrollVisits = (direction: "left" | "right") => {
     if (visitsScrollRef.current) {
@@ -157,6 +226,7 @@ function OverviewContent() {
   const [printFooterHeightPage2, setPrintFooterHeightPage2] = useState(15);
 
   useEffect(() => {
+    if (!sessionLoaded) return;
     const loadPrintSettings = async () => {
       try {
         const { data } = await supabase
@@ -183,10 +253,11 @@ function OverviewContent() {
       }
     };
     loadPrintSettings();
-  }, []);
+  }, [sessionLoaded]);
 
   const loadAllHistory = async (patientUhid: string) => {
     try {
+      setHistoryLoaded(false);
       // 1. Fetch all patient registrations
       const { data: regs, error: regErr } = await supabase
         .from("aka_opd_registration")
@@ -196,7 +267,6 @@ function OverviewContent() {
         .order("appointment_date_time", { ascending: false });
 
       if (regErr) throw regErr;
-      setRegistrations(regs || []);
 
       const regIds = regs?.map((r) => r.registration_id) || [];
       if (regIds.length === 0) {
@@ -208,27 +278,16 @@ function OverviewContent() {
         setReferrals([]);
         setLabResults([]);
         setMedicalHistory(null);
+        setRegistrations([]);
+        setHistoryLoaded(true);
         return;
       }
 
-      // 2. Fetch all symptoms
-      const { data: syms } = await supabase
-        .from("aka_symptoms")
-        .select("*")
-        .in("registration_id", regIds);
-      setSymptoms(syms || []);
-
-      // 3. Fetch all diagnoses
-      const { data: diags } = await supabase
-        .from("aka_diagnoses")
-        .select("*")
-        .in("registration_id", regIds);
-      setDiagnoses(diags || []);
-
-      // 4. Fetch all medications
-      const { data: meds } = await supabase
-        .from("aka_patient_medications")
-        .select(`
+      // Fetch all parameters concurrently
+      const [symsRes, diagsRes, medsRes, labsRes, procsRes, refsRes, resultsRes, historyRes] = await Promise.all([
+        supabase.from("aka_symptoms").select("*").in("registration_id", regIds),
+        supabase.from("aka_diagnoses").select("*").in("registration_id", regIds),
+        supabase.from("aka_patient_medications").select(`
           *,
           medicine:medicine_id (
             name,
@@ -236,52 +295,33 @@ function OverviewContent() {
             short_composition1,
             type
           )
-        `)
-        .in("registration_id", regIds);
-      setMedications(meds || []);
+        `).in("registration_id", regIds),
+        supabase.from("aka_patient_labs").select("*").in("registration_id", regIds),
+        supabase.from("aka_procedure").select("*").in("registration_id", regIds),
+        supabase.from("aka_refer_to").select("*").in("registration_id", regIds),
+        supabase.from("aka_lab_result").select("*").in("registration_id", regIds),
+        supabase.from("aka_patient_medical_history").select("*").eq("patient_uhid", patientUhid).maybeSingle()
+      ]);
 
-      // 5. Fetch all labs
-      const { data: labReqs } = await supabase
-        .from("aka_patient_labs")
-        .select("*")
-        .in("registration_id", regIds);
-      setLabs(labReqs || []);
+      setSymptoms(symsRes.data || []);
+      setDiagnoses(diagsRes.data || []);
+      setMedications(medsRes.data || []);
+      setLabs(labsRes.data || []);
+      setProcedures(procsRes.data || []);
+      setReferrals(refsRes.data || []);
+      setLabResults(resultsRes.data || []);
+      setMedicalHistory(historyRes.data || null);
 
-      // 6. Fetch all procedures
-      const { data: procs } = await supabase
-        .from("aka_procedure")
-        .select("*")
-        .in("registration_id", regIds);
-      setProcedures(procs || []);
-
-      // 7. Fetch all referrals
-      const { data: refs } = await supabase
-        .from("aka_refer_to")
-        .select("*")
-        .in("registration_id", regIds);
-      setReferrals(refs || []);
-
-      // 8. Fetch all lab results
-      const { data: results } = await supabase
-        .from("aka_lab_result")
-        .select("*")
-        .in("registration_id", regIds);
-      setLabResults(results || []);
-
-      // 9. Fetch patient-level medical history
-      const { data: history } = await supabase
-        .from("aka_patient_medical_history")
-        .select("*")
-        .eq("patient_uhid", patientUhid)
-        .maybeSingle();
-      setMedicalHistory(history || null);
-
+      setRegistrations(regs || []);
+      setHistoryLoaded(true);
     } catch (err) {
       console.error("Error loading patient history:", err);
+      setHistoryLoaded(true);
     }
   };
 
   useEffect(() => {
+    if (!sessionLoaded) return;
     if (!rxPatientId) return;
 
     const loadInitialPatient = async () => {
@@ -317,6 +357,21 @@ function OverviewContent() {
           return;
         }
 
+        // Map registration services & payments to compute amount
+        const billAmt = regData?.services 
+          ? regData.services.reduce((acc: number, s: any) => acc + (Number(s.fee) || 0), 0)
+          : 0;
+
+        const paymentsList = regData?.payments && Array.isArray(regData.payments) ? regData.payments : [];
+        const modesWithAmount: string[] = paymentsList.filter((p: any) => (p.amount || 0) > 0).map((p: any) => String(p.mode));
+        const uniqueModes: string[] = Array.from(new Set(modesWithAmount.length > 0 ? modesWithAmount : paymentsList.map((p: any) => String(p.mode))));
+        let pMethod = "Cash";
+        if (uniqueModes.includes("Cash") && uniqueModes.includes("Online")) {
+          pMethod = "Cash + Online";
+        } else if (uniqueModes.length > 0) {
+          pMethod = uniqueModes[0];
+        }
+
         const mappedPatient: Patient = {
           patient_id: pData.patient_id,
           id: pData.uhid,
@@ -334,8 +389,8 @@ function OverviewContent() {
           country: pData.country || "India",
           state: pData.state || "Maharashtra",
           statusTags: ["Ongoing"],
-          billAmount: 0,
-          paymentMethod: "Cash",
+          billAmount: billAmt,
+          paymentMethod: pMethod,
           isAbhaCreated: false,
           customTags: [],
           isCompleted: false,
@@ -365,6 +420,7 @@ function OverviewContent() {
         };
 
         setCurrentRxPatient(mappedPatient);
+        fetchLegacyCount(pData.name || "", pData.number || "");
         await loadAllHistory(patientUhid);
       } catch (err) {
         console.error("Failed to load initial overview data:", err);
@@ -374,7 +430,7 @@ function OverviewContent() {
     };
 
     loadInitialPatient();
-  }, [rxPatientId]);
+  }, [rxPatientId, sessionLoaded]);
 
   // ─── REASSIGN SINGLE ITEMS TO TODAY'S VISIT ───────────────────────
   const reassignSymptom = async (sym: any) => {
@@ -657,7 +713,16 @@ function OverviewContent() {
     const mappedDiags = regDiags.map(d => ({
       id: String(d.diagnosis_id),
       name: d.name,
-      since: d.duration,
+      since: d.since,
+      status: d.status,
+      severity: d.severity,
+      abdominalRegions: d.abdominal_regions || [],
+      painTypes: d.pain_types || [],
+      relievedBy: d.relieved_by || [],
+      abdominalTenderness: d.abdominal_tenderness,
+      palpations: d.palpations || [],
+      auscultations: d.auscultations || [],
+      clinicalCourse: d.clinical_course,
       note: d.note
     }));
 
@@ -702,6 +767,15 @@ function OverviewContent() {
     }));
 
     setActivePrintData({
+      registration_id: reg.registration_id,
+      appointment_date_time: reg.appointment_date_time,
+      clinic_name: reg.clinic_name,
+      treating_doctor: reg.treating_doctor,
+      visit_category: reg.visit_category,
+      referring_doctor: reg.referring_doctor,
+      discount_amount: reg.discount_amount,
+      services: reg.services,
+      payments: reg.payments,
       bp: reg.bp || "",
       pulse: reg.pulse || "",
       weight: reg.weight || "",
@@ -726,23 +800,38 @@ function OverviewContent() {
   // Filter registrations to show past ones
   const pastRegistrations = registrations.filter((r) => r.registration_id !== Number(rxPatientId));
 
+  // ─── GENERATE PDF BLOB RE-EXECUTION ON SETTINGS CHANGE ──────────────
   useEffect(() => {
     if (activePrintData && printRef.current) {
-      setTimeout(async () => {
+      const timer = setTimeout(async () => {
         const blobUrl = await printRef.current.generatePDF(false);
         if (blobUrl) {
           setPreviewBlobUrl(blobUrl);
         }
       }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [activePrintData, printShowLetterhead]);
+  }, [
+    activePrintData,
+    printShowHeader,
+    printHeaderHeight,
+    printShowFooter,
+    printFooterHeight,
+    printShowLetterhead,
+    printShowHeaderPage2,
+    printShowLetterheadPage2,
+    printShowFooterPage2,
+    printHeaderHeightPage2,
+    printFooterHeightPage2,
+    historyLoaded
+  ]);
 
   // Load latest visit preview by default on mount when registrations data becomes available
   useEffect(() => {
-    if (pastRegistrations.length > 0 && !activePrintData) {
+    if (historyLoaded && pastRegistrations.length > 0 && !activePrintData) {
       handlePrintPastVisit(pastRegistrations[0]);
     }
-  }, [pastRegistrations, activePrintData]);
+  }, [historyLoaded, pastRegistrations, activePrintData]);
 
   // Helper to extract doctor initials (e.g. "DR. LAXMAN SALVE" -> "LS")
   const getInitials = (docName: string): string => {
@@ -769,6 +858,17 @@ function OverviewContent() {
       r.name.toLowerCase().includes(labSearchQuery.toLowerCase())
     );
   })();
+
+  if (!sessionLoaded) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#F5F6F8] font-sans select-none">
+        <div className="text-center space-y-2">
+          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Verifying Session...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -834,12 +934,20 @@ function OverviewContent() {
 
         {/* Navigation tab bar in the center */}
         <div className="flex items-center h-full">
-          <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">Overview</button>
+          <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">
+            Overview {pastRegistrations.length > 0 ? `(${pastRegistrations.length})` : `(0)`}
+          </button>
           <button
             onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
             className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Pad
+          </button>
+          <button 
+            onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
+            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+          >
+            EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
           </button>
         </div>
 
@@ -1549,11 +1657,11 @@ function OverviewContent() {
               gender: currentRxPatient.gender,
               phone: currentRxPatient.phone,
               permanentAddress: currentRxPatient.permanentAddress,
-              opdRegistration: {
-                clinic_name: currentRxPatient.opdRegistration?.clinic_name,
-                treating_doctor: currentRxPatient.opdRegistration?.treating_doctor,
-                referring_doctor: currentRxPatient.opdRegistration?.referring_doctor
-              }
+              opdRegistration: activePrintData ? {
+                clinic_name: activePrintData.clinic_name,
+                treating_doctor: activePrintData.treating_doctor,
+                referring_doctor: activePrintData.referring_doctor
+              } : undefined
             }}
             bp={activePrintData?.bp || ""}
             pulse={activePrintData?.pulse || ""}

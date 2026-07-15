@@ -191,7 +191,7 @@ function formatFollowUpDate(date: Date): string {
 }
 
 function formatDuration(raw: string | undefined): string {
-    if (!raw) return '-';
+    if (!raw || raw.trim() === "") return '';
     raw = raw.trim().toLowerCase();
     const match = raw.match(/^(\d+)\s*([a-zA-Z]+)$/);
     if (match) {
@@ -665,13 +665,19 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
                 if (category) medText += `\n${category}`;
                 if (comp) medText += `\n${comp}`;
 
+                let freqText = m.freq || '';
+                if (m.timing) {
+                    if (freqText) freqText += `\n${m.timing}`;
+                    else freqText = m.timing;
+                }
+
                 return [
                     (index + 1).toString(),
                     { content: medText },
-                    m.dose || '-',
-                    m.freq || '-',
+                    m.dose || '',
+                    freqText,
                     formatDuration(m.duration),
-                    m.instr || '-'
+                    m.instr || ''
                 ];
             });
 
@@ -1166,8 +1172,8 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
                     <div>{m.freq}</div>
                     {m.timing && <div className="text-[9.5px] text-slate-500 font-medium mt-0.5">{m.timing}</div>}
                   </td>
-                  <td className="border border-[#cbd5e1] px-2.5 py-2 text-center font-semibold">{m.duration}</td>
-                  <td className="border border-[#cbd5e1] px-3 py-2 text-slate-600 font-medium italic">{m.instr || "-"}</td>
+                  <td className="border border-[#cbd5e1] px-2.5 py-2 text-center font-semibold">{formatDuration(m.duration)}</td>
+                  <td className="border border-[#cbd5e1] px-3 py-2 text-slate-600 font-medium italic">{m.instr || ""}</td>
                 </tr>
               ))}
             </tbody>
@@ -1214,6 +1220,9 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
                         <div className="font-bold text-[#0f172a]">{r.name}</div>
                         <div className="flex gap-2 text-[9.5px] text-slate-500 mt-0.5">
                           <span>Reading: <strong className="text-slate-700">{r.reading} {r.unit}</strong></span>
+                          {r.date && (
+                            <span>| Date: <strong className="text-slate-700">{r.date}</strong></span>
+                          )}
                           {r.interpretation && (
                             <span className={`px-1 rounded font-bold text-[8.5px] uppercase ${
                               r.interpretation.toLowerCase() === "high" ? "bg-red-50 text-red-600" :

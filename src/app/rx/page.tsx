@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, Suspense, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase, getUserRole } from "@/lib/supabase";
 
 import VitalsCard from "@/components/VitalsCard";
 import MedicalHistoryCard from "@/components/MedicalHistoryCard";
@@ -138,8 +138,84 @@ function RxPageContent() {
 
   const printRef = useRef<any>(null);
 
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentRxPatient, setCurrentRxPatient] = useState<Patient | null>(null);
+  const [pastVisitsCount, setPastVisitsCount] = useState<number>(0);
+  const [legacyVisitsCount, setLegacyVisitsCount] = useState<number>(0);
+
+  const fetchHeaderCounts = async (patientUhid: string, currentRegId: string | number, name: string, phone: any) => {
+    if (!patientUhid) return;
+    try {
+      const { count: pastCount, error: pastErr } = await supabase
+        .from("aka_opd_registration")
+        .select("*", { count: "exact", head: true })
+        .eq("patient_uhid", patientUhid)
+        .neq("registration_id", Number(currentRegId))
+        .or("is_deleted.is.null,is_deleted.eq.false");
+
+      if (!pastErr && pastCount !== null) {
+        setPastVisitsCount(pastCount);
+      }
+
+      if (name || phone) {
+        const cleanPhone = String(phone || "").replace(/\D/g, "");
+        let query = supabase.from("legacy_patients").select("*", { count: "exact", head: true });
+        
+        let orClause = "";
+        if (name) orClause += `name.ilike.*${name.trim()}*`;
+        if (cleanPhone) {
+          if (orClause) orClause += ",";
+          orClause += `phone.ilike.*${cleanPhone}*`;
+        }
+        
+        if (orClause) {
+          query = query.or(orClause);
+        }
+        
+        const { count: legacyCount, error: legacyErr } = await query;
+        if (!legacyErr && legacyCount !== null) {
+          setLegacyVisitsCount(legacyCount);
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching header counts:", e);
+    }
+  };
+
+  // Auth session check
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) {
+        router.push("/login");
+      } else {
+        const role = await getUserRole(session.user?.email || "");
+        if (role === "staff") {
+          router.push("/");
+        } else {
+          setUserRole(role);
+          setSessionLoaded(true);
+        }
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session) {
+        router.push("/login");
+      } else {
+        const role = await getUserRole(session.user?.email || "");
+        if (role === "staff") {
+          router.push("/");
+        } else {
+          setUserRole(role);
+          setSessionLoaded(true);
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   // Vitals states
   const [bp, setBp] = useState("");
@@ -224,6 +300,7 @@ function RxPageContent() {
 
   // Load prescription print settings from Supabase on mount
   useEffect(() => {
+    if (!sessionLoaded) return;
     const loadSettings = async () => {
       try {
         const { data, error } = await supabase
@@ -250,7 +327,7 @@ function RxPageContent() {
       }
     };
     loadSettings();
-  }, []);
+  }, [sessionLoaded]);
 
   // Save settings helper
   const savePrescriptionSettings = async (updates: {
@@ -288,6 +365,7 @@ function RxPageContent() {
 
   // Load patient context from DB on mount
   useEffect(() => {
+    if (!sessionLoaded) return;
     if (!rxPatientId) {
       setLoading(false);
       return;
@@ -424,6 +502,7 @@ function RxPageContent() {
         };
 
         setCurrentRxPatient(mappedPatient);
+        fetchHeaderCounts(patientUhid, rxPatientId || "", pData.name || "", pData.number || "");
 
         // Fetch patient medical history from the table
         const { data: histData, error: hError } = await supabase
@@ -667,6 +746,7 @@ function RxPageContent() {
           if (parsed.symptoms && !regData?.registration_id) setSymptoms(parsed.symptoms);
           if (parsed.diagnoses && !regData?.registration_id) setDiagnoses(parsed.diagnoses);
           if (parsed.labs && !regData?.registration_id) setLabs(parsed.labs);
+          if (parsed.labResults && !regData?.registration_id) setLabResults(parsed.labResults);
           if (parsed.notesForPatient && !regData) setNotesForPatient(parsed.notesForPatient);
           if (parsed.privateNotes && !regData) setPrivateNotes(parsed.privateNotes);
           if (parsed.refDoctorInput) setRefDoctorInput(parsed.refDoctorInput);
@@ -694,7 +774,9 @@ function RxPageContent() {
           if (!regData?.registration_id) {
             setLabs([{ id: "1", name: "Liver Function Test (LFT)", testOn: "2026-07-11", repeatOn: "2026-07-25", remarks: "" }]);
           }
-          setLabResults([]);
+          if (!regData?.registration_id) {
+            setLabResults([]);
+          }
           if (!regData) {
             setNotesForPatient("");
             setPrivateNotes("");
@@ -720,7 +802,7 @@ function RxPageContent() {
     };
 
     loadPatientData();
-  }, [rxPatientId]);
+  }, [rxPatientId, sessionLoaded]);
 
   // Debounced auto-save effect for vitals and Rx metadata directly updating Supabase columns
   useEffect(() => {
@@ -1480,6 +1562,7 @@ function RxPageContent() {
         symptoms,
         diagnoses,
         labs,
+        labResults,
         notesForPatient,
         privateNotes,
         refDoctorInput,
@@ -1988,6 +2071,17 @@ function RxPageContent() {
     );
   }
 
+  if (!sessionLoaded) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#F5F6F8] font-sans select-none">
+        <div className="text-center space-y-2">
+          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Verifying Session...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div id="main-rx-container" className="flex flex-col h-screen w-screen bg-white overflow-hidden font-sans select-none">
@@ -2021,14 +2115,14 @@ function RxPageContent() {
             onClick={() => router.push(`/rx/overview?rx=${rxPatientId}`)}
             className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
           >
-            Overview
+            Overview {pastVisitsCount > 0 ? `(${pastVisitsCount})` : `(0)`}
           </button>
           <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">Pad</button>
           <button 
             onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
             className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
           >
-            EkaCare Old Data
+            EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
           </button>
         </div>
 

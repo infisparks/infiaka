@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase, getUserRole } from "@/lib/supabase";
 
 interface Patient {
   patient_id?: number;
@@ -76,20 +76,75 @@ function EkaCarePageContent() {
   const searchParams = useSearchParams();
   const rxPatientId = searchParams.get("rx") || "";
 
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentRxPatient, setCurrentRxPatient] = useState<Patient | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+  const [pastVisitsCount, setPastVisitsCount] = useState<number>(0);
+  const [legacyVisitsCount, setLegacyVisitsCount] = useState<number>(0);
+
+  const fetchHeaderCounts = async (patientUhid: string, currentRegId: string | number, name: string, phone: string) => {
+    if (!patientUhid) return;
+    try {
+      const { count: pastCount, error: pastErr } = await supabase
+        .from("aka_opd_registration")
+        .select("*", { count: "exact", head: true })
+        .eq("patient_uhid", patientUhid)
+        .neq("registration_id", Number(currentRegId))
+        .or("is_deleted.is.null,is_deleted.eq.false");
+
+      if (!pastErr && pastCount !== null) {
+        setPastVisitsCount(pastCount);
+      }
+    } catch (e) {
+      console.error("Error fetching header counts:", e);
+    }
+  };
+
+  // Auth session check
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) {
+        router.push("/login");
+      } else {
+        const role = await getUserRole(session.user?.email || "");
+        if (role === "staff") {
+          router.push("/");
+        } else {
+          setUserRole(role);
+          setSessionLoaded(true);
+        }
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session) {
+        router.push("/login");
+      } else {
+        const role = await getUserRole(session.user?.email || "");
+        if (role === "staff") {
+          router.push("/");
+        } else {
+          setUserRole(role);
+          setSessionLoaded(true);
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   // Legacy data state variables
   const [legacyVisits, setLegacyVisits] = useState<any[]>([]);
   const [loadingLegacy, setLoadingLegacy] = useState(false);
   const [selectedLegacyVisit, setSelectedLegacyVisit] = useState<any>(null);
 
-  const fetchLegacyVisits = async (name: string, phone: string) => {
+  const fetchLegacyVisits = async (name: string, phone: any) => {
     if (!name && !phone) return;
     try {
       setLoadingLegacy(true);
-      const cleanPhone = phone.replace(/\D/g, "");
+      const cleanPhone = String(phone || "").replace(/\D/g, "");
       
       let query = supabase.from("legacy_patients").select("*");
       
@@ -111,6 +166,7 @@ function EkaCarePageContent() {
       if (error) throw error;
       
       setLegacyVisits(data || []);
+      setLegacyVisitsCount(data ? data.length : 0);
       if (data && data.length > 0) {
         setSelectedLegacyVisit(data[0]);
       }
@@ -122,6 +178,7 @@ function EkaCarePageContent() {
   };
 
   useEffect(() => {
+    if (!sessionLoaded) return;
     if (!rxPatientId) return;
 
     const loadPatientData = async () => {
@@ -185,6 +242,7 @@ function EkaCarePageContent() {
         };
 
         setCurrentRxPatient(mappedPatient);
+        fetchHeaderCounts(patientUhid, rxPatientId || "", pData.name || "", pData.number || "");
         
         if (mappedPatient.name || mappedPatient.phone) {
           await fetchLegacyVisits(mappedPatient.name, mappedPatient.phone);
@@ -198,7 +256,18 @@ function EkaCarePageContent() {
     };
 
     loadPatientData();
-  }, [rxPatientId]);
+  }, [rxPatientId, sessionLoaded]);
+
+  if (!sessionLoaded) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#F5F6F8] font-sans select-none">
+        <div className="text-center space-y-2">
+          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Verifying Session...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -233,12 +302,12 @@ function EkaCarePageContent() {
       {toast && <CustomToast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       {/* ─── HEADER BAR ─── */}
-      <header className="h-[60px] bg-white border-b border-[#E2E8F0] px-4 flex items-center justify-between shrink-0 select-none shadow-xs">
+      <header className="h-12 bg-white border-b border-[#E2E8F0] px-4 flex items-center justify-between shrink-0 shadow-2xs">
         {/* Left Back Arrow and Patient Meta */}
         <div className="flex items-center gap-3">
           <button 
             onClick={() => router.push("/")}
-            className="p-1.5 hover:bg-[#F1F5F9] rounded-md transition-colors"
+            className="p-1 hover:bg-[#E2E8F0] rounded-md text-[#718096] transition-colors"
             title="Go to Dashboard"
           >
             <svg className="w-4 h-4 text-foreground" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -263,7 +332,7 @@ function EkaCarePageContent() {
             onClick={() => router.push(`/rx/overview?rx=${rxPatientId}`)}
             className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
           >
-            Overview
+            Overview {pastVisitsCount > 0 ? `(${pastVisitsCount})` : `(0)`}
           </button>
           <button
             onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
@@ -272,7 +341,7 @@ function EkaCarePageContent() {
             Pad
           </button>
           <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">
-            EkaCare Old Data
+            EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
           </button>
         </div>
 
@@ -283,6 +352,12 @@ function EkaCarePageContent() {
           </button>
           <button className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white text-[10px] font-bold rounded flex items-center gap-1">
             ✨ DocScribe
+          </button>
+          <button className="px-2 py-1 text-[10.5px] font-semibold text-[#4A5568] hover:bg-gray-100 rounded">
+            Templates
+          </button>
+          <button className="px-2 py-1 text-[10.5px] font-semibold text-[#4A5568] hover:bg-gray-100 rounded flex items-center gap-1">
+            ⚙ Configure
           </button>
           <span className="px-2.5 py-1 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded text-[10px] font-bold tracking-wide select-none cursor-pointer">
             UPGRADE TO PRO

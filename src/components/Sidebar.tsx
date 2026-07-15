@@ -17,6 +17,9 @@ export default function Sidebar({ active, onQueueClick, onBookClick }: SidebarPr
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
+      if (typeof window !== "undefined") {
+        sessionStorage.clear();
+      }
       router.push("/login");
     } catch (e) {
       console.error("Sign out error:", e);
