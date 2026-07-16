@@ -955,6 +955,12 @@ function OverviewContent() {
           >
             Medical Certificate
           </button>
+          <button 
+            onClick={() => router.push(`/rx/documents?rx=${rxPatientId}`)}
+            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+          >
+            Documents
+          </button>
         </div>
 
         {/* Right Header Controls */}
@@ -1648,6 +1654,8 @@ function OverviewContent() {
           </button>
         </div>
       </footer>
+
+
 
       {/* HIDDEN PRINT PRESCRIPTION MOUNT FOR GENERATING BLOB PDF URLS */}
       {currentRxPatient && (

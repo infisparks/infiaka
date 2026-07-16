@@ -649,6 +649,12 @@ function CertificatePageContent() {
           <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">
             Medical Certificate
           </button>
+          <button 
+            onClick={() => router.push(`/rx/documents?rx=${rxPatientId}`)}
+            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+          >
+            Documents
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -861,6 +867,8 @@ function CertificatePageContent() {
           </div>
         </section>
       </main>
+
+
     </div>
   );
 }

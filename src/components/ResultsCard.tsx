@@ -104,6 +104,28 @@ interface LabResult {
   notes: string;
 }
 
+async function fetchDefaultUnitFromDb(paramName: string): Promise<string> {
+  if (!paramName?.trim()) return "";
+  try {
+    const { data, error } = await supabase
+      .from("aka_lab_result")
+      .select("unit")
+      .eq("name", paramName.trim())
+      .not("unit", "eq", "")
+      .not("unit", "is", null)
+      .order("lab_result_id", { ascending: false })
+      .limit(1);
+    
+    if (error) throw error;
+    if (data && data.length > 0) {
+      return data[0].unit || "";
+    }
+  } catch (err) {
+    console.error("Error fetching default unit from DB:", err);
+  }
+  return "";
+}
+
 interface ResultsCardProps {
   labResults: LabResult[];
   setLabResults: React.Dispatch<React.SetStateAction<LabResult[]>>;
@@ -396,13 +418,14 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
   }, [searchVal, paramOptions]);
 
   /* ─── helpers ─── */
-  const addLabResult = (name: string) => {
+  const addLabResult = async (name: string) => {
     if (!name.trim()) return;
     const formattedDate = formatISODateToDisplay(new Date().toISOString().split("T")[0]);
+    const defaultUnit = await fetchDefaultUnitFromDb(name.trim());
     const newRes: LabResult = {
       id: Date.now().toString(),
       name: name.trim(),
-      unit: "",
+      unit: defaultUnit,
       reading: "",
       interpretation: "",
       date: formattedDate,
@@ -519,7 +542,10 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
                 <div className="relative w-[28%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white overflow-visible">
                   <InlineParameterAutoComplete
                     value={row.name}
-                    onChange={(v) => patch(row.id, { name: v })}
+                    onChange={async (v) => {
+                      const defaultUnit = await fetchDefaultUnitFromDb(v);
+                      patch(row.id, { name: v, unit: defaultUnit });
+                    }}
                     paramOptions={paramOptions}
                     placeholder="Parameter name"
                     onAfterSelect={() => focusField(row.id, 'unit')}

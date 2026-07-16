@@ -189,6 +189,60 @@ function DashboardContent() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => getTodayLabel());
 
+  const formatDateLabel = (dateStr: string) => {
+    if (dateStr === "Yesterday") return "Yesterday";
+    if (dateStr.startsWith("Tdy")) return dateStr;
+    if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const parts = dateStr.split("-");
+      const year = parts[0];
+      const monthIdx = parseInt(parts[1], 10) - 1;
+      const day = parts[2];
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${day} ${months[monthIdx]} ${year}`;
+    }
+    return dateStr;
+  };
+
+  const handlePrevDate = () => {
+    if (selectedDate === "Yesterday") {
+      const twoDaysAgo = getKolkataDateString(-2);
+      setSelectedDate(twoDaysAgo);
+    } else if (selectedDate.startsWith("Tdy")) {
+      setSelectedDate("Yesterday");
+    } else if (selectedDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const parts = selectedDate.split("-");
+      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      d.setDate(d.getDate() - 1);
+      const prevDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      setSelectedDate(prevDateStr);
+    } else {
+      setSelectedDate("Yesterday");
+    }
+  };
+
+  const handleNextDate = () => {
+    if (selectedDate === "Yesterday") {
+      setSelectedDate(getTodayLabel());
+    } else if (selectedDate.startsWith("Tdy")) {
+      const tomorrow = getKolkataDateString(1);
+      setSelectedDate(tomorrow);
+    } else if (selectedDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const parts = selectedDate.split("-");
+      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      d.setDate(d.getDate() + 1);
+      const nextDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      
+      const todayStr = getKolkataDateString(0);
+      if (nextDateStr === todayStr) {
+        setSelectedDate(getTodayLabel());
+      } else {
+        setSelectedDate(nextDateStr);
+      }
+    } else {
+      setSelectedDate(getTodayLabel());
+    }
+  };
+
   // PrintPrescription specific states & ref
   const printPrescRef = useRef<any>(null);
   const [activePrescPrintData, setActivePrescPrintData] = useState<any>(null);
@@ -245,12 +299,13 @@ function DashboardContent() {
 
   const loadPatientsFromDb = async (dateLabel: string = "Tdy, 12 Jul") => {
     try {
-      // 1. Determine target date string (e.g. '2026-07-12')
       let targetDate = getKolkataDateString(0);
       if (dateLabel === "Yesterday") {
         targetDate = getKolkataDateString(-1);
       } else if (dateLabel.startsWith("Tdy")) {
         targetDate = getKolkataDateString(0);
+      } else if (dateLabel.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        targetDate = dateLabel;
       } else {
         const match = dateLabel.match(/(\d+)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
         if (match) {
@@ -1945,18 +2000,18 @@ function DashboardContent() {
             {/* Date Navigator */}
             <div className="flex items-center border border-[#E5E7EB] rounded-md bg-white p-0.5 overflow-hidden">
               <button
-                onClick={() => setSelectedDate("Yesterday")}
+                onClick={handlePrevDate}
                 className="p-1 hover:bg-gray-100 rounded text-[#718096]"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <span className="px-2 text-[11px] font-bold text-primary tracking-tight">
-                {selectedDate}
+              <span className="px-2 text-[11px] font-bold text-primary tracking-tight min-w-[80px] text-center select-text">
+                {formatDateLabel(selectedDate)}
               </span>
               <button
-                onClick={() => setSelectedDate(getTodayLabel())}
+                onClick={handleNextDate}
                 className="p-1 hover:bg-gray-100 rounded text-[#718096]"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
@@ -2021,11 +2076,24 @@ function DashboardContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
               </svg>
             </button>
-            <button className="p-1 border border-[#E5E7EB] rounded-md bg-white hover:bg-gray-50">
-              <svg className="w-3.5 h-3.5 text-[#718096]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </button>
+            <div className="relative">
+              <input
+                type="date"
+                id="custom-date-picker"
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setSelectedDate(e.target.value);
+                  }
+                }}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                title="Select custom date"
+              />
+              <button type="button" className="p-1 border border-[#E5E7EB] rounded-md bg-white hover:bg-gray-50 flex items-center justify-center">
+                <svg className="w-3.5 h-3.5 text-[#718096]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -2290,6 +2358,15 @@ function DashboardContent() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                       </svg>
                       Print Bill
+                    </button>
+
+                    {/* Documents Button (both Doctor and Staff) */}
+                    <button
+                      onClick={() => router.push(`/rx/documents?rx=${patient.opdRegistration?.registration_id || patient.id}`)}
+                      className="px-2 h-6 border border-[#CBD5E0] hover:bg-gray-50 rounded text-[10px] font-bold text-[#4A5568] flex items-center gap-1 transition-colors shrink-0"
+                      title="Upload/View Documents"
+                    >
+                      📂 Docs
                     </button>
 
                     {/* Print Prescription Button */}

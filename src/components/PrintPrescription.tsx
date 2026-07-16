@@ -296,7 +296,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
           if (pageNum === 1) {
             return {
               headerHeight: headerHeight,
-              maxContentY: pageHeight - footerHeight - 25,
+              maxContentY: pageHeight - footerHeight - 15,
               showFooter: showFooter,
               footerHeight: footerHeight,
               drawBg: showLetterhead
@@ -304,7 +304,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
           } else {
             return {
               headerHeight: headerHeightPage2 || 15,
-              maxContentY: pageHeight - (footerHeightPage2 || 15) - 25,
+              maxContentY: pageHeight - (footerHeightPage2 || 15) - 15,
               showFooter: showFooterPage2,
               footerHeight: footerHeightPage2 || 15,
               drawBg: showLetterhead || showLetterheadPage2
@@ -754,6 +754,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
                 }
             });
             currentY = (doc as any).lastAutoTable.finalY + 8;
+            pagesCount = doc.getNumberOfPages();
         }
 
         // --- PRESCRIBED LAB TESTS ---
@@ -860,6 +861,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         }
 
         // --- SIGNATURE FOOTER ---
+        pagesCount = doc.getNumberOfPages();
         const footerParams = getPageParams(pagesCount);
         if (currentY + 25 > footerParams.maxContentY) {
             doc.addPage();
@@ -873,7 +875,17 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         const finalParams = getPageParams(pagesCount);
         const footerY = Math.max(currentY + 10, pageHeight - finalParams.footerHeight - 20);
 
-     
+        // Add P.T.O to every page except the last page
+        const totalPages = doc.getNumberOfPages();
+        for (let i = 1; i < totalPages; i++) {
+            doc.setPage(i);
+            const params = getPageParams(i);
+            const ptoY = pageHeight - params.footerHeight - 12;
+            doc.setFont(fontName, "bold").setFontSize(9).setTextColor(textGray[0], textGray[1], textGray[2]);
+            doc.text("P.T.O", pageWidth - 20, ptoY, { align: "right" });
+        }
+        // Restore active page to the last page
+        doc.setPage(totalPages);
 
         const pdfBlob = doc.output("blob");
         const blobURL = URL.createObjectURL(pdfBlob);

@@ -445,6 +445,7 @@ function InlineMedicineAutoComplete({
   placeholder,
   onAfterSelect,
   onInputRef,
+  isAlreadyAdded,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -453,6 +454,7 @@ function InlineMedicineAutoComplete({
   placeholder?: string;
   onAfterSelect?: () => void;
   onInputRef?: (el: HTMLInputElement | null) => void;
+  isAlreadyAdded?: (medName: string, medId?: number) => boolean;
 }) {
   const [suggestions, setSuggestions] = useState<MedicineItem[]>([]);
   const dropdownClicked = useRef(false);
@@ -470,6 +472,12 @@ function InlineMedicineAutoComplete({
   };
 
   const handleSelect = (e: { value: MedicineItem }) => {
+    const added = isAlreadyAdded ? isAlreadyAdded(e.value.name, e.value.id) : false;
+    if (added) {
+      dropdownClicked.current = false;
+      onChange(""); // reset/clear out duplicate entry
+      return;
+    }
     dropdownClicked.current = true;
     onSelect(e.value);
     // Auto-focus dose field after medicine is selected
@@ -489,10 +497,18 @@ function InlineMedicineAutoComplete({
   };
 
   const itemTemplate = (item: MedicineItem) => {
+    const added = isAlreadyAdded ? isAlreadyAdded(item.name, item.id) : false;
     return (
-      <div className="p-1">
-        <div className="text-[11px] font-bold text-[#1e293b]">{item.name}</div>
-        <div className="text-[8px] text-[#A0AEC0] uppercase font-semibold">{item.generic}</div>
+      <div className={`p-1.5 flex items-center justify-between w-full ${added ? "opacity-60 cursor-not-allowed bg-slate-50/50" : ""}`}>
+        <div className="flex-1 min-w-0">
+          <div className={`text-[11px] font-bold ${added ? "text-slate-400 line-through" : "text-[#1e293b]"}`}>{item.name}</div>
+          <div className="text-[8px] text-[#A0AEC0] uppercase font-semibold truncate">{item.generic}</div>
+        </div>
+        {added && (
+          <span className="text-[7.5px] font-extrabold text-amber-700 bg-amber-50 border border-amber-250 px-1 py-0.2 rounded uppercase select-none shrink-0">
+            Added
+          </span>
+        )}
       </div>
     );
   };
@@ -599,9 +615,23 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
   };
 
   /* ─── helpers ─── */
-  const addMedicine = async (med: { name: string; generic: string; form?: string }) => {
+  const addMedicine = async (med: { id?: number; name: string; generic: string; form?: string }) => {
     // If the medicine generic matches empty, check if it's new custom typed text
     let name = med.name.trim();
+    if (!name) return;
+
+    // Prevent duplicate addition
+    const isDuplicate = medications.some(m => 
+      m.name.trim().toLowerCase() === name.toLowerCase() ||
+      (med.id && m.medicineId === med.id)
+    );
+    if (isDuplicate) {
+      setMedInput("");
+      setMedInputFocused(false);
+      setSearchHi(-1);
+      return;
+    }
+
     let generic = med.generic ? med.generic.trim() : "";
     let form = med.form ?? "tablet";
 
@@ -814,6 +844,15 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                           const cleanName = v.trim();
                           if (!cleanName) return;
                           
+                          // Prevent duplicate typed name
+                          const isDuplicate = medications.some(m => 
+                            m.id !== med.id && m.name.trim().toLowerCase() === cleanName.toLowerCase()
+                          );
+                          if (isDuplicate) {
+                            patch(med.id, { name: "", medicineId: undefined, generic: "" });
+                            return;
+                          }
+                          
                           const { data: existing } = await supabase
                             .from("medicine")
                             .select("id, name, salt_composition, short_composition1, type")
@@ -835,6 +874,14 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                               form: inserted.form 
                             });
                           }
+                        }}
+                        isAlreadyAdded={(medName, medId) => {
+                          return medications.some(m => 
+                            m.id !== med.id && (
+                              m.name.trim().toLowerCase() === medName.trim().toLowerCase() ||
+                              (medId && m.medicineId === medId)
+                            )
+                          );
                         }}
                         onAfterSelect={() => focusField(med.id, 'dose')}
                         placeholder="Medicine"
@@ -1034,31 +1081,70 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
               <div className="px-3 py-1 bg-indigo-50/60 text-indigo-700 rounded-lg text-[9px] font-extrabold uppercase tracking-wider mb-1.5 select-none inline-block">
                 Select Medicine to Add
               </div>
-              {list.map((med, i) => (
-                <div
-                  key={med.name}
-                  onMouseDown={() => addMedicine(med)}
-                  className={`p-2.5 px-3.5 text-left rounded-lg cursor-pointer transition-colors border-b border-[#F8FAFC] last:border-b-0 flex items-center justify-between
-                    ${i === searchHi ? "bg-indigo-50/80 text-indigo-950 font-black border-indigo-100" : "hover:bg-slate-50 text-slate-700"}`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12px] font-bold tracking-tight">{med.name}</div>
-                    {med.generic && <div className="text-[9.5px] text-[#A0AEC0] uppercase font-bold tracking-wide mt-0.5 truncate">{med.generic}</div>}
+              {list.map((med, i) => {
+                const added = medications.some(m => 
+                  m.name.trim().toLowerCase() === med.name.trim().toLowerCase() ||
+                  (med.id && m.medicineId === med.id)
+                );
+                return (
+                  <div
+                    key={med.name}
+                    onMouseDown={() => {
+                      if (!added) {
+                        addMedicine(med);
+                      }
+                    }}
+                    className={`p-2.5 px-3.5 text-left rounded-lg border-b border-[#F8FAFC] last:border-b-0 flex items-center justify-between transition-colors
+                      ${added 
+                        ? "bg-slate-50/60 cursor-not-allowed opacity-60" 
+                        : i === searchHi 
+                          ? "bg-indigo-50/80 text-indigo-950 font-black border-indigo-100 cursor-pointer" 
+                          : "hover:bg-slate-50 text-slate-700 cursor-pointer"
+                      }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-[12px] font-bold tracking-tight ${added ? "text-slate-400 line-through" : ""}`}>{med.name}</div>
+                      {med.generic && <div className="text-[9.5px] text-[#A0AEC0] uppercase font-bold tracking-wide mt-0.5 truncate">{med.generic}</div>}
+                    </div>
+                    {added ? (
+                      <span className="text-[9px] text-amber-700 font-extrabold shrink-0 bg-amber-50 border border-amber-250 px-2 py-0.5 rounded uppercase tracking-wider">
+                        Added
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-bold shrink-0 bg-slate-100 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100">
+                        + Add
+                      </span>
+                    )}
                   </div>
-                  <span className="text-[10px] text-slate-400 font-bold shrink-0 bg-slate-100 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100">
-                    + Add
-                  </span>
-                </div>
-              ))}
-              {hasCustomVal && (
-                <div
-                  onMouseDown={() => addMedicine({ name: medInput, generic: "" })}
-                  className="p-2.5 px-3.5 text-left rounded-lg cursor-pointer text-indigo-650 font-extrabold hover:bg-indigo-50 border-t border-[#F8FAFC] flex items-center gap-1.5"
-                >
-                  <span className="text-[12px]">+ Create new medicine</span>
-                  <span className="italic text-[12px] font-semibold text-slate-500">"{medInput.trim()}"</span>
-                </div>
-              )}
+                );
+              })}
+              {hasCustomVal && (() => {
+                const added = medications.some(m => m.name.trim().toLowerCase() === medInput.trim().toLowerCase());
+                return (
+                  <div
+                    onMouseDown={() => {
+                      if (!added) {
+                        addMedicine({ name: medInput, generic: "" });
+                      }
+                    }}
+                    className={`p-2.5 px-3.5 text-left rounded-lg border-t border-[#F8FAFC] flex items-center justify-between
+                      ${added 
+                        ? "bg-slate-50/60 cursor-not-allowed opacity-60" 
+                        : "hover:bg-indigo-50 text-indigo-650 font-extrabold cursor-pointer"
+                      }`}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`text-[12px] ${added ? "text-slate-400 line-through" : ""}`}>+ Create new medicine</span>
+                      <span className={`italic text-[12px] font-semibold truncate ${added ? "text-slate-450" : "text-slate-500"}`}>"{medInput.trim()}"</span>
+                    </div>
+                    {added && (
+                      <span className="text-[9px] text-amber-700 font-extrabold shrink-0 bg-amber-50 border border-amber-250 px-2 py-0.5 rounded uppercase tracking-wider">
+                        Added
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           );
         })()}

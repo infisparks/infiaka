@@ -81,6 +81,7 @@ function InlineAutoComplete({
 }) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const dropdownClicked = useRef(false);
+  const autoRef = useRef<any>(null);
 
   const search = (event: { query: string }) => {
     const q = event.query.trim().toLowerCase();
@@ -93,6 +94,9 @@ function InlineAutoComplete({
         if (!aStarts && bStarts) return 1;
         return 0;
       });
+    if (!q || options.some(opt => opt.toLowerCase() === q)) {
+      results = options;
+    }
     const sliced = results.slice(0, 30);
     if (q && !options.some((o) => o.toLowerCase() === q)) {
       setSuggestions([...sliced, `+ Create "${event.query.trim()}"`]);
@@ -138,12 +142,18 @@ function InlineAutoComplete({
   return (
     <div className="w-full h-full relative primereact-autocomplete-inline">
       <AutoComplete
+        ref={autoRef}
         value={value}
         suggestions={suggestions}
         completeMethod={search}
         onChange={(e) => onChange(e.value)}
         onSelect={handleSelect}
         onBlur={handleBlur}
+        minLength={0}
+        onFocus={(e) => {
+          search({ query: value || "" });
+          autoRef.current?.search(e, value || "", "dropdown");
+        }}
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
@@ -173,9 +183,11 @@ function InlineProcedureAutoComplete({
 }) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const dropdownClicked = useRef(false);
+  const autoRef = useRef<any>(null);
 
   const search = (event: { query: string }) => {
     const q = event.query.trim().toLowerCase();
+    let fontName = "helvetica"; // placeholder fallback
     let results = procOptions
       .filter((o) => o.toLowerCase().includes(q))
       .sort((a, b) => {
@@ -185,6 +197,9 @@ function InlineProcedureAutoComplete({
         if (!aStarts && bStarts) return 1;
         return 0;
       });
+    if (!q || procOptions.some(opt => opt.toLowerCase() === q)) {
+      results = procOptions;
+    }
     const sliced = results.slice(0, 30);
     if (q && !procOptions.some((o) => o.toLowerCase() === q)) {
       setSuggestions([...sliced, `+ Create "${event.query.trim()}"`]);
@@ -234,12 +249,18 @@ function InlineProcedureAutoComplete({
   return (
     <div className="w-full h-full relative primereact-autocomplete-inline flex items-center">
       <AutoComplete
+        ref={autoRef}
         value={value}
         suggestions={suggestions}
         completeMethod={search}
         onChange={(e) => { if (typeof e.value === "string") onChange(e.value); }}
         onSelect={handleSelect}
         onBlur={handleBlur}
+        minLength={0}
+        onFocus={(e) => {
+          search({ query: value || "" });
+          autoRef.current?.search(e, value || "", "dropdown");
+        }}
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
@@ -332,7 +353,7 @@ export default function ProceduresCard({ procedures, setProcedures }: Procedures
       {
         id: Date.now().toString(),
         name: name.trim(),
-        duration: "After 3 Days",
+        duration: "",
         note: ""
       }
     ]);
