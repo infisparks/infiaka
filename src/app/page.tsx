@@ -658,11 +658,11 @@ function DashboardContent() {
   const [registering, setRegistering] = useState(false);
 
   // DB Map: public.visit_vitals
-  const [initialBp, setInitialBp] = useState("120/80");
+  const [initialBp, setInitialBp] = useState("");
   const [initialPulse, setInitialPulse] = useState("");
   const [initialWeight, setInitialWeight] = useState("");
-  const [initialSpo2, setInitialSpo2] = useState("98");
-  const [initialSugar, setInitialSugar] = useState("100");
+  const [initialSpo2, setInitialSpo2] = useState("");
+  const [initialSugar, setInitialSugar] = useState("");
 
   // Tab counts
   // Helper function to normalize strings for comparison (removes dots, handles whitespace)
@@ -778,11 +778,11 @@ function DashboardContent() {
     setDiscountAmount(0);
     setServicesRows([{ id: "1", name: "First consultation", fee: 2000, qty: 1, type: "service" }]);
     setPaymentsRows([{ id: "1", mode: "Cash", amount: 0 }]);
-    setInitialBp("120/80");
+    setInitialBp("");
     setInitialPulse("");
     setInitialWeight("");
-    setInitialSpo2("98");
-    setInitialSugar("100");
+    setInitialSpo2("");
+    setInitialSugar("");
   };
 
   // Pre-fill selected patient details in registration form
@@ -802,11 +802,11 @@ function DashboardContent() {
       setState(selectedBookingPatient.state || "Maharashtra");
       
       if (selectedBookingPatient.vitals) {
-        setInitialBp(selectedBookingPatient.vitals.bp || "120/80");
+        setInitialBp(selectedBookingPatient.vitals.bp || "");
         setInitialPulse(selectedBookingPatient.vitals.pulse || "");
         setInitialWeight(selectedBookingPatient.vitals.weight || "");
-        setInitialSpo2(selectedBookingPatient.vitals.spo2 || "98");
-        setInitialSugar(selectedBookingPatient.vitals.sugar || "100");
+        setInitialSpo2(selectedBookingPatient.vitals.spo2 || "");
+        setInitialSugar(selectedBookingPatient.vitals.sugar || "");
       }
 
       if (selectedBookingPatient.opdRegistration) {
