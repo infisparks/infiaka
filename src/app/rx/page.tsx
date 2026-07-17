@@ -7,7 +7,11 @@ import { supabase, getUserRole } from "@/lib/supabase";
 import VitalsCard from "@/components/VitalsCard";
 import MedicalHistoryCard from "@/components/MedicalHistoryCard";
 import SymptomsCard from "@/components/SymptomsCard";
+import ExaminationFindingsCard from "@/components/ExaminationFindingsCard";
+import PlanSurgeryAdvisedCard from "@/components/PlanSurgeryAdvisedCard";
+import ProcedureDoneCard from "@/components/ProcedureDoneCard";
 import DiagnosisCard from "@/components/DiagnosisCard";
+import SurgeryPerformedCard from "@/components/SurgeryPerformedCard";
 import MedicationsCard from "@/components/MedicationsCard";
 import LabsCard from "@/components/LabsCard";
 import ResultsCard from "@/components/ResultsCard";
@@ -137,6 +141,28 @@ function RxPageContent() {
   const rxPatientId = searchParams.get("rx");
 
   const printRef = useRef<any>(null);
+
+  // Compile medical history elements into display format
+  const compileHistoryText = (items: any[], title: string) => {
+    if (!items || items.length === 0) return null;
+    return (
+      <div className="text-[11px] leading-relaxed">
+        <span className="font-bold text-primary mr-1">{title}:</span>
+        <span className="text-[#334155]">
+          {items.map((item: any) => {
+            const name = item.name || item.medicineName || item.relation || item.condition || item.item || item.title || "";
+            const details = [];
+            if (item.severity) details.push(`Severity: ${item.severity}`);
+            if (item.duration) details.push(`Duration: ${item.duration}`);
+            if (item.since) details.push(`Since: ${item.since}`);
+            if (item.relation) details.push(`Relation: ${item.relation}`);
+            
+            return name + (details.length > 0 ? ` (${details.join(", ")})` : "");
+          }).join(" | ")}
+        </span>
+      </div>
+    );
+  };
 
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -281,6 +307,12 @@ function RxPageContent() {
   const [advicesInput, setAdvicesInput] = useState("");
   const [advRest, setAdvRest] = useState(false);
   const [advWater, setAdvWater] = useState(false);
+  const [surgeryPerformed, setSurgeryPerformed] = useState("");
+  const [surgeryDate, setSurgeryDate] = useState("");
+  const [surgeryNotes, setSurgeryNotes] = useState("");
+  const [examinationFindings, setExaminationFindings] = useState("");
+  const [planSurgeryAdvised, setPlanSurgeryAdvised] = useState("");
+  const [procedureDone, setProcedureDone] = useState("");
   
   const [rxProcedures, setRxProcedures] = useState<ProcedureItem[]>([]);
   const [referrals, setReferrals] = useState<ReferralItem[]>([]);
@@ -736,6 +768,12 @@ function RxPageContent() {
           setAdvicesInput(regData.advice || "");
           setAdvRest(regData.advice_rest || false);
           setAdvWater(regData.advice_water || false);
+          setSurgeryPerformed(regData.surgery_performed || "");
+          setSurgeryDate(regData.surgery_date || "");
+          setSurgeryNotes(regData.surgery_notes || "");
+          setExaminationFindings(regData.examination_findings || "");
+          setPlanSurgeryAdvised(regData.plan_surgery_advised || "");
+          setProcedureDone(regData.procedure_done || "");
         }
 
         // Try load from local storage
@@ -757,6 +795,12 @@ function RxPageContent() {
           if (parsed.advWater !== undefined && !regData) setAdvWater(parsed.advWater);
           if (parsed.rxProcedures && !regData) setRxProcedures(parsed.rxProcedures);
           if (parsed.referrals && !regData) setReferrals(parsed.referrals);
+          if (parsed.surgeryPerformed && !regData) setSurgeryPerformed(parsed.surgeryPerformed);
+          if (parsed.surgeryDate && !regData) setSurgeryDate(parsed.surgeryDate);
+          if (parsed.surgeryNotes && !regData) setSurgeryNotes(parsed.surgeryNotes);
+          if (parsed.examinationFindings && !regData) setExaminationFindings(parsed.examinationFindings);
+          if (parsed.planSurgeryAdvised && !regData) setPlanSurgeryAdvised(parsed.planSurgeryAdvised);
+          if (parsed.procedureDone && !regData) setProcedureDone(parsed.procedureDone);
         } else {
           // Initialize defaults
           if (!regData?.registration_id) {
@@ -786,6 +830,12 @@ function RxPageContent() {
             setAdvicesInput("");
             setAdvRest(false);
             setAdvWater(false);
+            setSurgeryPerformed("");
+            setSurgeryDate("");
+            setSurgeryNotes("");
+            setExaminationFindings("");
+            setPlanSurgeryAdvised("");
+            setProcedureDone("");
             setRxProcedures([
               { id: "1", name: "Actinotherapy", duration: "After 3 Days", note: "" },
               { id: "2", name: "APTT", duration: "After 3 Days", note: "" }
@@ -827,7 +877,13 @@ function RxPageContent() {
             follow_up_notes: followUpNotes,
             advice: advicesInput,
             advice_rest: advRest,
-            advice_water: advWater
+            advice_water: advWater,
+            surgery_performed: surgeryPerformed,
+            surgery_date: surgeryDate,
+            surgery_notes: surgeryNotes,
+            examination_findings: examinationFindings,
+            plan_surgery_advised: planSurgeryAdvised,
+            procedure_done: procedureDone
           })
           .eq("registration_id", regId);
 
@@ -839,7 +895,7 @@ function RxPageContent() {
     }, 1000); // 1-second debounce to throttle database requests
 
     return () => clearTimeout(timer);
-  }, [bp, pulse, weight, spo2, sugar, notesForPatient, privateNotes, followUpVal, followUpNotes, advicesInput, advRest, advWater, currentRxPatient, loading]);
+  }, [bp, pulse, weight, spo2, sugar, notesForPatient, privateNotes, followUpVal, followUpNotes, advicesInput, advRest, advWater, surgeryPerformed, surgeryDate, surgeryNotes, examinationFindings, planSurgeryAdvised, procedureDone, currentRxPatient, loading]);
 
   // Debounced auto-save effect for patient medical history
   useEffect(() => {
@@ -1572,7 +1628,12 @@ function RxPageContent() {
         advRest,
         advWater,
         rxProcedures,
-        referrals
+        surgeryPerformed,
+        surgeryDate,
+        surgeryNotes,
+        examinationFindings,
+        planSurgeryAdvised,
+        procedureDone
       };
       localStorage.setItem(`saved_rx_${currentRxPatient.id}`, JSON.stringify(rxState));
 
@@ -1603,6 +1664,12 @@ function RxPageContent() {
             advice: advicesInput,
             advice_rest: advRest,
             advice_water: advWater,
+            surgery_performed: surgeryPerformed,
+            surgery_date: surgeryDate,
+            surgery_notes: surgeryNotes,
+            examination_findings: examinationFindings,
+            plan_surgery_advised: planSurgeryAdvised,
+            procedure_done: procedureDone,
             is_completed: true
           })
           .eq("registration_id", regId);
@@ -2174,6 +2241,11 @@ function RxPageContent() {
           setSugar={setSugar}
         />
 
+        <SymptomsCard
+          symptoms={symptoms}
+          setSymptoms={setSymptoms}
+        />
+
         <MedicalHistoryCard
           histNoKnown={histNoKnown}
           setHistNoKnown={setHistNoKnown}
@@ -2294,16 +2366,28 @@ function RxPageContent() {
           setAdvicesInput={setAdvicesInput}
         />
 
+        <ExaminationFindingsCard
+          examinationFindings={examinationFindings}
+          setExaminationFindings={setExaminationFindings}
+        />
 
-
-        <SymptomsCard
-          symptoms={symptoms}
-          setSymptoms={setSymptoms}
+        <ResultsCard
+          labResults={labResults}
+          setLabResults={setLabResults}
         />
 
         <DiagnosisCard
           diagnoses={diagnoses}
           setDiagnoses={setDiagnoses}
+        />
+
+        <SurgeryPerformedCard
+          surgeryPerformed={surgeryPerformed}
+          setSurgeryPerformed={setSurgeryPerformed}
+          surgeryDate={surgeryDate}
+          setSurgeryDate={setSurgeryDate}
+          surgeryNotes={surgeryNotes}
+          setSurgeryNotes={setSurgeryNotes}
         />
 
         <MedicationsCard
@@ -2316,21 +2400,9 @@ function RxPageContent() {
           setLabs={setLabs}
         />
 
-        <ResultsCard
-          labResults={labResults}
-          setLabResults={setLabResults}
-        />
-
-        <NotesCard
-          notesForPatient={notesForPatient}
-          setNotesForPatient={setNotesForPatient}
-          privateNotes={privateNotes}
-          setPrivateNotes={setPrivateNotes}
-        />
-
-        <ReferToDoctorCard
-          referrals={referrals}
-          setReferrals={setReferrals}
+        <PlanSurgeryAdvisedCard
+          planSurgeryAdvised={planSurgeryAdvised}
+          setPlanSurgeryAdvised={setPlanSurgeryAdvised}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full items-start">
@@ -2352,10 +2424,29 @@ function RxPageContent() {
           />
         </div>
 
+         <NotesCard
+          notesForPatient={notesForPatient}
+          setNotesForPatient={setNotesForPatient}
+          privateNotes={privateNotes}
+          setPrivateNotes={setPrivateNotes}
+        />
+
+        <ProcedureDoneCard
+          procedureDone={procedureDone}
+          setProcedureDone={setProcedureDone}
+        />
+
+        <ReferToDoctorCard
+          referrals={referrals}
+          setReferrals={setReferrals}
+        />
+
+        {/* 
         <ProceduresCard
           procedures={rxProcedures}
           setProcedures={setRxProcedures}
         />
+        */}
 
       </main>
 
@@ -2783,204 +2874,199 @@ function RxPageContent() {
                     </div>
                   )}
 
-                  {/* Main Grid: Symptoms, Diagnosis | Rx Medications */}
-                  <div className="grid grid-cols-3 gap-6 items-start mt-4">
-                    {/* Left Column (Symptoms, Diagnoses, Suggested Labs, Lab Results, Procedures, Referrals) */}
-                    <div className="col-span-1 border-r border-[#E2E8F0] pr-6 space-y-5 select-text">
-                      {/* Symptoms */}
-                      {symptoms.length > 0 && (
-                        <div>
-                          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
-                            Symptoms / Complaints
-                          </div>
-                          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
-                            {symptoms.map((s, idx) => (
-                              <li key={idx}>
-                                {s.name}{" "}
-                                {s.duration && (
-                                  <span className="text-slate-400 font-medium">({s.duration})</span>
-                                )}{" "}
-                                {s.severity && (
-                                  <span className="text-[9.5px] uppercase font-bold text-[#718096] bg-slate-100 px-1.5 py-0.5 rounded ml-1">
-                                    {s.severity}
-                                  </span>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Diagnoses */}
-                      {diagnoses.length > 0 && (
-                        <div>
-                          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
-                            Diagnoses
-                          </div>
-                          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
-                            {diagnoses.map((d, idx) => (
-                              <li key={idx}>
-                                {d.name}{" "}
-                                {d.since && (
-                                  <span className="text-slate-400 font-medium">(since {d.since})</span>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Suggested Labs */}
-                      {labs.length > 0 && (
-                        <div>
-                          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
-                            Suggested Investigations
-                          </div>
-                          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
-                            {labs.map((l, idx) => (
-                              <li key={idx}>
-                                {l.name}{" "}
-                                {l.testOn && (
-                                  <span className="text-slate-400 font-medium">(Test: {l.testOn})</span>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Lab Results */}
-                      {labResults.length > 0 && (
-                        <div>
-                          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
-                            Lab Results
-                          </div>
-                          <div className="space-y-2 text-[10.5px] font-semibold text-slate-700">
-                            {labResults.map((r, idx) => (
-                              <div key={idx} className="border-b pb-1.5 last:border-0">
-                                <div className="font-bold text-[#1a202c]">{r.name}</div>
-                                <div className="flex gap-2 text-[10px] text-slate-500 mt-0.5">
-                                  <span>Reading: <strong className="text-slate-700">{r.reading} {r.unit}</strong></span>
-                                  {r.interpretation && (
-                                    <span className={`px-1 rounded font-bold text-[9px] uppercase ${
-                                      r.interpretation.toLowerCase() === "high" ? "bg-red-50 text-red-600" :
-                                      r.interpretation.toLowerCase() === "low" ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600"
-                                    }`}>
-                                      {r.interpretation}
-                                    </span>
-                                  )}
-                                </div>
-                                {r.notes && <div className="text-[9.5px] text-slate-400 mt-0.5 italic">Note: {r.notes}</div>}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Suggested Procedures */}
-                      {rxProcedures.length > 0 && (
-                        <div>
-                          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
-                            Suggested Procedures
-                          </div>
-                          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
-                            {rxProcedures.map((p, idx) => (
-                              <li key={idx}>
-                                {p.name}{" "}
-                                {p.duration && (
-                                  <span className="text-slate-400 font-medium">({p.duration})</span>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Doctor Referrals */}
-                      {referrals.length > 0 && (
-                        <div>
-                          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
-                            Refer To Specialist
-                          </div>
-                          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
-                            {referrals.map((ref, idx) => (
-                              <li key={idx}>
-                                {ref.doctorName}{" "}
-                                {ref.notes && (
-                                  <span className="text-slate-400 font-medium">({ref.notes})</span>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+                  {/* 2. Symptoms */}
+                  {symptoms.length > 0 && (
+                    <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-white">
+                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
+                        Symptoms / Complaints
+                      </div>
+                      <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+                        {symptoms.map((s, idx) => (
+                          <li key={idx}>
+                            {s.name}{" "}
+                            {s.duration && (
+                              <span className="text-slate-400 font-medium">({s.duration})</span>
+                            )}{" "}
+                            {s.severity && (
+                              <span className="text-[9.5px] uppercase font-bold text-[#718096] bg-slate-100 px-1.5 py-0.5 rounded ml-1">
+                                {s.severity}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
+                  )}
 
-                    {/* Right Column (Medications Rx Symbol & Medicine Cards) */}
-                    <div className="col-span-2 space-y-4 select-text">
-                      <div className="text-[32px] font-bold text-primary font-serif -mt-2 leading-none">Rₓ</div>
-                      
-                      {medications.length > 0 ? (
-                        <div className="space-y-3">
-                          {medications.map((m, idx) => (
-                            <div key={idx} className="border-l-4 border-primary pl-3 py-1 space-y-0.5 bg-slate-50/50 rounded-r-md">
-                              <div className="text-[12.5px] font-bold text-[#1E293B]">{m.name}</div>
-                              {m.generic && <div className="text-[9.5px] text-[#718096] uppercase font-semibold">{m.generic}</div>}
-                              <div className="text-[11px] font-semibold text-slate-700 flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
-                                <span><strong>Dose:</strong> {m.dose}</span>
-                                <span><strong>Frequency:</strong> {m.freq}</span>
-                                <span><strong>Timing:</strong> {m.timing}</span>
-                                {m.duration && <span><strong>Duration:</strong> {m.duration}</span>}
-                              </div>
-                              {m.instr && (
-                                <div className="text-[10px] text-slate-500 italic mt-0.5">
-                                  Instruction: {m.instr}
-                                </div>
+                  {/* 3. Patient Medical History */}
+                  {(!histNoKnown || familyItems.length > 0 || conditions.length > 0 || allergies.length > 0 || procedures.length > 0 || currentMeds.length > 0 || habits.length > 0 || foodAllergies.length > 0 || travelHistory.length > 0 || otherHistory.length > 0) && (
+                    <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-slate-50/50 space-y-1.5">
+                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
+                        Patient Medical History
+                      </div>
+                      {conditions.length > 0 && compileHistoryText(conditions, "Patient Medical History")}
+                      {familyItems.length > 0 && compileHistoryText(familyItems, "Family History")}
+                      {habits.length > 0 && compileHistoryText(habits, "Lifestyle Habits")}
+                      {currentMeds.length > 0 && compileHistoryText(currentMeds, "Current Medications")}
+                      {allergies.length > 0 && compileHistoryText(allergies, "Drug Allergies")}
+                      {foodAllergies.length > 0 && compileHistoryText(foodAllergies, "Food Allergies")}
+                      {procedures.length > 0 && compileHistoryText(procedures, "Past Surgical Procedures")}
+                      {travelHistory.length > 0 && compileHistoryText(travelHistory, "Travel History")}
+                      {otherHistory.length > 0 && compileHistoryText(otherHistory, otherHistoryTitle || "Other Medical History")}
+                    </div>
+                  )}
+
+                  {/* 4. Examination Findings */}
+                  {examinationFindings && (
+                    <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-slate-50/50">
+                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
+                        Examination Findings
+                      </div>
+                      <div className="text-[11.5px] font-medium text-slate-700 whitespace-pre-line leading-relaxed font-sans">
+                        {examinationFindings}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 5. Lab Results */}
+                  {labResults.length > 0 && (
+                    <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-white">
+                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
+                        Lab Results
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-[10.5px] font-semibold text-slate-700">
+                        {labResults.map((r, idx) => (
+                          <div key={idx} className="border-b pb-1.5 last:border-0">
+                            <div className="font-bold text-[#1a202c]">{r.name}</div>
+                            <div className="flex gap-2 text-[10px] text-slate-500 mt-0.5">
+                              <span>Reading: <strong className="text-slate-700">{r.reading} {r.unit}</strong></span>
+                              {r.interpretation && (
+                                <span className={`px-1 rounded font-bold text-[9px] uppercase ${
+                                  r.interpretation.toLowerCase() === "high" ? "bg-red-50 text-red-600" :
+                                  r.interpretation.toLowerCase() === "low" ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600"
+                                }`}>
+                                  {r.interpretation}
+                                </span>
                               )}
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-[11px] text-slate-400 italic">No medications prescribed.</div>
-                      )}
+                            {r.notes && <div className="text-[9.5px] text-slate-400 mt-0.5 italic">Note: {r.notes}</div>}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  )}
 
-                {/* Bottom Segment: Follow Up, Advice, Notes, Signature */}
-                <div className="border-t border-[#E2E8F0] pt-4 mt-8 flex flex-col space-y-4">
-                  <div className="grid grid-cols-2 gap-6 text-[11px] font-semibold text-slate-700 select-text">
-                    <div className="space-y-2">
-                      {/* Follow Up */}
+                  {/* 6. Diagnoses */}
+                  {diagnoses.length > 0 && (
+                    <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-white">
+                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
+                        Diagnoses
+                      </div>
+                      <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+                        {diagnoses.map((d, idx) => (
+                          <li key={idx}>
+                            {d.name}{" "}
+                            {d.since && (
+                              <span className="text-slate-400 font-medium">(since {d.since})</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* 7. Surgery Performed */}
+                  {surgeryPerformed && (
+                    <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-slate-50/50">
+                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-1.5 mb-1">
+                        Surgery Performed
+                      </div>
+                      <div className="text-[11px] font-semibold text-slate-700 space-y-1">
+                        <div><span className="text-slate-400 font-medium">Surgery Name:</span> {surgeryPerformed}</div>
+                        {surgeryDate && <div><span className="text-slate-400 font-medium">Date of Surgery:</span> {surgeryDate}</div>}
+                        {surgeryNotes && <div><span className="text-slate-400 font-medium">Surgery Notes:</span> {surgeryNotes}</div>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 8. Medications */}
+                  <div className="mb-5">
+                    <div className="text-[32px] font-bold text-primary font-serif -mt-2 leading-none">Rₓ</div>
+                    {medications.length > 0 ? (
+                      <div className="space-y-3 mt-2">
+                        {medications.map((m, idx) => (
+                          <div key={idx} className="border-l-4 border-primary pl-3 py-1 space-y-0.5 bg-slate-50/50 rounded-r-md">
+                            <div className="text-[12.5px] font-bold text-[#1E293B]">{m.name}</div>
+                            {m.generic && <div className="text-[9.5px] text-[#718096] uppercase font-semibold">{m.generic}</div>}
+                            <div className="text-[11px] font-semibold text-slate-700 flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+                              <span><strong>Dose:</strong> {m.dose}</span>
+                              <span><strong>Frequency:</strong> {m.freq}</span>
+                              <span><strong>Timing:</strong> {m.timing}</span>
+                              {m.duration && <span><strong>Duration:</strong> {m.duration}</span>}
+                            </div>
+                            {m.instr && (
+                              <div className="text-[10px] text-slate-500 italic mt-0.5">
+                                Instruction: {m.instr}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-slate-400 italic">No medications prescribed.</div>
+                    )}
+                  </div>
+
+                  {/* 9. Advised Investigations */}
+                  {labs.length > 0 && (
+                    <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-white">
+                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
+                        Advised Investigations (Lab/Radiology)
+                      </div>
+                      <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+                        {labs.map((l, idx) => (
+                          <li key={idx}>
+                            {l.name}{" "}
+                            {l.testOn && (
+                              <span className="text-slate-400 font-medium">(Test: {l.testOn})</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* 10. Plan / Surgery Advised */}
+                  {planSurgeryAdvised && (
+                    <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-slate-50/50">
+                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
+                        Plan / Surgery Advised
+                      </div>
+                      <div className="text-[11.5px] font-medium text-slate-700 whitespace-pre-line leading-relaxed font-sans">
+                        {planSurgeryAdvised}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 11. Followups & Advice */}
+                  {(followUpVal || advicesInput || advRest || advWater) && (
+                    <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-white space-y-3">
                       {followUpVal && (
                         <div>
-                          <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5">Follow Up</strong>
-                          <div>
+                          <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5 border-b pb-1">Follow Up</strong>
+                          <div className="text-[11px] font-semibold text-slate-700 mt-1">
                             {followUpVal}{" "}
                             {followUpNotes && <span className="text-slate-500">({followUpNotes})</span>}
                           </div>
                         </div>
                       )}
 
-                      {/* Doctor Notes */}
-                      {notesForPatient && (
-                        <div>
-                          <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5">Doctor Notes for Patient</strong>
-                          <div className="bg-slate-50 p-2 rounded text-[10.5px] leading-relaxed border border-[#E2E8F0] white-space-pre-line font-medium text-slate-600">
-                            {notesForPatient}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      {/* Advices */}
                       {(advicesInput || advRest || advWater) && (
                         <div>
-                          <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5">General Advice</strong>
-                          <div className="space-y-1">
-                            {advicesInput && <div>{advicesInput}</div>}
-                            <div className="flex gap-3 text-[10px] font-bold text-slate-500">
+                          <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5 border-b pb-1">General Advice</strong>
+                          <div className="space-y-1 text-[11px] font-semibold text-[#1a202c] mt-1">
+                            {advicesInput && <div className="whitespace-pre-line">{advicesInput}</div>}
+                            <div className="flex gap-3 text-[10px] font-bold text-slate-500 mt-1">
                               {advRest && <span className="bg-slate-100 px-2 py-0.5 rounded">🛌 Rest Recommended</span>}
                               {advWater && <span className="bg-slate-100 px-2 py-0.5 rounded">💧 Drink Plentiful Water</span>}
                             </div>
@@ -2988,7 +3074,50 @@ function RxPageContent() {
                         </div>
                       )}
                     </div>
-                  </div>
+                  )}
+
+                  {/* 12. Notes / Remarks */}
+                  {notesForPatient && (
+                    <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-slate-50/50">
+                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
+                        Doctor Notes for Patient
+                      </div>
+                      <div className="text-[11.5px] font-medium text-slate-700 whitespace-pre-line leading-relaxed font-sans">
+                        {notesForPatient}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 13. Procedure Done */}
+                  {procedureDone && (
+                    <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-slate-50/50">
+                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
+                        Procedure Done
+                      </div>
+                      <div className="text-[11.5px] font-medium text-slate-700 whitespace-pre-line leading-relaxed font-sans">
+                        {procedureDone}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 14. Refer to Specialist */}
+                  {referrals && referrals.length > 0 && (
+                    <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-white">
+                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
+                        Refer To Specialist
+                      </div>
+                      <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700 mt-1">
+                        {referrals.map((ref, idx) => (
+                          <li key={idx}>
+                            {ref.doctorName}{" "}
+                            {ref.notes && (
+                              <span className="text-slate-400 font-medium">({ref.notes})</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                   {/* Sign-off row */}
                   {printShowFooter ? (
@@ -3040,6 +3169,12 @@ function RxPageContent() {
       advicesInput={advicesInput}
       advRest={advRest}
       advWater={advWater}
+      examinationFindings={examinationFindings}
+      surgeryPerformed={surgeryPerformed}
+      surgeryDate={surgeryDate}
+      surgeryNotes={surgeryNotes}
+      planSurgeryAdvised={planSurgeryAdvised}
+      procedureDone={procedureDone}
       histNoKnown={histNoKnown}
       familyItems={familyItems}
       conditions={conditions}

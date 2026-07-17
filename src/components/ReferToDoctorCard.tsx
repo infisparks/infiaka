@@ -28,12 +28,12 @@ async function fetchDoctors(): Promise<string[]> {
     // Ensure we always have "DR. LAXMAN SALVE" in the suggestions
     const list = (data || []).map((d: any) => d.value);
     if (!list.some(d => d.toLowerCase() === "dr. laxman salve")) {
-      list.unshift("DR. LAXMAN SALVE");
+      list.unshift("dr. laxman salve");
     }
     return list;
   } catch (err) {
     console.error("Error fetching referred doctors:", err);
-    return ["DR. LAXMAN SALVE"];
+    return ["dr. laxman salve"];
   }
 }
 

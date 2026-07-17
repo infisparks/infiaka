@@ -598,7 +598,8 @@ function DashboardContent() {
   const [referringDoctorCache, setReferringDoctorCache] = useState<string[]>([]);
 
   // Autocomplete focus states
-  const [addressFocused, setAddressFocused] = useState(false);
+  const [localAddressFocused, setLocalAddressFocused] = useState(false);
+  const [permanentAddressFocused, setPermanentAddressFocused] = useState(false);
   const [doctorFocused, setDoctorFocused] = useState(false);
   const [countryFocused, setCountryFocused] = useState(false);
   const [stateFocused, setStateFocused] = useState(false);
@@ -643,7 +644,7 @@ function DashboardContent() {
   // DB Map: public.visits
   const [appointmentDateTime, setAppointmentDateTime] = useState(() => getInitialAppointmentDateTime());
   const [clinicName, setClinicName] = useState("DLPC - Dadar");
-  const [treatingDoctor, setTreatingDoctor] = useState("DR. LAXMAN SALVE");
+  const [treatingDoctor, setTreatingDoctor] = useState("Dr Laxman Salve");
   const [visitCategory, setVisitCategory] = useState("First consultation");
   const [referringDoctor, setReferringDoctor] = useState("Dadar East");
   const [discountAmount, setDiscountAmount] = useState<number | "">("");
@@ -772,7 +773,7 @@ function DashboardContent() {
     setState("Maharashtra");
     setAppointmentDateTime(getInitialAppointmentDateTime());
     setClinicName("DLPC - Dadar");
-    setTreatingDoctor("DR. LAXMAN SALVE");
+    setTreatingDoctor("Dr Laxman Salve");
     setVisitCategory("First consultation");
     setReferringDoctor("Dadar East");
     setDiscountAmount(0);
@@ -1069,7 +1070,14 @@ function DashboardContent() {
   }, [phoneDialCode]);
 
   // Autocomplete matching structures
-  const matchingAddresses = useMemo(() => {
+  const matchingLocalAddresses = useMemo(() => {
+    if (localAddress.length < 2) return [];
+    return addressCache.filter((addr) =>
+      addr.toLowerCase().includes(localAddress.toLowerCase())
+    );
+  }, [addressCache, localAddress]);
+
+  const matchingPermanentAddresses = useMemo(() => {
     if (permanentAddress.length < 2) return [];
     return addressCache.filter((addr) =>
       addr.toLowerCase().includes(permanentAddress.toLowerCase())
@@ -1113,12 +1121,27 @@ function DashboardContent() {
     return list;
   };
 
-  const getAddressOptions = () => {
-    const list = [...matchingAddresses];
+  const getLocalAddressOptions = () => {
+    const list = [...matchingLocalAddresses];
+    if (localAddress.trim() && !addressCache.some(a => a.toLowerCase() === localAddress.trim().toLowerCase())) {
+      list.push(`+ Create "${localAddress.trim()}"`);
+    }
+    return list;
+  };
+
+  const getPermanentAddressOptions = () => {
+    const list = [...matchingPermanentAddresses];
     if (permanentAddress.trim() && !addressCache.some(a => a.toLowerCase() === permanentAddress.trim().toLowerCase())) {
       list.push(`+ Create "${permanentAddress.trim()}"`);
     }
     return list;
+  };
+
+  const addAddressToCacheState = (addr: string) => {
+    const trimmed = addr.trim();
+    if (trimmed && !addressCache.some(a => a.toLowerCase() === trimmed.toLowerCase())) {
+      setAddressCache((prev) => [...prev, trimmed]);
+    }
   };
 
   const getReferringDoctorOptions = () => {
@@ -1435,9 +1458,20 @@ function DashboardContent() {
     if (treatingDoctor.trim() && !doctorCache.includes(treatingDoctor.trim())) {
       setDoctorCache([...doctorCache, treatingDoctor.trim()]);
     }
-    if (permanentAddress.trim() && !addressCache.includes(permanentAddress.trim())) {
-      setAddressCache([...addressCache, permanentAddress.trim()]);
+    let tempAddressCache = [...addressCache];
+    let addressCacheChanged = false;
+    if (localAddress.trim() && !tempAddressCache.includes(localAddress.trim())) {
+      tempAddressCache.push(localAddress.trim());
+      addressCacheChanged = true;
     }
+    if (permanentAddress.trim() && !tempAddressCache.includes(permanentAddress.trim())) {
+      tempAddressCache.push(permanentAddress.trim());
+      addressCacheChanged = true;
+    }
+    if (addressCacheChanged) {
+      setAddressCache(tempAddressCache);
+    }
+
     if (referringDoctor.trim() && !referringDoctorCache.includes(referringDoctor.trim())) {
       setReferringDoctorCache([...referringDoctorCache, referringDoctor.trim()]);
     }
@@ -1457,7 +1491,10 @@ function DashboardContent() {
       setRegistering(true);
       // Async database increments
       if (treatingDoctor.trim()) incrementOption(160, treatingDoctor);
-      if (permanentAddress.trim()) incrementOption(161, permanentAddress);
+      if (localAddress.trim()) incrementOption(161, localAddress);
+      if (permanentAddress.trim() && permanentAddress.trim() !== localAddress.trim()) {
+        incrementOption(161, permanentAddress);
+      }
       if (referringDoctor.trim()) incrementOption(163, referringDoctor);
       if (country.trim()) incrementOption(165, country);
       if (state.trim()) incrementOption(166, state);
@@ -2633,7 +2670,7 @@ function DashboardContent() {
                         required
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        placeholder="9958399157"
+                        placeholder="9999999999"
                         className="w-full px-2 py-1 text-[11px] focus:outline-none placeholder:text-gray-300"
                       />
                     </div>
@@ -2685,55 +2722,60 @@ function DashboardContent() {
                     />
                   </div>
 
+                  {/* Local Address */}
                   <div className="space-y-1 relative sm:col-span-2">
-                    <label className="text-[10px] font-bold text-[#4A5568]">Permanent Address</label>
+                    <label className="text-[10px] font-bold text-[#4A5568]">Local Address</label>
                     <input
                       type="text"
-                      value={permanentAddress}
+                      maxLength={20}
+                      value={localAddress}
                       onChange={(e) => {
-                        setPermanentAddress(e.target.value);
-                        setActiveDDFocus("address");
+                        const val = e.target.value.slice(0, 20);
+                        setLocalAddress(val);
+                        setPermanentAddress(val);
+                        setActiveDDFocus("localAddress");
                         setActiveDDIndex(-1);
                       }}
                       onKeyDown={(e) =>
-                        handleInputKeyDown(e, "address", getAddressOptions(), (val) => {
+                        handleInputKeyDown(e, "localAddress", getLocalAddressOptions(), (val) => {
                           let finalVal = val;
                           const isCreate = val.startsWith('+ Create "');
                           if (isCreate) {
                             const match = val.match(/\+ Create "(.*)"/);
                             finalVal = match ? match[1] : val;
                             incrementOption(161, finalVal);
+                            addAddressToCacheState(finalVal);
                           }
-                          setPermanentAddress(finalVal);
                           setLocalAddress(finalVal);
-                          setAddressFocused(false);
+                          setPermanentAddress(finalVal);
+                          setLocalAddressFocused(false);
                         })
                       }
                       onFocus={() => {
-                        setAddressFocused(true);
-                        setActiveDDFocus("address");
+                        setLocalAddressFocused(true);
+                        setActiveDDFocus("localAddress");
                         setActiveDDIndex(-1);
                       }}
                       onBlur={() => {
                         setTimeout(() => {
-                          setAddressFocused(false);
-                          if (activeDDFocus === "address") setActiveDDFocus(null);
+                          setLocalAddressFocused(false);
+                          if (activeDDFocus === "localAddress") setActiveDDFocus(null);
                         }, 200);
                       }}
-                      placeholder="Type permanent address (e.g. mumbra)"
+                      placeholder="Type local address (e.g. mumbra)"
                       className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none focus:border-primary placeholder:text-gray-300"
                     />
-                    
-                    {addressFocused && getAddressOptions().length > 0 && (
+
+                    {localAddressFocused && getLocalAddressOptions().length > 0 && (
                       <div className="absolute left-0 top-full mt-1 z-30 w-full bg-white border border-[#CBD5E0] rounded-md shadow-lg max-h-32 overflow-y-auto p-1 space-y-0.5">
-                        {getAddressOptions().map((addr, idx) => {
+                        {getLocalAddressOptions().map((addr, idx) => {
                           const isCreate = addr.startsWith('+ Create "');
                           let displayVal = addr;
                           if (isCreate) {
                             const match = addr.match(/\+ Create "(.*)"/);
                             displayVal = match ? match[1] : addr;
                           }
-                          const isHighlighted = idx === activeDDIndex && activeDDFocus === "address";
+                          const isHighlighted = idx === activeDDIndex && activeDDFocus === "localAddress";
                           return (
                             <div
                               key={addr}
@@ -2741,10 +2783,11 @@ function DashboardContent() {
                                 let finalVal = displayVal;
                                 if (isCreate) {
                                   incrementOption(161, displayVal);
+                                  addAddressToCacheState(displayVal);
                                 }
-                                setPermanentAddress(finalVal);
                                 setLocalAddress(finalVal);
-                                setAddressFocused(false);
+                                setPermanentAddress(finalVal);
+                                setLocalAddressFocused(false);
                               }}
                               className={`p-1.5 text-[11px] rounded cursor-pointer text-left font-semibold transition-colors
                                 ${isHighlighted ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground"}`}
@@ -2763,15 +2806,85 @@ function DashboardContent() {
                     )}
                   </div>
 
-                  <div className="space-y-1 sm:col-span-2">
-                    <label className="text-[10px] font-bold text-[#4A5568]">Local Address</label>
+                  {/* Permanent Address */}
+                  <div className="space-y-1 relative sm:col-span-2">
+                    <label className="text-[10px] font-bold text-[#4A5568]">Permanent Address</label>
                     <input
                       type="text"
-                      value={localAddress}
-                      onChange={(e) => setLocalAddress(e.target.value)}
-                      placeholder="Type local address"
+                      maxLength={20}
+                      value={permanentAddress}
+                      onChange={(e) => {
+                        const val = e.target.value.slice(0, 20);
+                        setPermanentAddress(val);
+                        setActiveDDFocus("permanentAddress");
+                        setActiveDDIndex(-1);
+                      }}
+                      onKeyDown={(e) =>
+                        handleInputKeyDown(e, "permanentAddress", getPermanentAddressOptions(), (val) => {
+                          let finalVal = val;
+                          const isCreate = val.startsWith('+ Create "');
+                          if (isCreate) {
+                            const match = val.match(/\+ Create "(.*)"/);
+                            finalVal = match ? match[1] : val;
+                            incrementOption(161, finalVal);
+                            addAddressToCacheState(finalVal);
+                          }
+                          setPermanentAddress(finalVal);
+                          setPermanentAddressFocused(false);
+                        })
+                      }
+                      onFocus={() => {
+                        setPermanentAddressFocused(true);
+                        setActiveDDFocus("permanentAddress");
+                        setActiveDDIndex(-1);
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => {
+                          setPermanentAddressFocused(false);
+                          if (activeDDFocus === "permanentAddress") setActiveDDFocus(null);
+                        }, 200);
+                      }}
+                      placeholder="Type permanent address (e.g. mumbra)"
                       className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none focus:border-primary placeholder:text-gray-300"
                     />
+
+                    {permanentAddressFocused && getPermanentAddressOptions().length > 0 && (
+                      <div className="absolute left-0 top-full mt-1 z-30 w-full bg-white border border-[#CBD5E0] rounded-md shadow-lg max-h-32 overflow-y-auto p-1 space-y-0.5">
+                        {getPermanentAddressOptions().map((addr, idx) => {
+                          const isCreate = addr.startsWith('+ Create "');
+                          let displayVal = addr;
+                          if (isCreate) {
+                            const match = addr.match(/\+ Create "(.*)"/);
+                            displayVal = match ? match[1] : addr;
+                          }
+                          const isHighlighted = idx === activeDDIndex && activeDDFocus === "permanentAddress";
+                          return (
+                            <div
+                              key={addr}
+                              onMouseDown={() => {
+                                let finalVal = displayVal;
+                                if (isCreate) {
+                                  incrementOption(161, displayVal);
+                                  addAddressToCacheState(displayVal);
+                                }
+                                setPermanentAddress(finalVal);
+                                setPermanentAddressFocused(false);
+                              }}
+                              className={`p-1.5 text-[11px] rounded cursor-pointer text-left font-semibold transition-colors
+                                ${isHighlighted ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-foreground"}`}
+                            >
+                              {isCreate ? (
+                                <span className="text-primary font-bold">
+                                  + Create <span className="italic font-semibold">"{displayVal}"</span>
+                                </span>
+                              ) : (
+                                addr
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1 relative">

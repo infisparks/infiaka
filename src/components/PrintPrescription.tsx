@@ -85,6 +85,7 @@ interface Patient {
   phone: string;
   queueNo?: string;
   permanentAddress?: string;
+  localAddress?: string;
   opdRegistration?: {
     clinic_name?: string;
     treating_doctor?: string;
@@ -112,6 +113,14 @@ interface PrintPrescriptionProps {
   advicesInput?: string;
   advRest?: boolean;
   advWater?: boolean;
+  
+  // New fields
+  examinationFindings?: string;
+  surgeryPerformed?: string;
+  surgeryDate?: string;
+  surgeryNotes?: string;
+  planSurgeryAdvised?: string;
+  procedureDone?: string;
   
   // Medical history properties
   histNoKnown?: boolean;
@@ -236,6 +245,13 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
   advicesInput = "",
   advRest = false,
   advWater = false,
+  
+  examinationFindings = "",
+  surgeryPerformed = "",
+  surgeryDate = "",
+  surgeryNotes = "",
+  planSurgeryAdvised = "",
+  procedureDone = "",
   
   histNoKnown = false,
   familyItems = [],
@@ -456,7 +472,6 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
             return arr.map(item => {
                 let main = item[mainKey] || item.name || item.destination || item.member || item.relation || item.condition || item.medicineName || item.item || item.title || 'Unknown';
                 let subs = [];
-                if (item.status) subs.push(`Status: ${item.status}`);
                 if (item.severity) subs.push(`Severity: ${item.severity}`);
                 if (item.duration) subs.push(`Duration: ${item.duration}`);
                 if (item.since) subs.push(`Since: ${item.since}`);
@@ -512,7 +527,10 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         const nameWidth = doc.getTextWidth(nameStr);
 
         doc.setFont(fontName, "normal").setFontSize(10).setTextColor(textDark[0], textDark[1], textDark[2]);
-        const ageInfo = `, ${patient?.gender || "N/A"}, ${patient?.age || '0'} ${patient?.ageUnit || 'Y'}(s), +${patient?.phone || 'N/A'}`;
+        const formattedGender = patient?.gender 
+          ? (patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1).toLowerCase()) 
+          : "N/A";
+        const ageInfo = `, ${formattedGender}, ${patient?.age || '0'} ${patient?.ageUnit || 'Y'}(s), +${patient?.phone || 'N/A'}`;
         doc.text(ageInfo, 20 + nameWidth, currentY);
 
         const dDate = new Date();
@@ -531,12 +549,13 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         doc.text(uhidStr, curX, currentY);
         curX += doc.getTextWidth(uhidStr);
 
-        if (patient?.permanentAddress) {
+        const displayAddress = patient?.localAddress || patient?.permanentAddress;
+        if (displayAddress) {
             doc.setFont(fontName, "bold");
             doc.text(", Address : ", curX, currentY);
             curX += doc.getTextWidth(", Address : ");
             doc.setFont(fontName, "normal");
-            const addrSplit = patient.permanentAddress.split(',')[0];
+            const addrSplit = displayAddress.split(',')[0];
             doc.text(addrSplit, curX, currentY);
             curX += doc.getTextWidth(addrSplit);
         }
@@ -555,11 +574,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
 
         // Vitals
         const activeVitals = [];
-        if (bp) activeVitals.push({ main: `BP: ${bp} mmHg`, sub: "" });
-        if (pulse) activeVitals.push({ main: `Pulse: ${pulse} bpm`, sub: "" });
         if (weight) activeVitals.push({ main: `Weight: ${weight} kg`, sub: "" });
-        if (spo2) activeVitals.push({ main: `SpO2: ${spo2}%`, sub: "" });
-        if (sugar) activeVitals.push({ main: `Sugar: ${sugar} mg/dL`, sub: "" });
         if (activeVitals.length > 0) {
             drawInlineSection("VITALS", activeVitals);
         }
@@ -579,52 +594,78 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
             drawInlineSection("SYMPTOMS", symItems);
         }
 
-        // 2. PATIENT MEDICAL HISTORY (Conditions)
-        if (conditions && conditions.length > 0) {
-            drawInlineSection("Patient Medical History", getHistItems(conditions, 'name'));
+        // 2. PATIENT MEDICAL HISTORY
+        const hasHistory = !histNoKnown || familyItems.length > 0 || conditions.length > 0 || allergies.length > 0 || procedures.length > 0 || currentMeds.length > 0 || habits.length > 0 || foodAllergies.length > 0 || travelHistory.length > 0 || otherHistory.length > 0;
+        if (hasHistory) {
+            checkPageBreak(12);
+            doc.setFont(fontName, "bold").setFontSize(9.5).setTextColor(colorHeader[0], colorHeader[1], colorHeader[2]);
+            doc.text("PATIENT MEDICAL HISTORY", 20, currentY);
+            currentY += 5;
+            
+            const drawHistoryInline = (title: string, items: any[], nameKey: string) => {
+                if (!items || items.length === 0) return;
+                const displayItems = items.map(item => {
+                    const name = item[nameKey] || item.name || item.medicineName || item.relation || item.condition || item.item || item.title || "";
+                    const details = [];
+                    if (item.severity) details.push(`Severity: ${item.severity}`);
+                    if (item.duration) details.push(`Duration: ${item.duration}`);
+                    if (item.since) details.push(`Since: ${item.since}`);
+                    if (item.relation) details.push(`Relation: ${item.relation}`);
+                    return { main: name, sub: details.length > 0 ? ` (${details.join(", ")})` : "" };
+                });
+                
+                checkPageBreak(10);
+                doc.setFont(fontName, "bold").setFontSize(8.5).setTextColor(textDark[0], textDark[1], textDark[2]);
+                doc.text(title + ": ", 20, currentY);
+                const prefixWidth = doc.getTextWidth(title + ": ");
+                
+                doc.setFont(fontName, "normal").setFontSize(8.5).setTextColor(textDark[0], textDark[1], textDark[2]);
+                const textParts = displayItems.map(item => item.main + item.sub).join(" | ");
+                const lines = doc.splitTextToSize(textParts, pageWidth - 40 - prefixWidth);
+                
+                for (let i = 0; i < lines.length; i++) {
+                    if (i > 0) {
+                        checkPageBreak(8);
+                        doc.text(lines[i], 20, currentY);
+                    } else {
+                        doc.text(lines[i], 20 + prefixWidth, currentY);
+                    }
+                    currentY += 4.5;
+                }
+                currentY += 1.5;
+            };
+
+            if (conditions && conditions.length > 0) drawHistoryInline("Patient Medical History", conditions, 'name');
+            if (familyItems && familyItems.length > 0) drawHistoryInline("Family History", familyItems, 'name');
+            if (habits && habits.length > 0) drawHistoryInline("Lifestyle Habits", habits, 'name');
+            if (currentMeds && currentMeds.length > 0) drawHistoryInline("Current Medications", currentMeds, 'name');
+            if (allergies && allergies.length > 0) drawHistoryInline("Drug Allergies", allergies, 'name');
+            if (foodAllergies && foodAllergies.length > 0) drawHistoryInline("Food Allergies", foodAllergies, 'name');
+            if (procedures && procedures.length > 0) drawHistoryInline("Past Surgical Procedures", procedures, 'name');
+            if (travelHistory && travelHistory.length > 0) drawHistoryInline("Travel History", travelHistory, 'destination');
+            if (otherHistory && otherHistory.length > 0) drawHistoryInline(otherHistoryTitle || "Other Medical History", otherHistory, 'name');
         }
 
-        // 3. CURRENT MEDICATIONS
-        if (currentMeds && currentMeds.length > 0) {
-            drawInlineSection("Current Medications", getHistItems(currentMeds, 'name'));
+        // 3. EXAMINATION FINDINGS
+        if (examinationFindings) {
+            drawInlineSection("EXAMINATION FINDINGS", [{ main: examinationFindings, sub: '' }]);
         }
 
-        // 4. DRUG ALLERGIES
-        if (allergies && allergies.length > 0) {
-            drawInlineSection("Drug Allergies", getHistItems(allergies, 'name'));
+        // 4. INVESTIGATIVE READINGS
+        if (labResults && labResults.length > 0) {
+            const resultItems = labResults.map(r => {
+                let info = r.name;
+                let subs = [];
+                if (r.reading) subs.push(r.reading + (r.unit ? ` ${r.unit}` : ''));
+                if (r.interpretation) subs.push(`[${r.interpretation}]`);
+                if (r.date) subs.push(r.date);
+                if (r.notes) subs.push(r.notes);
+                return { main: info, sub: subs.length > 0 ? `: ${subs.join(' - ')}` : '' };
+            });
+            drawInlineSection("INVESTIGATIVE READINGS", resultItems);
         }
 
-        // 5. PAST PROCEDURES
-        if (procedures && procedures.length > 0) {
-            drawInlineSection("Past Procedures", getHistItems(procedures, 'name'));
-        }
-
-        // Food Allergies
-        if (foodAllergies && foodAllergies.length > 0) {
-            drawInlineSection("Food Allergies", getHistItems(foodAllergies, 'name'));
-        }
-
-        // Family History
-        if (familyItems && familyItems.length > 0) {
-            drawInlineSection("Family History", getHistItems(familyItems, 'name'));
-        }
-
-        // Lifestyle Habits
-        if (habits && habits.length > 0) {
-            drawInlineSection("Lifestyle Habits", getHistItems(habits, 'name'));
-        }
-
-        // Travel History
-        if (travelHistory && travelHistory.length > 0) {
-            drawInlineSection("Travel History", getHistItems(travelHistory, 'destination'));
-        }
-
-        // Other Medical History
-        if (otherHistory && otherHistory.length > 0) {
-            drawInlineSection(otherHistoryTitle || "Other History", getHistItems(otherHistory, 'name'));
-        }
-
-        // 6. DIAGNOSIS
+        // 5. DIAGNOSIS
         if (diagnoses && diagnoses.length > 0) {
             const diagItems = diagnoses.map(d => {
                 let subs = [];
@@ -642,6 +683,15 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
                 return { main: d.name, sub: subs.length > 0 ? ` (${subs.join(' | ')})` : '' };
             });
             drawInlineSection("DIAGNOSIS", diagItems);
+        }
+
+        // 6. SURGERY PERFORMED
+        if (surgeryPerformed) {
+            const surgDetails = [];
+            surgDetails.push({ main: `Surgery Name: ${surgeryPerformed}`, sub: '' });
+            if (surgeryDate) surgDetails.push({ main: `Date of Surgery: ${surgeryDate}`, sub: '' });
+            if (surgeryNotes) surgDetails.push({ main: `Surgery Notes: ${surgeryNotes}`, sub: '' });
+            drawInlineSection("SURGERY PERFORMED", surgDetails);
         }
 
         // --- PRESCRIPTION TITLE ---
@@ -757,7 +807,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
             pagesCount = doc.getNumberOfPages();
         }
 
-        // --- PRESCRIBED LAB TESTS ---
+        // 8. ADVISED INVESTIGATIONS (LAB/RADIOLOGY)
         if (labs && labs.length > 0) {
             const labItems = labs.map(l => {
                 let subs = [];
@@ -766,35 +816,15 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
                 if (l.remarks) subs.push(`Remark: ${l.remarks}`);
                 return { main: l.name, sub: subs.length > 0 ? ` (${subs.join(' | ')})` : '' };
             });
-            drawInlineSection("PRESCRIBED LAB TESTS", labItems);
+            drawInlineSection("ADVISED INVESTIGATIONS (LAB/RADIOLOGY)", labItems);
         }
 
-        // --- INVESTIGATIVE READINGS ---
-        if (labResults && labResults.length > 0) {
-            const resultItems = labResults.map(r => {
-                let info = r.name;
-                let subs = [];
-                if (r.reading) subs.push(r.reading + (r.unit ? ` ${r.unit}` : ''));
-                if (r.interpretation) subs.push(`[${r.interpretation}]`);
-                if (r.date) subs.push(r.date);
-                if (r.notes) subs.push(r.notes);
-                return { main: info, sub: subs.length > 0 ? `: ${subs.join(' - ')}` : '' };
-            });
-            drawInlineSection("INVESTIGATIVE READINGS", resultItems);
+        // 9. PLAN / SURGERY ADVISED
+        if (planSurgeryAdvised) {
+            drawInlineSection("PLAN / SURGERY ADVISED", [{ main: planSurgeryAdvised, sub: '' }]);
         }
 
-        // --- REFER TO ---
-        if (referrals && referrals.length > 0) {
-            const refItems = referrals.map(ref => {
-                let info = ref.doctorName;
-                let subs = [];
-                if (ref.notes) subs.push(ref.notes);
-                return { main: info, sub: subs.length > 0 ? `, ${subs.join(' | ')}` : '' };
-            });
-            drawInlineSection("REFER TO", refItems);
-        }
-
-        // --- ADVICE ---
+        // 10. FOLLOW UP & GENERAL ADVICE
         const advList = [];
         let adviceLines = [];
         if (advicesInput) {
@@ -809,34 +839,15 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         }
         if (adviceLines.length > 0) {
             advList.push({ main: adviceLines.join('\n'), sub: '' });
-            drawInlineSection("ADVICE", advList);
+            drawInlineSection("GENERAL ADVICE", advList);
         }
 
-        // --- PROCEDURES ---
-        if (rxProcedures && rxProcedures.length > 0) {
-            const procItems = rxProcedures.map(p => {
-                let subs = [];
-                if (p.duration) subs.push(`Note: ${p.duration}`);
-                if (p.note) subs.push(`Note: ${p.note}`);
-                return { main: p.name, sub: subs.length > 0 ? ` (${subs.join(' | ')})` : '' };
-            });
-            drawInlineSection("PROCEDURES", procItems);
-        }
-
-        // --- REMARKS / NOTES ---
-        if (notesForPatient) {
-            drawInlineSection("NOTES", [{ main: notesForPatient, sub: '' }]);
-        }
-
-        // --- FOLLOW UP ---
         let followUpDate: Date | null = null;
         if (followUpVal) {
             followUpDate = calculateFollowUpDate(new Date(), followUpVal);
         }
-
         if (followUpDate || followUpVal) {
             checkPageBreak(10);
-            
             doc.setFont(fontName, "bold").setFontSize(9).setTextColor(colorHeader[0], colorHeader[1], colorHeader[2]);
             const label = "FOLLOWUP: ";
             doc.text(label, 20, currentY);
@@ -856,8 +867,28 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
                 doc.setFont(fontName, "normal").setFontSize(9).setTextColor(textGray[0], textGray[1], textGray[2]);
                 doc.text(` (${followUpNotes})`, curX, currentY);
             }
-            
             currentY += 6;
+        }
+
+        // 11. DOCTOR NOTES FOR PATIENT
+        if (notesForPatient) {
+            drawInlineSection("DOCTOR NOTES FOR PATIENT", [{ main: notesForPatient, sub: '' }]);
+        }
+
+        // 12. PROCEDURE DONE
+        if (procedureDone) {
+            drawInlineSection("PROCEDURE DONE", [{ main: procedureDone, sub: '' }]);
+        }
+
+        // 13. REFER TO SPECIALIST / DOCTOR (Last)
+        if (referrals && referrals.length > 0) {
+            const refItems = referrals.map(ref => {
+                let info = ref.doctorName;
+                let subs = [];
+                if (ref.notes) subs.push(ref.notes);
+                return { main: info, sub: subs.length > 0 ? `, ${subs.join(' | ')}` : '' };
+            });
+            drawInlineSection("REFER TO SPECIALIST / DOCTOR", refItems);
         }
 
         // --- SIGNATURE FOOTER ---
@@ -910,7 +941,6 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
           {items.map((item) => {
             const name = item.name || item.medicineName || item.relation || item.condition || item.item || item.title || "";
             const details = [];
-            if (item.status) details.push(`Status: ${item.status}`);
             if (item.severity) details.push(`Severity: ${item.severity}`);
             if (item.duration) details.push(`Duration: ${item.duration}`);
             if (item.since) details.push(`Since: ${item.since}`);
@@ -1022,7 +1052,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
           <div>
             <span className="text-[#64748b]">Age / Gender:</span>{" "}
             <span className="text-[#0f172a]">
-              {patient?.age} {patient?.ageUnit || 'Year'}(s) / {patient?.gender}
+              {patient?.age} {patient?.ageUnit || 'Year'}(s) / {patient?.gender ? (patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1).toLowerCase()) : "N/A"}
             </span>
           </div>
           <div>
@@ -1053,47 +1083,43 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
           )}
         </div>
       </div>
-
-      {/* ─── VITALS RIBBON ─── */}
-      {(bp || pulse || weight || spo2 || sugar) && (
-        <div className="mb-5">
+      {weight && (
+        <div className="mb-5 w-fit">
           <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1.5 border-b pb-0.5">Vitals</div>
-          <div className="grid grid-cols-5 gap-3 bg-[#f8fafc] border border-[#e2e8f0] px-3 py-2 rounded-lg text-center select-text">
-            {bp && (
-              <div>
-                <div className="text-[9px] font-bold text-[#64748b] uppercase">BP</div>
-                <div className="text-[12px] font-extrabold text-[#334155]">{bp} <span className="text-[9px] font-semibold text-slate-400">mmHg</span></div>
-              </div>
-            )}
-            {pulse && (
-              <div>
-                <div className="text-[9px] font-bold text-[#64748b] uppercase">Pulse</div>
-                <div className="text-[12px] font-extrabold text-[#334155]">{pulse} <span className="text-[9px] font-semibold text-slate-400">bpm</span></div>
-              </div>
-            )}
-            {weight && (
-              <div>
-                <div className="text-[9px] font-bold text-[#64748b] uppercase">Weight</div>
-                <div className="text-[12px] font-extrabold text-[#334155]">{weight} <span className="text-[9px] font-semibold text-slate-400">kg</span></div>
-              </div>
-            )}
-            {spo2 && (
-              <div>
-                <div className="text-[9px] font-bold text-[#64748b] uppercase">SpO2</div>
-                <div className="text-[12px] font-extrabold text-[#334155]">{spo2}<span className="text-[9px] font-semibold text-slate-400">%</span></div>
-              </div>
-            )}
-            {sugar && (
-              <div>
-                <div className="text-[9px] font-bold text-[#64748b] uppercase">Sugar</div>
-                <div className="text-[12px] font-extrabold text-[#334155]">{sugar} <span className="text-[9px] font-semibold text-slate-400">mg/dL</span></div>
-              </div>
-            )}
+          <div className="bg-[#f8fafc] border border-[#e2e8f0] px-4 py-2 rounded-lg text-center select-text">
+            <div>
+              <div className="text-[9px] font-bold text-[#64748b] uppercase">Weight</div>
+              <div className="text-[12px] font-extrabold text-[#334155]">{weight} <span className="text-[9px] font-semibold text-slate-400">kg</span></div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ─── MEDICAL HISTORY SECTION ─── */}
+      {/* ─── 2. SYMPTOMS ─── */}
+      {symptoms && symptoms.length > 0 && (
+        <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg avoid-break">
+          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-0.5">
+            Symptoms / Complaints
+          </div>
+          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+            {symptoms.map((s, idx) => (
+              <li key={idx}>
+                {s.name}{" "}
+                {s.duration && (
+                  <span className="text-slate-400 font-medium">({s.duration})</span>
+                )}{" "}
+                {s.severity && (
+                  <span className="text-[9px] uppercase font-bold text-[#64748b] bg-slate-100 px-1 py-0.2 rounded ml-1">
+                    {s.severity}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* ─── 3. PATIENT MEDICAL HISTORY ─── */}
       {(!histNoKnown || familyItems.length > 0 || conditions.length > 0 || allergies.length > 0 || procedures.length > 0 || currentMeds.length > 0 || habits.length > 0 || foodAllergies.length > 0 || travelHistory.length > 0 || otherHistory.length > 0) && (
         <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg bg-slate-50/50 space-y-1.5 avoid-break">
           <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1">
@@ -1111,55 +1137,83 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         </div>
       )}
 
-      {/* ─── CLINICAL DIAGNOSTICS & SYMPTOMS ─── */}
-      {(symptoms.length > 0 || diagnoses.length > 0) && (
-        <div className="grid grid-cols-2 gap-4 mb-5 avoid-break">
-          {/* Symptoms */}
-          {symptoms.length > 0 && (
-            <div className="border border-[#e2e8f0] p-3 rounded-lg">
-              <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-0.5">
-                Symptoms / Complaints
-              </div>
-              <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
-                {symptoms.map((s, idx) => (
-                  <li key={idx}>
-                    {s.name}{" "}
-                    {s.duration && (
-                      <span className="text-slate-400 font-medium">({s.duration})</span>
-                    )}{" "}
-                    {s.severity && (
-                      <span className="text-[9px] uppercase font-bold text-[#64748b] bg-slate-100 px-1 py-0.2 rounded ml-1">
-                        {s.severity}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Diagnoses */}
-          {diagnoses.length > 0 && (
-            <div className="border border-[#e2e8f0] p-3 rounded-lg">
-              <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-0.5">
-                Diagnoses
-              </div>
-              <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
-                {diagnoses.map((d, idx) => (
-                  <li key={idx}>
-                    {d.name}{" "}
-                    {d.since && (
-                      <span className="text-slate-400 font-medium">(since {d.since})</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+      {/* ─── 4. EXAMINATION FINDING ─── */}
+      {examinationFindings && (
+        <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg bg-slate-50/50 avoid-break">
+          <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1">
+            Examination Findings
+          </div>
+          <div className="text-[11px] font-medium text-slate-750 whitespace-pre-line leading-relaxed">
+            {examinationFindings}
+          </div>
         </div>
       )}
 
-      {/* ─── MEDICATIONS (Rx) TABLE ─── */}
+      {/* ─── 5. LAB RESULTS ─── */}
+      {labResults && labResults.length > 0 && (
+        <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg avoid-break">
+          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-0.5">
+            Lab Results
+          </div>
+          <div className="grid grid-cols-2 gap-4 text-[10.5px] font-semibold text-slate-700">
+            {labResults.map((r, idx) => (
+              <div key={idx} className="border-b pb-1 last:border-0">
+                <div className="font-bold text-[#0f172a]">{r.name}</div>
+                <div className="flex gap-2 text-[9.5px] text-slate-500 mt-0.5">
+                  <span>Reading: <strong className="text-slate-700">{r.reading} {r.unit}</strong></span>
+                  {r.date && (
+                    <span>| Date: <strong className="text-slate-700">{r.date}</strong></span>
+                  )}
+                  {r.interpretation && (
+                    <span className={`px-1 rounded font-bold text-[8.5px] uppercase ${
+                      r.interpretation.toLowerCase() === "high" ? "bg-red-50 text-red-600" :
+                      r.interpretation.toLowerCase() === "low" ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600"
+                    }`}>
+                      {r.interpretation}
+                    </span>
+                  )}
+                </div>
+                {r.notes && <div className="text-[9px] text-slate-400 mt-0.5 italic">Note: {r.notes}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── 6. DIAGNOSIS ─── */}
+      {diagnoses && diagnoses.length > 0 && (
+        <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg avoid-break">
+          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-0.5">
+            Diagnoses
+          </div>
+          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+            {diagnoses.map((d, idx) => (
+              <li key={idx}>
+                {d.name}{" "}
+                {d.since && (
+                  <span className="text-slate-400 font-medium">(since {d.since})</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* ─── 7. SURGERY PERFORMED ─── */}
+      {surgeryPerformed && (
+        <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg bg-slate-50/50 avoid-break">
+          <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1.5">
+            Surgery Performed
+          </div>
+          <div className="text-[11px] font-semibold text-slate-700 space-y-1">
+            <div><span className="text-slate-400 font-medium">Surgery Name:</span> {surgeryPerformed}</div>
+            {surgeryDate && <div><span className="text-slate-400 font-medium">Date of Surgery:</span> {surgeryDate}</div>}
+            {surgeryNotes && <div><span className="text-slate-400 font-medium">Surgery Notes:</span> {surgeryNotes}</div>}
+          </div>
+        </div>
+      )}
+
+      {/* ─── 8. MEDICATIONS (Rx) TABLE ─── */}
       <div className="mb-5 avoid-break">
         <div className="text-[32px] font-bold text-primary font-serif -mt-2 leading-none mb-2">Rₓ</div>
         {medications.length > 0 ? (
@@ -1200,152 +1254,108 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         )}
       </div>
 
-      {/* ─── INVESTIGATIONS & CLINICAL FINDINGS ─── */}
-      {(labs.length > 0 || labResults.length > 0 || rxProcedures.length > 0 || referrals.length > 0) && (
-        <div className="grid grid-cols-2 gap-4 mb-5 avoid-break">
-          {/* Left Block: Suggested Labs & Lab Results */}
-          {(labs.length > 0 || labResults.length > 0) && (
-            <div className="border border-[#e2e8f0] p-3 rounded-lg space-y-3">
-              {labs.length > 0 && (
-                <div>
-                  <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1.5 border-b pb-0.5">
-                    Suggested Investigations
-                  </div>
-                  <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
-                    {labs.map((l, idx) => (
-                      <li key={idx}>
-                        {l.name}{" "}
-                        {l.testOn && (
-                          <span className="text-slate-400 font-medium">(Test: {l.testOn})</span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+      {/* ─── 9. ADVISED INVESTIGATIONS ─── */}
+      {labs && labs.length > 0 && (
+        <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg avoid-break">
+          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1.5 border-b pb-0.5">
+            Advised Investigations (Lab/Radiology)
+          </div>
+          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+            {labs.map((l, idx) => (
+              <li key={idx}>
+                {l.name}{" "}
+                {l.testOn && (
+                  <span className="text-slate-400 font-medium">(Test: {l.testOn})</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
-              {labResults.length > 0 && (
-                <div>
-                  <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1.5 border-b pb-0.5">
-                    Lab Results
-                  </div>
-                  <div className="space-y-2 text-[10.5px] font-semibold text-slate-700">
-                    {labResults.map((r, idx) => (
-                      <div key={idx} className="border-b pb-1 last:border-0">
-                        <div className="font-bold text-[#0f172a]">{r.name}</div>
-                        <div className="flex gap-2 text-[9.5px] text-slate-500 mt-0.5">
-                          <span>Reading: <strong className="text-slate-700">{r.reading} {r.unit}</strong></span>
-                          {r.date && (
-                            <span>| Date: <strong className="text-slate-700">{r.date}</strong></span>
-                          )}
-                          {r.interpretation && (
-                            <span className={`px-1 rounded font-bold text-[8.5px] uppercase ${
-                              r.interpretation.toLowerCase() === "high" ? "bg-red-50 text-red-600" :
-                              r.interpretation.toLowerCase() === "low" ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600"
-                            }`}>
-                              {r.interpretation}
-                            </span>
-                          )}
-                        </div>
-                        {r.notes && <div className="text-[9px] text-slate-400 mt-0.5 italic">Note: {r.notes}</div>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+      {/* ─── 10. PLAN/SURGERY ADVISED ─── */}
+      {planSurgeryAdvised && (
+        <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg bg-slate-50/50 avoid-break">
+          <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1">
+            Plan / Surgery Advised
+          </div>
+          <div className="text-[11px] font-medium text-slate-750 whitespace-pre-line leading-relaxed">
+            {planSurgeryAdvised}
+          </div>
+        </div>
+      )}
+
+      {/* ─── 11. FOLLOWUPS & ADVICE ─── */}
+      {/* ─── 11. FOLLOWUPS & ADVICE ─── */}
+      {(followUpVal || advicesInput || advRest || advWater) && (
+        <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg avoid-break space-y-3">
+          {followUpVal && (
+            <div>
+              <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5 border-b pb-0.5">Follow Up</strong>
+              <div className="text-[11px] font-semibold text-slate-700 mt-1">
+                {followUpVal}{" "}
+                {followUpNotes && <span className="text-slate-400 font-medium">({followUpNotes})</span>}
+              </div>
             </div>
           )}
 
-          {/* Right Block: Suggested Procedures & Doctor Referrals */}
-          {(rxProcedures.length > 0 || referrals.length > 0) && (
-            <div className="border border-[#e2e8f0] p-3 rounded-lg space-y-3">
-              {rxProcedures.length > 0 && (
-                <div>
-                  <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1.5 border-b pb-0.5">
-                    Suggested Procedures
-                  </div>
-                  <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
-                    {rxProcedures.map((p, idx) => (
-                      <li key={idx}>
-                        {p.name}{" "}
-                        {p.duration && (
-                          <span className="text-slate-400 font-medium">({p.duration})</span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {referrals.length > 0 && (
-                <div>
-                  <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1.5 border-b pb-0.5">
-                    Refer To Specialist
-                  </div>
-                  <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
-                    {referrals.map((ref, idx) => (
-                      <li key={idx}>
-                        {ref.doctorName}{" "}
-                        {ref.notes && (
-                          <span className="text-slate-400 font-medium">({ref.notes})</span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+          {(advicesInput || advRest || advWater) && (
+            <div>
+              <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5 border-b pb-0.5">General Advice</strong>
+              <ul className="list-disc pl-4 space-y-0.5 text-[11px] font-semibold text-slate-700 mt-1">
+                {advicesInput && advicesInput.split('\n').filter(line => line.trim() !== '').map((line, idx) => (
+                  <li key={idx}>{line.trim()}</li>
+                ))}
+                {advRest && <li>Please take some rest.</li>}
+                {advWater && <li>Drink plenty of water.</li>}
+              </ul>
             </div>
           )}
         </div>
       )}
 
-      {/* ─── BOTTOM DETAILS: NOTES, ADVICE, FOLLOWUP ─── */}
-      <div className="border-t border-[#cbd5e1] pt-3.5 mt-6 grid grid-cols-2 gap-6 text-[11px] font-semibold text-slate-700 avoid-break">
-        <div className="space-y-3">
-          {/* Follow Up */}
-          {followUpVal && (
-            <div>
-              <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5">Follow Up</strong>
-              <div className="text-[#0f172a]">
-                {followUpVal}{" "}
-                {followUpNotes && <span className="text-slate-500">({followUpNotes})</span>}
-              </div>
-            </div>
-          )}
-
-          {/* Doctor Notes */}
-          {notesForPatient && (
-            <div>
-              <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5">Doctor Notes for Patient</strong>
-              <div className="bg-slate-50 p-2.5 rounded border border-[#e2e8f0] text-[10.5px] leading-relaxed white-space-pre-line font-medium text-slate-600">
-                {notesForPatient}
-              </div>
-            </div>
-          )}
+      {/* ─── 12. NOTES / REMARKS ─── */}
+      {notesForPatient && (
+        <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg bg-slate-50/50 avoid-break">
+          <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1">
+            Doctor Notes for Patient
+          </div>
+          <div className="text-[11px] font-medium text-slate-750 whitespace-pre-line leading-relaxed">
+            {notesForPatient}
+          </div>
         </div>
+      )}
 
-        <div className="space-y-3">
-          {/* Advices */}
-          {(advicesInput || advRest || advWater) && (
-            <div>
-              <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5">General Advice</strong>
-              <div className="space-y-1.5 text-[#0f172a] text-[10px] font-semibold text-slate-750">
-                <ul className="list-disc pl-4 space-y-0.5">
-                  {advicesInput && advicesInput.split('\n').filter(line => line.trim() !== '').map((line, idx) => (
-                    <li key={idx}>{line.trim()}</li>
-                  ))}
-                  {advRest && <li>Please take some rest.</li>}
-                  {advWater && <li>Drink plenty of water.</li>}
-                </ul>
-              </div>
-            </div>
-          )}
+      {/* ─── 13. PROCEDURE DONE ─── */}
+      {procedureDone && (
+        <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg bg-slate-50/50 avoid-break">
+          <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1">
+            Procedure Done
+          </div>
+          <div className="text-[11px] font-medium text-slate-750 whitespace-pre-line leading-relaxed">
+            {procedureDone}
+          </div>
         </div>
-      </div>
+      )}
 
-    
-  
-
+      {/* ─── 14. REFER TO SPECIALIST ─── */}
+      {referrals && referrals.length > 0 && (
+        <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg avoid-break">
+          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1.5 border-b pb-0.5">
+            Refer To Specialist
+          </div>
+          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+            {referrals.map((ref, idx) => (
+              <li key={idx}>
+                {ref.doctorName}{" "}
+                {ref.notes && (
+                  <span className="text-slate-400 font-medium">({ref.notes})</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 });

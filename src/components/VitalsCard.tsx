@@ -50,7 +50,7 @@ export default function VitalsCard({
               type="text"
               value={bp}
               onChange={(e) => setBp(e.target.value)}
-              placeholder="120/80"
+              placeholder="0"
               className="w-full h-7 font-bold text-[11px] border border-[#CBD5E0] focus:border-primary rounded focus:outline-none bg-white placeholder-slate-350 px-2"
             />
             <span className="text-[9px] text-[#94A3B8] font-bold shrink-0">mmHg</span>
@@ -68,7 +68,7 @@ export default function VitalsCard({
               type="text"
               value={pulse}
               onChange={(e) => setPulse(e.target.value)}
-              placeholder="72"
+              placeholder="0"
               className="w-full h-7 font-bold text-[11px] border border-[#CBD5E0] focus:border-primary rounded focus:outline-none bg-white placeholder-slate-350 px-2"
             />
             <span className="text-[9px] text-[#94A3B8] font-bold shrink-0">/min</span>
@@ -86,7 +86,7 @@ export default function VitalsCard({
               type="text"
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
-              placeholder="70"
+              placeholder="0"
               className="w-full h-7 font-bold text-[11px] border border-[#CBD5E0] focus:border-primary rounded focus:outline-none bg-white placeholder-slate-350 px-2"
             />
             <span className="text-[9px] text-[#94A3B8] font-bold shrink-0">kg</span>
@@ -104,7 +104,7 @@ export default function VitalsCard({
               type="text"
               value={spo2}
               onChange={(e) => setSpo2(e.target.value)}
-              placeholder="98"
+              placeholder="0"
               className="w-full h-7 font-bold text-[11px] border border-[#CBD5E0] focus:border-primary rounded focus:outline-none bg-white placeholder-slate-350 px-2"
             />
             <span className="text-[9px] text-[#94A3B8] font-bold shrink-0">%</span>
@@ -122,7 +122,7 @@ export default function VitalsCard({
               type="text"
               value={sugar}
               onChange={(e) => setSugar(e.target.value)}
-              placeholder="100"
+              placeholder="0"
               className="w-full h-7 font-bold text-[11px] border border-[#CBD5E0] focus:border-primary rounded focus:outline-none bg-white placeholder-slate-350 px-2"
             />
             <span className="text-[9px] text-[#94A3B8] font-bold shrink-0">mg/dL</span>

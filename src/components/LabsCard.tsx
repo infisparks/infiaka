@@ -578,7 +578,7 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
           <div className="w-6 h-6 rounded-md bg-gradient-to-br from-yellow-500 to-amber-600 flex items-center justify-center text-white text-xs shadow-sm">
             🧪
           </div>
-          <span className="text-[12px] font-bold text-[#1E293B] tracking-tight">Lab Investigations</span>
+          <span className="text-[12px] font-bold text-[#1E293B] tracking-tight">Advised Investigations (Lab/Radiology)</span>
         </div>
         <div className="flex items-center gap-2">
           <button className="w-7 h-7 rounded-lg bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] flex items-center justify-center text-slate-500 transition-colors">

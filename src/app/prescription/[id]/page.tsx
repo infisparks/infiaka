@@ -462,6 +462,7 @@ ${clinicName}`;
             gender: patient.gender || "Male",
             phone: String(patient.number || ""),
             permanentAddress: patient.address || "",
+            localAddress: patient.local_address || "",
             opdRegistration: {
               clinic_name: reg.clinic_name,
               treating_doctor: reg.treating_doctor,
@@ -486,6 +487,12 @@ ${clinicName}`;
           notes_for_patient: reg.notes_for_patient || "",
           follow_up: reg.follow_up || "",
           follow_up_notes: reg.follow_up_notes || "",
+          examinationFindings: reg.examination_findings || "",
+          surgeryPerformed: reg.surgery_performed || "",
+          surgeryDate: reg.surgery_date || "",
+          surgeryNotes: reg.surgery_notes || "",
+          planSurgeryAdvised: reg.plan_surgery_advised || "",
+          procedureDone: reg.procedure_done || "",
           medicalHistory: history || null
         });
 
@@ -870,6 +877,12 @@ ${clinicName}`;
           notesForPatient={activePrintData.notes_for_patient}
           followUpVal={activePrintData.follow_up}
           followUpNotes={activePrintData.follow_up_notes}
+          examinationFindings={activePrintData.examinationFindings}
+          surgeryPerformed={activePrintData.surgeryPerformed}
+          surgeryDate={activePrintData.surgeryDate}
+          surgeryNotes={activePrintData.surgeryNotes}
+          planSurgeryAdvised={activePrintData.planSurgeryAdvised}
+          procedureDone={activePrintData.procedureDone}
           histNoKnown={activePrintData.medicalHistory?.no_known_history || false}
           familyItems={activePrintData.medicalHistory?.family_history || []}
           conditions={activePrintData.medicalHistory?.existing_conditions || []}
