@@ -12,7 +12,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Eka Care Clone",
+  title: "Infi Plus",
   description: "A modern health record and medical dashboard.",
 };
 

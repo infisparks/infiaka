@@ -70,7 +70,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 text-2xl font-bold mb-1 shadow-sm">
             🩺
           </div>
-          <h1 className="text-2xl font-extrabold text-[#111827]">Eka Care Clone</h1>
+          <h1 className="text-2xl font-extrabold text-[#111827]">Proctology </h1>
           <p className="text-[13px] font-semibold text-[#6B7280]">
             Log in to manage patient records and clinical visits
           </p>
