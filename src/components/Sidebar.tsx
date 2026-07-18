@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 interface SidebarProps {
-  active: "queue" | "book" | "upcoming" | "payments" | "orders" | "more" | "deleted";
+  active: "queue" | "book" | "upcoming" | "payments" | "orders" | "more" | "deleted" | "inventory";
   onQueueClick?: (e: React.MouseEvent) => void;
   onBookClick?: (e: React.MouseEvent) => void;
 }
@@ -130,19 +130,19 @@ export default function Sidebar({ active, onQueueClick, onBookClick }: SidebarPr
           <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90">Payments</span>
         </Link>
 
-        {/* Orders Tab */}
-        <a
-          href="#"
+        {/* Inventory Tab */}
+        <Link
+          href="/inventory"
           className={`w-11 py-1.5 rounded-lg flex flex-col items-center justify-center transition-colors ${
-            active === "orders" ? "text-primary bg-primary/10" : "text-[#718096] hover:bg-gray-100"
+            active === "inventory" ? "text-primary bg-primary/10" : "text-[#718096] hover:bg-gray-100"
           }`}
-          title="Orders"
+          title="Inventory Management"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-20L4 7m8 4v10M4 7v10l8 4" />
           </svg>
-          <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90">Orders</span>
-        </a>
+          <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90 leading-none text-center">Inv</span>
+        </Link>
 
         {/* More Tab */}
         <a

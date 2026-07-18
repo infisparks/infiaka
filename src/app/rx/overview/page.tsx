@@ -589,6 +589,94 @@ function OverviewContent() {
     }
   };
 
+  const reassignExaminationFindings = async (text: string) => {
+    try {
+      const { error } = await supabase
+        .from("aka_opd_registration")
+        .update({ examination_findings: text })
+        .eq("registration_id", Number(rxPatientId));
+      if (error) throw error;
+      showToast("Examination findings reassigned successfully!", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to reassign examination findings.", "error");
+    }
+  };
+
+  const reassignPlanSurgery = async (text: string) => {
+    try {
+      const { error } = await supabase
+        .from("aka_opd_registration")
+        .update({ plan_surgery_advised: text })
+        .eq("registration_id", Number(rxPatientId));
+      if (error) throw error;
+      showToast("Plan surgery reassigned successfully!", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to reassign plan surgery.", "error");
+    }
+  };
+
+  const reassignSurgeryPerformed = async (performed: string, date: string, notes: string) => {
+    try {
+      const { error } = await supabase
+        .from("aka_opd_registration")
+        .update({
+          surgery_performed: performed,
+          surgery_date: date,
+          surgery_notes: notes
+        })
+        .eq("registration_id", Number(rxPatientId));
+      if (error) throw error;
+      showToast("Surgery performed reassigned successfully!", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to reassign surgery performed.", "error");
+    }
+  };
+
+  const reassignProcedureDone = async (text: string) => {
+    try {
+      const { error } = await supabase
+        .from("aka_opd_registration")
+        .update({ procedure_done: text })
+        .eq("registration_id", Number(rxPatientId));
+      if (error) throw error;
+      showToast("Procedure done reassigned successfully!", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to reassign procedure done.", "error");
+    }
+  };
+
+  const reassignNotesForPatient = async (text: string) => {
+    try {
+      const { error } = await supabase
+        .from("aka_opd_registration")
+        .update({ notes_for_patient: text })
+        .eq("registration_id", Number(rxPatientId));
+      if (error) throw error;
+      showToast("Patient notes reassigned successfully!", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to reassign patient notes.", "error");
+    }
+  };
+
+  const reassignFollowUp = async (val: string, notes: string) => {
+    try {
+      const { error } = await supabase
+        .from("aka_opd_registration")
+        .update({ follow_up: val, follow_up_notes: notes })
+        .eq("registration_id", Number(rxPatientId));
+      if (error) throw error;
+      showToast("Follow-up reassigned successfully!", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to reassign follow-up.", "error");
+    }
+  };
+
   // ─── REASSIGN FULL VISIT ──────────────────────────────────────────
   const reassignFullVisit = async (visitRegId: number) => {
     try {
@@ -676,12 +764,22 @@ function OverviewContent() {
         });
       }
 
-      // Reassign Advices
+      // Reassign Advices & All Clinical Notes
       if (visitRegObj) {
         await supabase.from("aka_opd_registration").update({
           advice: visitRegObj.advice || "",
           advice_rest: visitRegObj.advice_rest || false,
-          advice_water: visitRegObj.advice_water || false
+          advice_water: visitRegObj.advice_water || false,
+          examination_findings: visitRegObj.examination_findings || "",
+          plan_surgery_advised: visitRegObj.plan_surgery_advised || "",
+          surgery_performed: visitRegObj.surgery_performed || "",
+          surgery_date: visitRegObj.surgery_date || "",
+          surgery_notes: visitRegObj.surgery_notes || "",
+          procedure_done: visitRegObj.procedure_done || "",
+          notes_for_patient: visitRegObj.notes_for_patient || "",
+          private_notes: visitRegObj.private_notes || "",
+          follow_up: visitRegObj.follow_up || "",
+          follow_up_notes: visitRegObj.follow_up_notes || ""
         }).eq("registration_id", Number(rxPatientId));
       }
 
@@ -792,6 +890,13 @@ function OverviewContent() {
       advice_rest: reg.advice_rest || false,
       advice_water: reg.advice_water || false,
       notes_for_patient: reg.notes_for_patient || "",
+      private_notes: reg.private_notes || "",
+      examination_findings: reg.examination_findings || "",
+      plan_surgery_advised: reg.plan_surgery_advised || "",
+      surgery_performed: reg.surgery_performed || "",
+      surgery_date: reg.surgery_date || "",
+      surgery_notes: reg.surgery_notes || "",
+      procedure_done: reg.procedure_done || "",
       follow_up: reg.follow_up || "",
       follow_up_notes: reg.follow_up_notes || ""
     });
@@ -1043,6 +1148,9 @@ function OverviewContent() {
                 const regLabs = labs.filter((l) => l.registration_id === reg.registration_id);
                 const regProcs = procedures.filter((p) => p.registration_id === reg.registration_id);
                 const regRefs = referrals.filter((r) => r.registration_id === reg.registration_id);
+                const regResults = labResults.filter((r) => r.registration_id === reg.registration_id);
+                const regAdviceStr = reg.advice || reg.advices || reg.advices_input || reg.advice_notes || reg.general_advice || "";
+                const hasAdvice = Boolean(regAdviceStr || reg.advice_rest || reg.advice_water);
 
                 const visitDateStr = new Date(reg.appointment_date_time || reg.created_at).toLocaleDateString('en-US', {
                   day: 'numeric',
@@ -1055,7 +1163,7 @@ function OverviewContent() {
                 return (
                   <div 
                     key={reg.registration_id} 
-                    className={`w-[340px] shrink-0 border rounded-xl bg-white overflow-hidden shadow-2xs hover:shadow-xs transition-all flex flex-col h-[460px] ${
+                    className={`w-[350px] shrink-0 border rounded-xl bg-white overflow-hidden shadow-2xs hover:shadow-xs transition-all flex flex-col h-[520px] ${
                       isSelected ? "border-primary ring-2 ring-primary/20 shadow-md scale-[1.01]" : "border-[#E5E7EB]"
                     }`}
                   >
@@ -1105,37 +1213,26 @@ function OverviewContent() {
                     {/* Card Content - scrollable vertically internally if too long */}
                     <div className="flex-1 overflow-y-auto p-1.5 divide-y divide-[#F1F5F9] text-[11.5px]">
                       
-                      {/* History & Vitals block */}
-                      {(reg.bp || reg.pulse || reg.weight || reg.spo2 || reg.sugar || medicalHistory) && (
+                      {/* 1. Vitals row */}
+                      {(reg.bp || reg.pulse || reg.weight || reg.spo2 || reg.sugar) && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors">
                           <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-rose-500 shadow-sm">
-                            Hx
+                            Vt
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Vitals & History</div>
-                            <div className="space-y-1.5">
-                              {(reg.bp || reg.pulse || reg.weight || reg.spo2 || reg.sugar) && (
-                                <div className="text-[10px] font-bold text-slate-600 flex flex-wrap gap-x-2.5">
-                                  {reg.bp && <span>BP: {reg.bp}</span>}
-                                  {reg.pulse && <span>PR: {reg.pulse}</span>}
-                                  {reg.weight && <span>Wt: {reg.weight}kg</span>}
-                                </div>
-                              )}
-                              {medicalHistory?.existing_conditions && (
-                                <div className="flex flex-wrap gap-1">
-                                  {medicalHistory.existing_conditions.map((c: any, idx: number) => (
-                                    <span key={idx} className="text-[9.5px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold">
-                                      {c.name}: {c.status}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
+                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Vitals</div>
+                            <div className="text-[10px] font-bold text-slate-600 flex flex-wrap gap-x-3 gap-y-1 select-text">
+                              {reg.bp && <span>BP: {reg.bp}</span>}
+                              {reg.pulse && <span>Pulse: {reg.pulse}</span>}
+                              {reg.weight && <span>Weight: {reg.weight} kg</span>}
+                              {reg.spo2 && <span>SpO2: {reg.spo2}%</span>}
+                              {reg.sugar && <span>Sugar: {reg.sugar}</span>}
                             </div>
                           </div>
                         </div>
                       )}
 
-                      {/* Symptoms row */}
+                      {/* 2. Symptoms row */}
                       {regSyms.length > 0 && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
                           <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-sky-500 shadow-sm uppercase">
@@ -1143,7 +1240,7 @@ function OverviewContent() {
                           </div>
                           <div className="flex-1 text-left">
                             <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Symptoms</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal">
+                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text">
                               {regSyms.map((s, idx) => (
                                 <span key={s.symptom_id}>
                                   {s.name}{s.duration ? ` (${s.duration})` : ""}{idx < regSyms.length - 1 ? " | " : ""}
@@ -1165,7 +1262,50 @@ function OverviewContent() {
                         </div>
                       )}
 
-                      {/* Diagnosis row */}
+                      {/* 3. Examination Findings row */}
+                      {reg.examination_findings && (
+                        <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-cyan-600 shadow-sm uppercase">
+                            Ef
+                          </div>
+                          <div className="flex-1 text-left">
+                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Examination Findings</div>
+                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text whitespace-pre-wrap">
+                              {reg.examination_findings}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => reassignExaminationFindings(reg.examination_findings)}
+                            className="p-1 hover:bg-indigo-50 border border-transparent rounded text-indigo-650 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1"
+                            title="Reassign examination findings to today"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 4. Lab Results row */}
+                      {regResults.length > 0 && (
+                        <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-emerald-600 shadow-sm uppercase">
+                            Lr
+                          </div>
+                          <div className="flex-1 text-left">
+                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Lab Results</div>
+                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text">
+                              {regResults.map((r, idx) => (
+                                <span key={r.lab_result_id || idx} className="block">
+                                  {r.name}: <span className="font-extrabold text-indigo-650">{r.reading}</span> {r.unit || ""} {r.interpretation ? `(${r.interpretation})` : ""}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 5. Diagnosis row */}
                       {regDiags.length > 0 && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
                           <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-violet-500 shadow-sm uppercase">
@@ -1173,8 +1313,8 @@ function OverviewContent() {
                           </div>
                           <div className="flex-1 text-left">
                             <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Diagnosis</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal">
-                              {regDiags.map((d, idx) => (
+                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text">
+                              {regDiags.map((d) => (
                                 <div key={d.diagnosis_id} className="block">
                                   {d.name} {d.icd10_code ? `[${d.icd10_code}]` : ""}
                                 </div>
@@ -1195,7 +1335,33 @@ function OverviewContent() {
                         </div>
                       )}
 
-                      {/* Medications row (Shows every single detail and can reassign) */}
+                      {/* 6. Surgery Performed row */}
+                      {(reg.surgery_performed || reg.surgery_notes) && (
+                        <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-rose-600 shadow-sm uppercase">
+                            Sp
+                          </div>
+                          <div className="flex-1 text-left">
+                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Surgery Performed</div>
+                            <div className="text-[11.5px] font-bold text-slate-800 leading-tight select-text">
+                              {reg.surgery_performed}
+                              {reg.surgery_date && <span className="block text-[10px] text-slate-500 font-semibold mt-0.5">Date: {reg.surgery_date}</span>}
+                              {reg.surgery_notes && <span className="block text-[10px] text-slate-600 font-normal mt-0.5 whitespace-pre-wrap">{reg.surgery_notes}</span>}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => reassignSurgeryPerformed(reg.surgery_performed || "", reg.surgery_date || "", reg.surgery_notes || "")}
+                            className="p-1 hover:bg-indigo-50 border border-transparent rounded text-indigo-650 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1"
+                            title="Reassign surgery performed details to today"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 7. Medications row */}
                       {regMeds.length > 0 && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
                           <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-pink-500 shadow-sm uppercase">
@@ -1255,7 +1421,7 @@ function OverviewContent() {
                         </div>
                       )}
 
-                      {/* Investigations row */}
+                      {/* 8. Investigations / Labs row */}
                       {regLabs.length > 0 && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
                           <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-amber-500 shadow-sm uppercase">
@@ -1263,7 +1429,7 @@ function OverviewContent() {
                           </div>
                           <div className="flex-1 text-left">
                             <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Investigations</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal">
+                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text">
                               {regLabs.map((l, idx) => (
                                 <span key={l.patient_lab_id}>
                                   {l.name}{idx < regLabs.length - 1 ? " | " : ""}
@@ -1285,28 +1451,22 @@ function OverviewContent() {
                         </div>
                       )}
 
-                      {/* Procedures row */}
-                      {regProcs.length > 0 && (
+                      {/* 9. Plan / Surgery Advised row */}
+                      {reg.plan_surgery_advised && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-teal-500 shadow-sm uppercase">
-                            Pr
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-purple-700 shadow-sm uppercase">
+                            Sa
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Procedures</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal">
-                              {regProcs.map((p, idx) => (
-                                <span key={p.procedure_id}>
-                                  {p.name}{idx < regProcs.length - 1 ? " | " : ""}
-                                </span>
-                              ))}
+                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Plan / Surgery Advised</div>
+                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text whitespace-pre-wrap">
+                              {reg.plan_surgery_advised}
                             </div>
                           </div>
                           <button
-                            onClick={async () => {
-                              for (const p of regProcs) await reassignProcedure(p);
-                            }}
+                            onClick={() => reassignPlanSurgery(reg.plan_surgery_advised)}
                             className="p-1 hover:bg-indigo-50 border border-transparent rounded text-indigo-650 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1"
-                            title="Reassign procedures to today"
+                            title="Reassign surgery plan to today"
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
@@ -1315,7 +1475,121 @@ function OverviewContent() {
                         </div>
                       )}
 
-                      {/* Referrals row */}
+                      {/* 10. Follow Up row */}
+                      {(reg.follow_up || reg.follow_up_notes) && (
+                        <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-blue-600 shadow-sm uppercase">
+                            Fu
+                          </div>
+                          <div className="flex-1 text-left">
+                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Follow Up</div>
+                            <div className="text-[11.5px] font-bold text-slate-800 leading-tight select-text">
+                              {reg.follow_up && <span>Follow-up: {reg.follow_up}</span>}
+                              {reg.follow_up_notes && <span className="block text-[10px] text-slate-600 font-normal mt-0.5 whitespace-pre-wrap">{reg.follow_up_notes}</span>}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => reassignFollowUp(reg.follow_up || "", reg.follow_up_notes || "")}
+                            className="p-1 hover:bg-indigo-50 border border-transparent rounded text-indigo-650 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1"
+                            title="Reassign follow-up to today"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 11. Advice row */}
+                      {hasAdvice && (
+                        <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-purple-600 shadow-sm uppercase">
+                            Ad
+                          </div>
+                          <div className="flex-1 text-left">
+                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Advice</div>
+                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal whitespace-pre-wrap select-text">
+                              {regAdviceStr}
+                              {reg.advice_rest && <span className="block text-[10px] text-slate-500 font-semibold mt-0.5">• Take some rest</span>}
+                              {reg.advice_water && <span className="block text-[10px] text-slate-500 font-semibold mt-0.5">• Drink water</span>}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => reassignAdvice(regAdviceStr, reg.advice_rest || false, reg.advice_water || false)}
+                            className="p-1 hover:bg-indigo-50 border border-transparent rounded text-indigo-650 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1"
+                            title="Reassign advice to today"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 12. Notes for Patient row */}
+                      {reg.notes_for_patient && (
+                        <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-amber-600 shadow-sm uppercase">
+                            Nt
+                          </div>
+                          <div className="flex-1 text-left">
+                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Notes for Patient</div>
+                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text whitespace-pre-wrap">
+                              {reg.notes_for_patient}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => reassignNotesForPatient(reg.notes_for_patient)}
+                            className="p-1 hover:bg-indigo-50 border border-transparent rounded text-indigo-650 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1"
+                            title="Reassign notes for patient to today"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 13. Private Notes row */}
+                      {reg.private_notes && (
+                        <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-slate-600 shadow-sm uppercase">
+                            Pn
+                          </div>
+                          <div className="flex-1 text-left">
+                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Private / Doctor Notes</div>
+                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text whitespace-pre-wrap">
+                              {reg.private_notes}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 14. Procedure Done row */}
+                      {reg.procedure_done && (
+                        <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-emerald-600 shadow-sm uppercase">
+                            Pd
+                          </div>
+                          <div className="flex-1 text-left">
+                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Procedure Done</div>
+                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text whitespace-pre-wrap">
+                              {reg.procedure_done}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => reassignProcedureDone(reg.procedure_done)}
+                            className="p-1 hover:bg-indigo-50 border border-transparent rounded text-indigo-650 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1"
+                            title="Reassign procedure done to today"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 15. Referrals row */}
                       {regRefs.length > 0 && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
                           <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-pink-650 shadow-sm uppercase">
@@ -1323,7 +1597,7 @@ function OverviewContent() {
                           </div>
                           <div className="flex-1 text-left">
                             <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Referrals</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal">
+                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text">
                               {regRefs.map((r, idx) => (
                                 <span key={r.refer_id}>
                                   Dr. {r.doctor_name}{idx < regRefs.length - 1 ? " | " : ""}
@@ -1337,32 +1611,6 @@ function OverviewContent() {
                             }}
                             className="p-1 hover:bg-indigo-50 border border-transparent rounded text-indigo-650 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1"
                             title="Reassign referrals to today"
-                          >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
-                            </svg>
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Advice row */}
-                      {(reg.advice || reg.advice_rest || reg.advice_water) && (
-                        <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-purple-600 shadow-sm uppercase">
-                            Ad
-                          </div>
-                          <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Advice</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-tight">
-                              {reg.advice}
-                              {reg.advice_rest && <span className="block text-[10px] text-slate-500 mt-0.5">• Take some rest</span>}
-                              {reg.advice_water && <span className="block text-[10px] text-slate-500 mt-0.5">• Drink water</span>}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => reassignAdvice(reg.advice || "", reg.advice_rest || false, reg.advice_water || false)}
-                            className="p-1 hover:bg-indigo-50 border border-transparent rounded text-indigo-650 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1"
-                            title="Reassign advice to today"
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />

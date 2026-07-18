@@ -518,12 +518,33 @@ function DashboardContent() {
             };
           });
 
+          // Fetch products from the new inventory table and merge them
+          let productList: any[] = [];
+          try {
+            const { data: dbProducts, error: prodError } = await supabase
+              .from("aka_inventory_products")
+              .select("name, selling_price")
+              .order("name", { ascending: true });
+            
+            if (!prodError && dbProducts) {
+              productList = dbProducts.map(p => ({
+                name: p.name,
+                price: Number(p.selling_price) || 0,
+                type: "product" as const
+              }));
+            }
+          } catch (e) {
+            console.warn("Could not load inventory products (table might not exist yet):", e);
+          }
+
+          const combinedServicesList = [...servicesList, ...productList];
+
           const countries = dbCatalog.filter(c => c.category_id === 165).map(c => c.value);
           const states = dbCatalog.filter(c => c.category_id === 166).map(c => c.value);
 
           if (docList.length > 0) setDoctorCache(docList);
           if (addrList.length > 0) setAddressCache(addrList);
-          if (servicesList.length > 0) setServiceCache(servicesList);
+          if (combinedServicesList.length > 0) setServiceCache(combinedServicesList);
           if (countries.length > 0) setCountryCache(countries);
           if (states.length > 0) setStateCache(states);
           if (clinicList.length > 0) setClinicCache(clinicList);
@@ -1170,12 +1191,7 @@ function DashboardContent() {
 
   const getServiceOptions = (val: string) => {
     const filtered = serviceCache.filter(s => !val || s.name.toLowerCase().includes(val.toLowerCase()));
-    let list = filtered.map(s => s.name);
-    if (val.trim() && !serviceCache.some(s => s.name.toLowerCase() === val.trim().toLowerCase())) {
-      list.push(`+ Create "${val.trim()}" (Service)`);
-      list.push(`+ Create "${val.trim()}" (Product)`);
-    }
-    return list;
+    return filtered.map(s => s.name);
   };
 
   // Autocomplete generic keydown navigation
@@ -1223,7 +1239,23 @@ function DashboardContent() {
       const match = val.match(/\+ Create "(.*)" \((Service|Product)\)/);
       finalVal = match ? match[1] : val;
       const type = isCreateProduct ? "product" : "service";
-      incrementOption(164, finalVal, { type, price: rowFee });
+      
+      if (type === "product") {
+        supabase
+          .from("aka_inventory_products")
+          .insert({ name: finalVal.trim(), qty: 0, selling_price: rowFee })
+          .then(({ error }) => {
+            if (error) console.error("Error creating new inventory product:", error);
+          });
+      } else {
+        incrementOption(164, finalVal, { type, price: rowFee });
+      }
+
+      setServiceCache((prev) => {
+        if (prev.some(s => s.name.toLowerCase() === finalVal.toLowerCase())) return prev;
+        return [...prev, { name: finalVal.trim(), price: rowFee, type }];
+      });
+
       updateServiceRow(rowId, finalVal, rowFee, type);
     } else {
       const matched = serviceCache.find((s) => s.name.toLowerCase() === val.toLowerCase());
@@ -1500,7 +1532,19 @@ function DashboardContent() {
       if (state.trim()) incrementOption(166, state);
       servicesRows.forEach((row) => {
         if (row.name.trim()) {
-          incrementOption(164, row.name, { type: row.type || "service", price: row.fee });
+          if (row.type === "product") {
+            const exists = serviceCache.some(s => s.name.toLowerCase() === row.name.trim().toLowerCase());
+            if (!exists) {
+              supabase
+                .from("aka_inventory_products")
+                .insert({ name: row.name.trim(), qty: 0, selling_price: row.fee })
+                .then(({ error }) => {
+                  if (error) console.error("Error creating typed inventory product:", error);
+                });
+            }
+          } else {
+            incrementOption(164, row.name, { type: row.type || "service", price: row.fee });
+          }
         }
       });
 
