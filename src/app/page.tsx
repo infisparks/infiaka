@@ -2603,7 +2603,11 @@ function DashboardContent() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setSelectedBookingPatient(null)}
+                    onClick={() => {
+                      setSelectedBookingPatient(null);
+                      resetForm();
+                      openBooking("true");
+                    }}
                     className="text-[9px] font-bold text-red-500 hover:underline"
                   >
                     Clear Selector

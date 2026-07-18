@@ -5,20 +5,7 @@ import { supabase } from "@/lib/supabase";
 
 const DEFAULT_ADVICES = [
   "Avoid maida (eg: toast, butter, biscuit, Khari, cake, pav, bread)",
-  "Avoid exposure to excess light, sound, over work",
-  "Oil, ghee, maida, rice, sugar, red meat to be avoided",
-  "Avoid tea, coffee, tobacco, smoking, spicy food",
-  "Dinner 2 hr before going to lying down position",
-  "Propped up position while sleeping",
-  "Walk regularly for 30 minutes daily",
-  "Stop mobile phone use",
-  "Dietician reference",
-  "Weight reduction advised",
-  "Oral intake around 1-1.25 lt / day",
-  "Avoid folding knees, use English style lavatories",
-  "Salt restriction",
-  "Steam inhalation twice daily",
-  "Gargle with warm salt water"
+
 ];
 
 async function fetchAdvices(categoryId: number, defaults: string[]): Promise<string[]> {
