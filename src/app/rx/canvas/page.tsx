@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase, getUserRole } from "@/lib/supabase";
+import SignaturePad from "signature_pad";
 
 interface Patient {
   patient_id?: number;
@@ -17,19 +18,6 @@ interface Patient {
     clinic_name?: string;
     treating_doctor?: string;
   };
-}
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface DrawingLine {
-  id: string;
-  points: Point[];
-  color: string;
-  width: number;
-  isErased: boolean;
 }
 
 const COLOR_PRESETS = [
@@ -51,7 +39,7 @@ export default function CanvasPage() {
         <div className="flex h-screen w-screen items-center justify-center bg-[#F5F6F8] font-sans select-none">
           <div className="text-center space-y-2">
             <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Loading Canvas Workspace...</p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Loading Medical Canvas Engine...</p>
           </div>
         </div>
       }
@@ -73,22 +61,11 @@ function CanvasPageContent() {
   const [pastVisitsCount, setPastVisitsCount] = useState<number>(0);
   const [legacyVisitsCount, setLegacyVisitsCount] = useState<number>(0);
 
-  // Drawing States (React State & Synchronous Ref Sync for 0ms Fast Pen Strokes)
-  const [lines, setLines] = useState<DrawingLine[]>([]);
+  // SignaturePad Medical Engine States
   const [currentColor, setCurrentColor] = useState<string>("#000000");
   const [strokeWidth, setStrokeWidth] = useState<number>(4);
   const [isErasing, setIsErasing] = useState<boolean>(false);
   const [templateImageUrl, setTemplateImageUrl] = useState<string>("/letterhead.jpg");
-
-  // Synchronous High-Performance Drawing Refs (Fixes 1-second lag & dropped fast strokes)
-  const linesRef = useRef<DrawingLine[]>([]);
-  const activeLineRef = useRef<DrawingLine | null>(null);
-  const isDrawingRef = useRef<boolean>(false);
-
-  // Keep linesRef in sync with React lines state
-  useEffect(() => {
-    linesRef.current = lines;
-  }, [lines]);
 
   // Viewport Transform States (Pan & Pinch Zoom)
   const [zoomScale, setZoomScale] = useState<number>(1.0);
@@ -106,13 +83,15 @@ function CanvasPageContent() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const signaturePadRef = useRef<SignaturePad | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
 
-  // Touch gesture refs
+  // Touch gesture refs for pan & pinch zoom
   const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const pinchStartDistRef = useRef<number | null>(null);
   const pinchStartScaleRef = useRef<number>(1.0);
+  const initialPointDataRef = useRef<any[] | null>(null);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type });
@@ -132,10 +111,8 @@ function CanvasPageContent() {
     });
   }, [router]);
 
-  // Block text selection, drag gestures, and browser double-tap zoom globally
+  // Block text selection, drag gestures, and browser callouts globally
   useEffect(() => {
-    let lastTapTime = 0;
-
     const killSelection = (e: Event) => {
       if (typeof window !== "undefined" && window.getSelection) {
         const sel = window.getSelection();
@@ -143,69 +120,68 @@ function CanvasPageContent() {
       }
     };
 
-    const handleDoubleTap = (e: TouchEvent) => {
-      const now = Date.now();
-      if (now - lastTapTime < 300) {
-        if (e.cancelable) e.preventDefault();
-      }
-      lastTapTime = now;
-    };
-
     document.addEventListener("selectstart", killSelection, { capture: true });
     document.addEventListener("selectionchange", killSelection, { capture: true });
     document.addEventListener("dragstart", killSelection, { capture: true });
-    document.addEventListener("touchend", handleDoubleTap, { capture: true, passive: false });
 
     return () => {
       document.removeEventListener("selectstart", killSelection, { capture: true });
       document.removeEventListener("selectionchange", killSelection, { capture: true });
       document.removeEventListener("dragstart", killSelection, { capture: true });
-      document.removeEventListener("touchend", handleDoubleTap, { capture: true });
     };
   }, []);
 
-  // Ignore ALL clicks, long presses, double clicks, and context menus in prescription workspace
+  // Initialize SignaturePad Industry-Standard Medical Canvas Engine
   useEffect(() => {
     const canvas = canvasRef.current;
-    const workspace = workspaceRef.current;
     if (!canvas) return;
 
-    const swallowEvent = (e: Event) => {
-      if (e.cancelable) e.preventDefault();
-      e.stopPropagation();
-      if (typeof window !== "undefined" && window.getSelection) {
-        const sel = window.getSelection();
-        if (sel) sel.removeAllRanges();
-      }
-    };
-
-    const eventsToBlock = [
-      "click",
-      "dblclick",
-      "contextmenu",
-      "auxclick",
-      "dragstart",
-      "gesturestart",
-      "gesturechange",
-      "gestureend",
-    ];
-
-    eventsToBlock.forEach((evt) => {
-      canvas.addEventListener(evt, swallowEvent, { capture: true, passive: false });
-      if (workspace) {
-        workspace.addEventListener(evt, swallowEvent, { capture: true, passive: false });
-      }
+    const signaturePad = new SignaturePad(canvas, {
+      minWidth: strokeWidth * 0.8,
+      maxWidth: strokeWidth * 1.5,
+      penColor: isErasing ? "rgba(0,0,0,1)" : currentColor,
+      backgroundColor: "rgba(0, 0, 0, 0)",
+      velocityFilterWeight: 0.7,
+      minDistance: 1,
     });
 
+    if (isErasing) {
+      signaturePad.compositeOperation = "destination-out";
+    } else {
+      signaturePad.compositeOperation = "source-over";
+    }
+
+    signaturePadRef.current = signaturePad;
+
+    // Load initial data if loaded before init
+    if (initialPointDataRef.current && Array.isArray(initialPointDataRef.current)) {
+      try {
+        signaturePad.fromData(initialPointDataRef.current);
+      } catch (e) {
+        console.error("Error loading initial signature_pad data:", e);
+      }
+    }
+
     return () => {
-      eventsToBlock.forEach((evt) => {
-        canvas.removeEventListener(evt, swallowEvent, { capture: true });
-        if (workspace) {
-          workspace.removeEventListener(evt, swallowEvent, { capture: true });
-        }
-      });
+      signaturePad.off();
     };
   }, []);
+
+  // Dynamically update SignaturePad properties when tool/color/width changes
+  useEffect(() => {
+    const pad = signaturePadRef.current;
+    if (!pad) return;
+
+    pad.minWidth = strokeWidth * 0.8;
+    pad.maxWidth = strokeWidth * 1.5;
+    pad.penColor = isErasing ? "rgba(0,0,0,1)" : currentColor;
+
+    if (isErasing) {
+      pad.compositeOperation = "destination-out";
+    } else {
+      pad.compositeOperation = "source-over";
+    }
+  }, [currentColor, strokeWidth, isErasing]);
 
   // Listen for native fullscreen change events
   useEffect(() => {
@@ -310,17 +286,17 @@ function CanvasPageContent() {
         setCurrentRxPatient(mappedPatient);
         fetchHeaderCounts(patientUhid, rxPatientId, pData?.name || "", pData?.number || "");
 
-        // Load Canvas Data from Supabase
+        // Load Canvas Data into SignaturePad Engine
+        let pointsToLoad: any[] | null = null;
         if (regData.canvas_data) {
           try {
             const parsed = typeof regData.canvas_data === "string" ? JSON.parse(regData.canvas_data) : regData.canvas_data;
             if (Array.isArray(parsed)) {
-              setLines(parsed);
-              linesRef.current = parsed;
+              pointsToLoad = parsed;
+            } else if (parsed.points && Array.isArray(parsed.points)) {
+              pointsToLoad = parsed.points;
             } else if (parsed.lines && Array.isArray(parsed.lines)) {
-              setLines(parsed.lines);
-              linesRef.current = parsed.lines;
-              if (parsed.templateUrl) setTemplateImageUrl(parsed.templateUrl);
+              pointsToLoad = parsed.lines;
             }
           } catch (e) {
             console.error("Error parsing canvas data from DB:", e);
@@ -331,12 +307,20 @@ function CanvasPageContent() {
           if (savedLocal) {
             try {
               const parsed = JSON.parse(savedLocal);
-              if (Array.isArray(parsed)) {
-                setLines(parsed);
-                linesRef.current = parsed;
-              }
+              if (Array.isArray(parsed)) pointsToLoad = parsed;
             } catch (e) {
               console.error("Error reading local canvas:", e);
+            }
+          }
+        }
+
+        if (pointsToLoad) {
+          initialPointDataRef.current = pointsToLoad;
+          if (signaturePadRef.current) {
+            try {
+              signaturePadRef.current.fromData(pointsToLoad);
+            } catch (err) {
+              console.error("Error restoring signature pad points:", err);
             }
           }
         }
@@ -351,64 +335,6 @@ function CanvasPageContent() {
     loadData();
   }, [sessionLoaded, rxPatientId]);
 
-  // Synchronous Full Canvas Redraw Function with Bezier Curve Smoothing
-  const renderCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const allLines = activeLineRef.current
-      ? [...linesRef.current, activeLineRef.current]
-      : linesRef.current;
-
-    allLines.forEach((line) => {
-      if (!line.points || line.points.length < 1) return;
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.lineWidth = line.width || 4;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.globalAlpha = 1.0;
-
-      if (line.isErased) {
-        ctx.globalCompositeOperation = "destination-out";
-        ctx.strokeStyle = "rgba(0,0,0,1)";
-      } else {
-        ctx.globalCompositeOperation = "source-over";
-        const strokeColor = line.color && line.color !== "" ? line.color : "#000000";
-        ctx.strokeStyle = strokeColor;
-      }
-
-      ctx.moveTo(line.points[0].x, line.points[0].y);
-
-      if (line.points.length === 1) {
-        ctx.lineTo(line.points[0].x + 0.1, line.points[0].y + 0.1);
-      } else if (line.points.length === 2) {
-        ctx.lineTo(line.points[1].x, line.points[1].y);
-      } else {
-        // Quadratic Bezier Curve Smoothing for Fluid S-Pen Calligraphy
-        let i = 1;
-        for (i = 1; i < line.points.length - 1; i++) {
-          const xc = (line.points[i].x + line.points[i + 1].x) / 2;
-          const yc = (line.points[i].y + line.points[i + 1].y) / 2;
-          ctx.quadraticCurveTo(line.points[i].x, line.points[i].y, xc, yc);
-        }
-        ctx.lineTo(line.points[i].x, line.points[i].y);
-      }
-
-      ctx.stroke();
-      ctx.restore();
-    });
-  };
-
-  useEffect(() => {
-    renderCanvas();
-  }, [lines]);
-
   // Clear accidental browser text highlights (Palm Rejection)
   const suppressTextSelection = () => {
     if (typeof window !== "undefined" && window.getSelection) {
@@ -417,168 +343,17 @@ function CanvasPageContent() {
     }
   };
 
-  // Transform Screen Point to Fixed Canvas Resolution (1000 x 1414)
-  const getCanvasPoint = (e: React.PointerEvent<HTMLCanvasElement> | any): Point | null => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-
-    let clientX = 0;
-    let clientY = 0;
-
-    if (e.touches && e.touches.length > 0) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else if ("clientX" in e) {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    } else {
-      return null;
-    }
-
-    return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY,
-    };
-  };
-
-  // Check if pointer input is S-Pen / Stylus or Desktop Mouse (Finger touches return false)
-  const isPenOrStylusInput = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e.pointerType === "pen") return true;
-    if (e.pointerType === "mouse") return true; // Allows mouse drawing on desktop
-    return false;
-  };
-
-  // ─── HIGH PERFORMANCE DIRECT SYNCHRONOUS STROKE HANDLERS (0ms Latency) ───
-  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e.cancelable) e.preventDefault();
-    e.stopPropagation();
-    suppressTextSelection();
-
-    // If it's a finger touch, DO NOT WRITE! Hand touches handle Pan & Zoom.
-    if (!isPenOrStylusInput(e)) return;
-
-    try {
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    } catch (err) {}
-
-    const pt = getCanvasPoint(e);
-    if (!pt) return;
-
-    isDrawingRef.current = true;
-    const newLine: DrawingLine = {
-      id: String(Date.now()) + "_" + Math.random().toString(36).substring(2, 6),
-      points: [pt],
-      color: currentColor,
-      width: isErasing ? strokeWidth * 6 : strokeWidth,
-      isErased: isErasing,
-    };
-
-    activeLineRef.current = newLine;
-    // Render initial point instantly onto context in 0ms
-    renderCanvas();
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e.cancelable) e.preventDefault();
-    e.stopPropagation();
-    suppressTextSelection();
-
-    if (!isDrawingRef.current || !activeLineRef.current) return;
-    if (!isPenOrStylusInput(e)) return;
-
-    const pt = getCanvasPoint(e);
-    if (!pt) return;
-
-    // Append point directly to Ref (No React state re-render queue delay!)
-    activeLineRef.current.points.push(pt);
-
-    // Fast 60-120fps direct 2D context line segment render (0ms latency)
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        const line = activeLineRef.current;
-        const len = line.points.length;
-        if (len >= 2) {
-          ctx.save();
-          ctx.beginPath();
-          ctx.lineWidth = line.width || 4;
-          ctx.lineCap = "round";
-          ctx.lineJoin = "round";
-          ctx.globalAlpha = 1.0;
-
-          if (line.isErased) {
-            ctx.globalCompositeOperation = "destination-out";
-            ctx.strokeStyle = "rgba(0,0,0,1)";
-          } else {
-            ctx.globalCompositeOperation = "source-over";
-            ctx.strokeStyle = line.color && line.color !== "" ? line.color : "#000000";
-          }
-
-          if (len === 2) {
-            ctx.moveTo(line.points[0].x, line.points[0].y);
-            ctx.lineTo(line.points[1].x, line.points[1].y);
-          } else {
-            const p1 = line.points[len - 2];
-            const p2 = line.points[len - 1];
-            const midX = (p1.x + p2.x) / 2;
-            const midY = (p1.y + p2.y) / 2;
-            ctx.moveTo(p1.x, p1.y);
-            ctx.quadraticCurveTo(p1.x, p1.y, midX, midY);
-          }
-
-          ctx.stroke();
-          ctx.restore();
-        }
-      }
-    }
-  };
-
-  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e.cancelable) e.preventDefault();
-    e.stopPropagation();
-    suppressTextSelection();
-
-    try {
-      if ((e.target as HTMLElement).hasPointerCapture(e.pointerId)) {
-        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-      }
-    } catch (err) {}
-
-    if (!isDrawingRef.current) return;
-    isDrawingRef.current = false;
-
-    if (activeLineRef.current && activeLineRef.current.points.length > 0) {
-      const completedLine = activeLineRef.current;
-      linesRef.current = [...linesRef.current, completedLine];
-      activeLineRef.current = null;
-
-      // Synchronously update React state for persistence and saving
-      setLines([...linesRef.current]);
-      localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(linesRef.current));
-    } else {
-      activeLineRef.current = null;
-    }
-  };
-
   // ─── Touch Gestures: 1 Finger Pan & 2 Finger Pinch Zoom ───
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     suppressTextSelection();
-    if (isDrawingRef.current) return;
 
     if (e.touches.length === 1) {
-      // 1 Finger: Move / Pan Page
       setIsPanning(true);
       panStartRef.current = {
         x: e.touches[0].clientX - panOffset.x,
         y: e.touches[0].clientY - panOffset.y,
       };
     } else if (e.touches.length === 2) {
-      // 2 Fingers: Pinch Zoom In/Out
       setIsPanning(false);
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
@@ -591,16 +366,13 @@ function CanvasPageContent() {
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     suppressTextSelection();
-    if (isDrawingRef.current) return;
 
     if (e.touches.length === 1 && isPanning) {
-      // Pan Offset Update
       setPanOffset({
         x: e.touches[0].clientX - panStartRef.current.x,
         y: e.touches[0].clientY - panStartRef.current.y,
       });
     } else if (e.touches.length === 2 && pinchStartDistRef.current) {
-      // Pinch Zoom Scale Update
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
@@ -644,14 +416,13 @@ function CanvasPageContent() {
       if (document.documentElement.requestFullscreen) {
         document.documentElement.requestFullscreen().then(() => {
           setIsFullscreen(true);
-          setIsHeaderVisible(false); // Hide header to maximize drawing area
+          setIsHeaderVisible(false);
           showToast("Full Screen Mode Enabled (Header Collapsed)", "info");
         }).catch(() => {
           setIsHeaderVisible(!isHeaderVisible);
           setShowIpadTip(true);
         });
       } else {
-        // iPad Safari unsupported requestFullscreen fallback
         setIsHeaderVisible(!isHeaderVisible);
         setShowIpadTip(true);
       }
@@ -666,28 +437,38 @@ function CanvasPageContent() {
 
   // Actions
   const handleUndo = () => {
-    if (linesRef.current.length === 0) return;
-    const updated = linesRef.current.slice(0, linesRef.current.length - 1);
-    linesRef.current = updated;
-    setLines(updated);
-    localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(updated));
+    const pad = signaturePadRef.current;
+    if (!pad) return;
+    const data = pad.toData();
+    if (data && data.length > 0) {
+      data.pop(); // Remove last drawn stroke
+      pad.fromData(data);
+      if (rxPatientId) {
+        localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(data));
+      }
+    }
   };
 
   const handleClearAll = () => {
-    linesRef.current = [];
-    activeLineRef.current = null;
-    setLines([]);
-    localStorage.removeItem(`saved_canvas_${rxPatientId}`);
+    const pad = signaturePadRef.current;
+    if (pad) pad.clear();
+    if (rxPatientId) {
+      localStorage.removeItem(`saved_canvas_${rxPatientId}`);
+    }
     setIsClearModalOpen(false);
     showToast("Canvas cleared", "info");
   };
 
   const handleSaveData = async () => {
     if (!rxPatientId) return;
+    const pad = signaturePadRef.current;
+    if (!pad) return;
+
     setSaving(true);
     try {
+      const pointData = pad.toData();
       const payload = {
-        lines: linesRef.current,
+        points: pointData,
         updated_at: new Date().toISOString(),
       };
 
@@ -698,7 +479,7 @@ function CanvasPageContent() {
 
       if (error) throw error;
 
-      localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(linesRef.current));
+      localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(pointData));
       showToast("Canvas Drawing Saved Successfully!");
     } catch (err: any) {
       console.error("Error saving canvas data:", err);
@@ -709,8 +490,9 @@ function CanvasPageContent() {
   };
 
   const handlePrintPdf = () => {
+    const pad = signaturePadRef.current;
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!pad || !canvas) return;
 
     const dataUrl = canvas.toDataURL("image/png");
     const printWindow = window.open("", "_blank");
@@ -745,7 +527,7 @@ function CanvasPageContent() {
       <div className="flex h-screen w-screen items-center justify-center bg-[#F5F6F8] font-sans select-none">
         <div className="text-center space-y-2">
           <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Loading Patient Canvas...</p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Loading Medical Canvas Engine...</p>
         </div>
       </div>
     );
@@ -980,8 +762,7 @@ function CanvasPageContent() {
 
           <button
             onClick={handleUndo}
-            disabled={lines.length === 0}
-            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
+            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
             title="Undo last stroke"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1070,18 +851,11 @@ function CanvasPageContent() {
             draggable={false}
           />
 
-          {/* HTML5 Canvas (Resolution 1000 x 1414) */}
+          {/* HTML5 Canvas with SignaturePad Medical Engine (Resolution 1000 x 1414) */}
           <canvas
             ref={canvasRef}
             width={1000}
             height={1414}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerUp}
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
             className="w-full h-full cursor-crosshair touch-none relative z-10 select-none canvas-no-select"
             style={{
               userSelect: "none",
