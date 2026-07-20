@@ -73,14 +73,22 @@ function CanvasPageContent() {
   const [pastVisitsCount, setPastVisitsCount] = useState<number>(0);
   const [legacyVisitsCount, setLegacyVisitsCount] = useState<number>(0);
 
-  // Drawing States
+  // Drawing States (React State & Synchronous Ref Sync for 0ms Fast Pen Strokes)
   const [lines, setLines] = useState<DrawingLine[]>([]);
   const [currentColor, setCurrentColor] = useState<string>("#000000");
   const [strokeWidth, setStrokeWidth] = useState<number>(4);
   const [isErasing, setIsErasing] = useState<boolean>(false);
-  const [isDrawing, setIsDrawing] = useState<boolean>(false);
-  const [currentLine, setCurrentLine] = useState<DrawingLine | null>(null);
   const [templateImageUrl, setTemplateImageUrl] = useState<string>("/letterhead.jpg");
+
+  // Synchronous High-Performance Drawing Refs (Fixes 1-second lag & dropped fast strokes)
+  const linesRef = useRef<DrawingLine[]>([]);
+  const activeLineRef = useRef<DrawingLine | null>(null);
+  const isDrawingRef = useRef<boolean>(false);
+
+  // Keep linesRef in sync with React lines state
+  useEffect(() => {
+    linesRef.current = lines;
+  }, [lines]);
 
   // Viewport Transform States (Pan & Pinch Zoom)
   const [zoomScale, setZoomScale] = useState<number>(1.0);
@@ -124,7 +132,7 @@ function CanvasPageContent() {
     });
   }, [router]);
 
-  // Completely block text selection, drag gestures, and browser double-tap zoom globally
+  // Block text selection, drag gestures, and browser double-tap zoom globally
   useEffect(() => {
     let lastTapTime = 0;
 
@@ -180,17 +188,11 @@ function CanvasPageContent() {
       "gesturestart",
       "gesturechange",
       "gestureend",
-      "touchstart",
-      "touchmove",
-      "touchend",
-      "pointerdown",
-      "pointermove",
-      "pointerup",
     ];
 
     eventsToBlock.forEach((evt) => {
       canvas.addEventListener(evt, swallowEvent, { capture: true, passive: false });
-      if (workspace && (evt === "click" || evt === "dblclick" || evt === "contextmenu" || evt === "dragstart")) {
+      if (workspace) {
         workspace.addEventListener(evt, swallowEvent, { capture: true, passive: false });
       }
     });
@@ -198,7 +200,7 @@ function CanvasPageContent() {
     return () => {
       eventsToBlock.forEach((evt) => {
         canvas.removeEventListener(evt, swallowEvent, { capture: true });
-        if (workspace && (evt === "click" || evt === "dblclick" || evt === "contextmenu" || evt === "dragstart")) {
+        if (workspace) {
           workspace.removeEventListener(evt, swallowEvent, { capture: true });
         }
       });
@@ -314,8 +316,10 @@ function CanvasPageContent() {
             const parsed = typeof regData.canvas_data === "string" ? JSON.parse(regData.canvas_data) : regData.canvas_data;
             if (Array.isArray(parsed)) {
               setLines(parsed);
+              linesRef.current = parsed;
             } else if (parsed.lines && Array.isArray(parsed.lines)) {
               setLines(parsed.lines);
+              linesRef.current = parsed.lines;
               if (parsed.templateUrl) setTemplateImageUrl(parsed.templateUrl);
             }
           } catch (e) {
@@ -327,7 +331,10 @@ function CanvasPageContent() {
           if (savedLocal) {
             try {
               const parsed = JSON.parse(savedLocal);
-              if (Array.isArray(parsed)) setLines(parsed);
+              if (Array.isArray(parsed)) {
+                setLines(parsed);
+                linesRef.current = parsed;
+              }
             } catch (e) {
               console.error("Error reading local canvas:", e);
             }
@@ -344,17 +351,18 @@ function CanvasPageContent() {
     loadData();
   }, [sessionLoaded, rxPatientId]);
 
-  // Redraw Canvas whenever lines or currentLine changes
+  // Synchronous Full Canvas Redraw Function (Instant rendering from linesRef)
   const renderCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Clear entire canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const allLines = currentLine ? [...lines, currentLine] : lines;
+    const allLines = activeLineRef.current
+      ? [...linesRef.current, activeLineRef.current]
+      : linesRef.current;
 
     allLines.forEach((line) => {
       if (!line.points || line.points.length < 1) return;
@@ -392,7 +400,7 @@ function CanvasPageContent() {
 
   useEffect(() => {
     renderCanvas();
-  }, [lines, currentLine]);
+  }, [lines]);
 
   // Clear accidental browser text highlights (Palm Rejection)
   const suppressTextSelection = () => {
@@ -437,7 +445,7 @@ function CanvasPageContent() {
     return false;
   };
 
-  // Pointer Down (Drawing Handler - Only S-Pen / Pen / Mouse)
+  // ─── HIGH PERFORMANCE DIRECT SYNCHRONOUS STROKE HANDLERS (0ms Latency) ───
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.cancelable) e.preventDefault();
     e.stopPropagation();
@@ -453,15 +461,18 @@ function CanvasPageContent() {
     const pt = getCanvasPoint(e);
     if (!pt) return;
 
-    setIsDrawing(true);
+    isDrawingRef.current = true;
     const newLine: DrawingLine = {
-      id: String(Date.now()),
+      id: String(Date.now()) + "_" + Math.random().toString(36).substring(2, 6),
       points: [pt],
       color: currentColor,
       width: isErasing ? strokeWidth * 6 : strokeWidth,
       isErased: isErasing,
     };
-    setCurrentLine(newLine);
+
+    activeLineRef.current = newLine;
+    // Render initial point instantly onto context in 0ms
+    renderCanvas();
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -469,19 +480,47 @@ function CanvasPageContent() {
     e.stopPropagation();
     suppressTextSelection();
 
-    if (!isDrawing || !currentLine) return;
+    if (!isDrawingRef.current || !activeLineRef.current) return;
     if (!isPenOrStylusInput(e)) return;
 
     const pt = getCanvasPoint(e);
     if (!pt) return;
 
-    setCurrentLine((prev) => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        points: [...prev.points, pt],
-      };
-    });
+    // Append point directly to Ref (No React state re-render queue delay!)
+    activeLineRef.current.points.push(pt);
+
+    // Fast 60-120fps direct 2D context line segment render (0ms latency)
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        const line = activeLineRef.current;
+        const len = line.points.length;
+        if (len >= 2) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.lineWidth = line.width || 4;
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          ctx.globalAlpha = 1.0;
+
+          if (line.isErased) {
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.strokeStyle = "rgba(0,0,0,1)";
+          } else {
+            ctx.globalCompositeOperation = "source-over";
+            ctx.strokeStyle = line.color && line.color !== "" ? line.color : "#000000";
+          }
+
+          const p1 = line.points[len - 2];
+          const p2 = line.points[len - 1];
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -495,21 +534,26 @@ function CanvasPageContent() {
       }
     } catch (err) {}
 
-    if (!isDrawing) return;
-    setIsDrawing(false);
-    if (currentLine && currentLine.points.length > 0) {
-      const updated = [...lines, currentLine];
-      setLines(updated);
-      localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(updated));
+    if (!isDrawingRef.current) return;
+    isDrawingRef.current = false;
+
+    if (activeLineRef.current && activeLineRef.current.points.length > 0) {
+      const completedLine = activeLineRef.current;
+      linesRef.current = [...linesRef.current, completedLine];
+      activeLineRef.current = null;
+
+      // Synchronously update React state for persistence and saving
+      setLines([...linesRef.current]);
+      localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(linesRef.current));
+    } else {
+      activeLineRef.current = null;
     }
-    setCurrentLine(null);
   };
 
   // ─── Touch Gestures: 1 Finger Pan & 2 Finger Pinch Zoom ───
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     suppressTextSelection();
-    // If drawing with S-Pen, don't pan
-    if (isDrawing) return;
+    if (isDrawingRef.current) return;
 
     if (e.touches.length === 1) {
       // 1 Finger: Move / Pan Page
@@ -532,7 +576,7 @@ function CanvasPageContent() {
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     suppressTextSelection();
-    if (isDrawing) return;
+    if (isDrawingRef.current) return;
 
     if (e.touches.length === 1 && isPanning) {
       // Pan Offset Update
@@ -607,13 +651,16 @@ function CanvasPageContent() {
 
   // Actions
   const handleUndo = () => {
-    if (lines.length === 0) return;
-    const updated = lines.slice(0, lines.length - 1);
+    if (linesRef.current.length === 0) return;
+    const updated = linesRef.current.slice(0, linesRef.current.length - 1);
+    linesRef.current = updated;
     setLines(updated);
     localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(updated));
   };
 
   const handleClearAll = () => {
+    linesRef.current = [];
+    activeLineRef.current = null;
     setLines([]);
     localStorage.removeItem(`saved_canvas_${rxPatientId}`);
     setIsClearModalOpen(false);
@@ -625,7 +672,7 @@ function CanvasPageContent() {
     setSaving(true);
     try {
       const payload = {
-        lines,
+        lines: linesRef.current,
         updated_at: new Date().toISOString(),
       };
 
@@ -636,7 +683,7 @@ function CanvasPageContent() {
 
       if (error) throw error;
 
-      localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(lines));
+      localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(linesRef.current));
       showToast("Canvas Drawing Saved Successfully!");
     } catch (err: any) {
       console.error("Error saving canvas data:", err);
