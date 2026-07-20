@@ -124,7 +124,7 @@ function CanvasPageContent() {
     });
   }, [router]);
 
-  // Suppress iPad / Android text selection globally on document
+  // Suppress iPad Safari text selection globally on selectionchange
   useEffect(() => {
     const preventSelection = () => {
       if (typeof window !== "undefined" && window.getSelection) {
@@ -134,48 +134,31 @@ function CanvasPageContent() {
     };
 
     document.addEventListener("selectionchange", preventSelection);
-    document.addEventListener("selectstart", (e) => e.preventDefault());
-    return () => {
-      document.removeEventListener("selectionchange", preventSelection);
-      document.removeEventListener("selectstart", (e) => e.preventDefault());
-    };
+    return () => document.removeEventListener("selectionchange", preventSelection);
   }, []);
 
-  // Intercept ALL canvas pointer & touch events to block browser text selection completely (Google Keep style)
+  // Attach non-passive touch listeners to canvas to prevent iOS Safari drag-select
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const blockBrowserDefault = (e: Event) => {
-      if (e.cancelable) {
-        e.preventDefault();
-      }
+    const preventTouchSelect = (e: TouchEvent | PointerEvent) => {
       if (typeof window !== "undefined" && window.getSelection) {
         const sel = window.getSelection();
         if (sel) sel.removeAllRanges();
       }
     };
 
-    const events = [
-      "touchstart",
-      "touchmove",
-      "touchend",
-      "pointerdown",
-      "pointermove",
-      "pointerup",
-      "contextmenu",
-      "selectstart",
-      "dragstart",
-    ];
-
-    events.forEach((evt) => {
-      canvas.addEventListener(evt, blockBrowserDefault, { passive: false });
-    });
+    canvas.addEventListener("touchstart", preventTouchSelect, { passive: false });
+    canvas.addEventListener("touchmove", preventTouchSelect, { passive: false });
+    canvas.addEventListener("pointerdown", preventTouchSelect, { passive: false });
+    canvas.addEventListener("pointermove", preventTouchSelect, { passive: false });
 
     return () => {
-      events.forEach((evt) => {
-        canvas.removeEventListener(evt, blockBrowserDefault);
-      });
+      canvas.removeEventListener("touchstart", preventTouchSelect);
+      canvas.removeEventListener("touchmove", preventTouchSelect);
+      canvas.removeEventListener("pointerdown", preventTouchSelect);
+      canvas.removeEventListener("pointermove", preventTouchSelect);
     };
   }, []);
 
@@ -404,17 +387,26 @@ function CanvasPageContent() {
     };
   };
 
-  // Pointer Down (Drawing Handler - Continuous pen stroke creation for every letter)
-  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    suppressTextSelection();
+  // Check if pointer input is S-Pen / Stylus or Desktop Mouse (Finger touches return false)
+  const isPenOrStylusInput = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType === "pen") return true;
+    if (e.pointerType === "mouse") return true; // Allows mouse drawing on desktop
+    return false;
+  };
 
+  // Pointer Down (Drawing Handler - Only S-Pen / Pen / Mouse)
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    suppressTextSelection();
+    // If it's a finger touch, DO NOT WRITE/DRAW! Hand touches handle Pan & Zoom.
+    if (!isPenOrStylusInput(e)) return;
+
+    e.preventDefault();
     const pt = getCanvasPoint(e);
     if (!pt) return;
 
     setIsDrawing(true);
     const newLine: DrawingLine = {
-      id: `${Date.now()}_${Math.random()}`,
+      id: String(Date.now()),
       points: [pt],
       color: currentColor,
       width: isErasing ? strokeWidth * 6 : strokeWidth,
@@ -424,10 +416,11 @@ function CanvasPageContent() {
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    suppressTextSelection();
     if (!isDrawing || !currentLine) return;
+    if (!isPenOrStylusInput(e)) return;
 
+    suppressTextSelection();
+    e.preventDefault();
     const pt = getCanvasPoint(e);
     if (!pt) return;
 
@@ -441,10 +434,9 @@ function CanvasPageContent() {
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    suppressTextSelection();
     if (!isDrawing) return;
-
+    suppressTextSelection();
+    e.preventDefault();
     setIsDrawing(false);
     if (currentLine && currentLine.points.length > 0) {
       const updated = [...lines, currentLine];
@@ -457,7 +449,7 @@ function CanvasPageContent() {
   // ─── Touch Gestures: 1 Finger Pan & 2 Finger Pinch Zoom ───
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     suppressTextSelection();
-    // If drawing inside canvas, don't pan workspace
+    // If drawing with S-Pen, don't pan
     if (isDrawing) return;
 
     if (e.touches.length === 1) {
@@ -679,9 +671,7 @@ function CanvasPageContent() {
 
       {/* HEADER BAR (Collapsible for Max Drawing Space) */}
       {isHeaderVisible && (
-        <header
-          className="h-12 bg-white border-b border-[#E2E8F0] px-4 flex items-center justify-between shrink-0 z-20 transition-all select-none canvas-no-select"
-        >
+        <header className="h-12 bg-white border-b border-[#E2E8F0] px-4 flex items-center justify-between shrink-0 z-20 transition-all select-none canvas-no-select">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/")}
@@ -693,8 +683,8 @@ function CanvasPageContent() {
               </svg>
             </button>
             {currentRxPatient ? (
-              <div className="text-left leading-tight select-none">
-                <div className="flex items-center gap-2 select-none">
+              <div className="text-left leading-tight">
+                <div className="flex items-center gap-2">
                   <span className="text-[12px] font-bold text-slate-900 select-none">{currentRxPatient.name}</span>
                   <span className="text-[11px] font-medium text-[#718096] select-none">
                     {currentRxPatient.age}y | {currentRxPatient.gender}
@@ -758,9 +748,7 @@ function CanvasPageContent() {
       )}
 
       {/* CANVAS TOOLBAR */}
-      <div
-        className="bg-white border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-sm z-10 select-none canvas-no-select"
-      >
+      <div className="bg-white border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-sm z-10 select-none canvas-no-select">
         {/* Colors & Pen/Eraser Tools */}
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">Color:</span>
