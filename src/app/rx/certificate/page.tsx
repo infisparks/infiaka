@@ -641,6 +641,12 @@ function CertificatePageContent() {
             Pad
           </button>
           <button 
+            onClick={() => router.push(`/rx/canvas?rx=${rxPatientId}`)}
+            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+          >
+            Canvas
+          </button>
+          <button 
             onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
             className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
           >

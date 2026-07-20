@@ -53,6 +53,47 @@ function DocumentsPageContent() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentRxPatient, setCurrentRxPatient] = useState<Patient | null>(null);
+  const [pastVisitsCount, setPastVisitsCount] = useState<number>(0);
+  const [legacyVisitsCount, setLegacyVisitsCount] = useState<number>(0);
+
+  const fetchHeaderCounts = async (patientUhid: string, currentRegId: string | number, name: string, phone: any) => {
+    if (!patientUhid) return;
+    try {
+      const { count: pastCount, error: pastErr } = await supabase
+        .from("aka_opd_registration")
+        .select("*", { count: "exact", head: true })
+        .eq("patient_uhid", patientUhid)
+        .neq("registration_id", Number(currentRegId))
+        .or("is_deleted.is.null,is_deleted.eq.false");
+
+      if (!pastErr && pastCount !== null) {
+        setPastVisitsCount(pastCount);
+      }
+
+      if (name || phone) {
+        const cleanPhone = String(phone || "").replace(/\D/g, "");
+        let query = supabase.from("legacy_patients").select("*", { count: "exact", head: true });
+        
+        let orClause = "";
+        if (name) orClause += `name.ilike.*${name.trim()}*`;
+        if (cleanPhone) {
+          if (orClause) orClause += ",";
+          orClause += `phone.ilike.*${cleanPhone}*`;
+        }
+        
+        if (orClause) {
+          query = query.or(orClause);
+        }
+        
+        const { count: legacyCount, error: legacyErr } = await query;
+        if (!legacyErr && legacyCount !== null) {
+          setLegacyVisitsCount(legacyCount);
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching header counts:", e);
+    }
+  };
 
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [docsLoading, setDocsLoading] = useState(false);
@@ -177,6 +218,7 @@ function DocumentsPageContent() {
         };
 
         setCurrentRxPatient(mappedPatient);
+        fetchHeaderCounts(uhid, rxPatientId, pData?.name || "", pData?.number || "");
       } catch (err) {
         console.error("Error loading patient details:", err);
         showToast("Error loading patient details.", "error");
@@ -420,23 +462,35 @@ function DocumentsPageContent() {
             onClick={() => router.push(`/rx/overview?rx=${rxPatientId}`)}
             className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
           >
-            Overview
+            Overview {pastVisitsCount > 0 ? `(${pastVisitsCount})` : `(0)`}
           </button>
           {userRole !== "staff" && (
-            <>
-              <button
-                onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
-                className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
-              >
-                Pad
-              </button>
-              <button 
-                onClick={() => router.push(`/rx/certificate?rx=${rxPatientId}`)}
-                className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
-              >
-                Medical Certificate
-              </button>
-            </>
+            <button
+              onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
+              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            >
+              Pad
+            </button>
+          )}
+          <button 
+            onClick={() => router.push(`/rx/canvas?rx=${rxPatientId}`)}
+            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+          >
+            Canvas
+          </button>
+          <button 
+            onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
+            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+          >
+            EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
+          </button>
+          {userRole !== "staff" && (
+            <button 
+              onClick={() => router.push(`/rx/certificate?rx=${rxPatientId}`)}
+              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            >
+              Medical Certificate
+            </button>
           )}
           <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">
             Documents

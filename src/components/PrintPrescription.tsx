@@ -685,13 +685,13 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
             drawInlineSection("DIAGNOSIS", diagItems);
         }
 
-        // 6. SURGERY PERFORMED
+        // 6. SURGERY
         if (surgeryPerformed) {
             const surgDetails = [];
-            surgDetails.push({ main: `Surgery Name: ${surgeryPerformed}`, sub: '' });
+            surgDetails.push({ main: `Surgery Performed: ${surgeryPerformed}`, sub: '' });
             if (surgeryDate) surgDetails.push({ main: `Date of Surgery: ${surgeryDate}`, sub: '' });
             if (surgeryNotes) surgDetails.push({ main: `Surgery Notes: ${surgeryNotes}`, sub: '' });
-            drawInlineSection("SURGERY PERFORMED", surgDetails);
+            drawInlineSection("SURGERY", surgDetails);
         }
 
         // --- PRESCRIPTION TITLE ---
@@ -1199,14 +1199,14 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         </div>
       )}
 
-      {/* ─── 7. SURGERY PERFORMED ─── */}
+      {/* ─── 7. SURGERY ─── */}
       {surgeryPerformed && (
         <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg bg-slate-50/50 avoid-break">
           <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1.5">
-            Surgery Performed
+            Surgery
           </div>
           <div className="text-[11px] font-semibold text-slate-700 space-y-1">
-            <div><span className="text-slate-400 font-medium">Surgery Name:</span> {surgeryPerformed}</div>
+            <div><span className="text-slate-400 font-medium">Surgery Performed:</span> {surgeryPerformed}</div>
             {surgeryDate && <div><span className="text-slate-400 font-medium">Date of Surgery:</span> {surgeryDate}</div>}
             {surgeryNotes && <div><span className="text-slate-400 font-medium">Surgery Notes:</span> {surgeryNotes}</div>}
           </div>

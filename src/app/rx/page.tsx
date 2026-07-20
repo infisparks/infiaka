@@ -2186,6 +2186,12 @@ function RxPageContent() {
           </button>
           <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">Pad</button>
           <button 
+            onClick={() => router.push(`/rx/canvas?rx=${rxPatientId}`)}
+            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+          >
+            Canvas
+          </button>
+          <button 
             onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
             className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
           >
@@ -2975,14 +2981,14 @@ function RxPageContent() {
                     </div>
                   )}
 
-                  {/* 7. Surgery Performed */}
+                  {/* 7. Surgery */}
                   {surgeryPerformed && (
                     <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-slate-50/50">
                       <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-1.5 mb-1">
-                        Surgery Performed
+                        Surgery
                       </div>
                       <div className="text-[11px] font-semibold text-slate-700 space-y-1">
-                        <div><span className="text-slate-400 font-medium">Surgery Name:</span> {surgeryPerformed}</div>
+                        <div><span className="text-slate-400 font-medium">Surgery Performed:</span> {surgeryPerformed}</div>
                         {surgeryDate && <div><span className="text-slate-400 font-medium">Date of Surgery:</span> {surgeryDate}</div>}
                         {surgeryNotes && <div><span className="text-slate-400 font-medium">Surgery Notes:</span> {surgeryNotes}</div>}
                       </div>

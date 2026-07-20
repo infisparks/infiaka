@@ -252,14 +252,22 @@ export default function SurgeryPerformedCard({
   };
 
   return (
-    <section className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-4 shadow-sm w-full">
-      <span className="text-[10px] font-bold text-[#4A5568] uppercase flex items-center gap-1.5 select-none border-b pb-1.5">
-        Surgery Performed
-      </span>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Input 1: Surgery Performed */}
-        <div className="space-y-1 relative" ref={nameContainerRef}>
-          <label className="text-[9px] font-bold text-[#718096] uppercase select-none">Surgery Name</label>
+    <section className="bg-white border border-slate-200 rounded-xl p-4 md:p-5 space-y-4 shadow-sm w-full transition-all">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+        <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5 select-none">
+          <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 0L5 5m4.121 4.121L5 19" />
+          </svg>
+          Surgery
+        </span>
+      </div>
+
+      <div className="space-y-4">
+        {/* Row 1: Full width - Surgery Performed */}
+        <div className="w-full relative" ref={nameContainerRef}>
+          <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1 select-none">
+            Surgery Performed
+          </label>
           <input
             type="text"
             value={surgeryPerformed}
@@ -273,13 +281,13 @@ export default function SurgeryPerformedCard({
               setNameDDIndex(-1);
             }}
             onKeyDown={handleNameKeyDown}
-            placeholder="Enter surgery name..."
-            className="w-full p-2 border border-[#CBD5E0] rounded-md text-[11px] focus:outline-none"
+            placeholder="Enter surgery performed (e.g., Appendectomy, Knee Replacement)..."
+            className="w-full px-3 py-2 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
           />
 
-          {/* Autocomplete Dropdown list for Surgery Name */}
+          {/* Autocomplete Dropdown list for Surgery Performed */}
           {surgeryNameFocused && nameSuggestions.length > 0 && (
-            <div className="absolute left-0 top-full mt-1 z-50 w-full bg-white border border-[#E2E8F0] rounded-md shadow-lg max-h-48 overflow-y-auto p-1 space-y-0.5">
+            <div className="absolute left-0 top-full mt-1 z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto p-1 space-y-0.5">
               {nameSuggestions.map((opt, idx) => {
                 const isCreate = opt.startsWith('+ Create "');
                 let displayVal = opt;
@@ -293,11 +301,11 @@ export default function SurgeryPerformedCard({
                     key={opt}
                     onMouseDown={() => handleNameSuggestionSelect(opt)}
                     onMouseEnter={() => setNameDDIndex(idx)}
-                    className={`p-2 text-[11px] rounded cursor-pointer text-left transition-colors font-semibold
-                      ${isHighlighted ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-[#2D3748]"}`}
+                    className={`px-3 py-2 text-xs rounded-md cursor-pointer text-left transition-colors font-medium
+                      ${isHighlighted ? "bg-indigo-50 text-indigo-700 font-semibold" : "hover:bg-slate-50 text-slate-700"}`}
                   >
                     {isCreate ? (
-                      <span className="text-primary font-bold">
+                      <span className="text-indigo-600 font-bold">
                         + Create <span className="italic font-semibold">"{displayVal}"</span>
                       </span>
                     ) : (
@@ -310,98 +318,105 @@ export default function SurgeryPerformedCard({
           )}
         </div>
 
-        {/* Input 2: Date of Surgery */}
-        <div className="space-y-1 relative" ref={dateContainerRef}>
-          <label className="text-[9px] font-bold text-[#718096] uppercase select-none">Date of Surgery</label>
-          <div className="relative flex items-center">
-            <input
-              type="text"
-              value={surgeryDate}
-              onChange={(e) => {
-                setSurgeryDate(e.target.value);
-                setDateFocused(true);
-                setDateDDIndex(-1);
-              }}
-              onFocus={() => {
-                setDateFocused(true);
-                setDateDDIndex(-1);
-              }}
-              onKeyDown={handleDateKeyDown}
-              placeholder="e.g., 23 July 2026 or type '2 days'"
-              className="w-full p-2 pr-8 border border-[#CBD5E0] rounded-md text-[11px] focus:outline-none"
-            />
-            {/* Calendar trigger button */}
-            <button
-              type="button"
-              onClick={() => {
-                if (dateInputRef.current) {
-                  if (dateInputRef.current.showPicker) {
-                    dateInputRef.current.showPicker();
-                  } else {
-                    dateInputRef.current.click();
+        {/* Row 2: Date of Surgery (less width ~1/3) and Surgery Notes (more width ~2/3) */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          {/* Input 2: Date of Surgery (md:col-span-4) */}
+          <div className="md:col-span-4 relative" ref={dateContainerRef}>
+            <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1 select-none">
+              Date of Surgery
+            </label>
+            <div className="relative flex items-center">
+              <input
+                type="text"
+                value={surgeryDate}
+                onChange={(e) => {
+                  setSurgeryDate(e.target.value);
+                  setDateFocused(true);
+                  setDateDDIndex(-1);
+                }}
+                onFocus={() => {
+                  setDateFocused(true);
+                  setDateDDIndex(-1);
+                }}
+                onKeyDown={handleDateKeyDown}
+                placeholder="e.g., 23 July 2026 or '2 days ago'"
+                className="w-full px-3 py-2 pr-9 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+              />
+              {/* Calendar trigger button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (dateInputRef.current) {
+                    if (dateInputRef.current.showPicker) {
+                      dateInputRef.current.showPicker();
+                    } else {
+                      dateInputRef.current.click();
+                    }
                   }
-                }
-              }}
-              className="absolute right-2.5 text-gray-400 hover:text-[#4A5568] focus:outline-none"
-              title="Open calendar picker"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="w-4 h-4"
+                }}
+                className="absolute right-2.5 text-slate-400 hover:text-indigo-600 focus:outline-none transition-colors"
+                title="Open calendar picker"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"
-                />
-              </svg>
-            </button>
-            {/* Hidden native Date picker input */}
-            <input
-              type="date"
-              ref={dateInputRef}
-              onChange={(e) => handleDatePickerChange(e.target.value)}
-              className="absolute opacity-0 pointer-events-none w-0 h-0 right-0"
-            />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.75}
+                  stroke="currentColor"
+                  className="w-4 h-4"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"
+                  />
+                </svg>
+              </button>
+              {/* Hidden native Date picker input */}
+              <input
+                type="date"
+                ref={dateInputRef}
+                onChange={(e) => handleDatePickerChange(e.target.value)}
+                className="absolute opacity-0 pointer-events-none w-0 h-0 right-0"
+              />
+            </div>
+
+            {/* Autocomplete Dropdown list for Date of Surgery */}
+            {dateFocused && dateSuggestions.length > 0 && (
+              <div className="absolute left-0 top-full mt-1 z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto p-1 space-y-0.5">
+                {dateSuggestions.map((opt, idx) => {
+                  const isHighlighted = idx === dateDDIndex;
+                  const dateVal = calculateRelativeDate(opt.replace(/\s*ago$/i, ""));
+                  return (
+                    <div
+                      key={opt}
+                      onMouseDown={() => handleDateSuggestionSelect(opt)}
+                      onMouseEnter={() => setDateDDIndex(idx)}
+                      className={`px-3 py-2 text-xs rounded-md cursor-pointer text-left transition-colors flex justify-between items-center
+                        ${isHighlighted ? "bg-indigo-50 text-indigo-700 font-semibold" : "hover:bg-slate-50 text-slate-700"}`}
+                    >
+                      <span className="font-medium">{opt}</span>
+                      <span className="text-[10px] text-slate-400 font-normal">({dateVal})</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {/* Autocomplete Dropdown list for Date of Surgery */}
-          {dateFocused && dateSuggestions.length > 0 && (
-            <div className="absolute left-0 top-full mt-1 z-50 w-full bg-white border border-[#E2E8F0] rounded-md shadow-lg max-h-48 overflow-y-auto p-1 space-y-0.5">
-              {dateSuggestions.map((opt, idx) => {
-                const isHighlighted = idx === dateDDIndex;
-                const dateVal = calculateRelativeDate(opt.replace(/\s*ago$/i, ""));
-                return (
-                  <div
-                    key={opt}
-                    onMouseDown={() => handleDateSuggestionSelect(opt)}
-                    onMouseEnter={() => setDateDDIndex(idx)}
-                    className={`p-2 text-[11px] rounded cursor-pointer text-left transition-colors flex justify-between items-center
-                      ${isHighlighted ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-[#2D3748]"}`}
-                  >
-                    <span className="font-semibold">{opt}</span>
-                    <span className="text-[10px] text-gray-400 font-normal">({dateVal})</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Input 3: Surgery Notes */}
-        <div className="space-y-1">
-          <label className="text-[9px] font-bold text-[#718096] uppercase select-none">Surgery Notes</label>
-          <input
-            type="text"
-            value={surgeryNotes}
-            onChange={(e) => setSurgeryNotes(e.target.value)}
-            placeholder="Enter complications or surgery notes..."
-            className="w-full p-2 border border-[#CBD5E0] rounded-md text-[11px] focus:outline-none"
-          />
+          {/* Input 3: Surgery Notes (md:col-span-8) */}
+          <div className="md:col-span-8">
+            <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1 select-none">
+              Surgery Notes
+            </label>
+            <input
+              type="text"
+              value={surgeryNotes}
+              onChange={(e) => setSurgeryNotes(e.target.value)}
+              placeholder="Enter complications or surgery notes..."
+              className="w-full px-3 py-2 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+            />
+          </div>
         </div>
       </div>
     </section>

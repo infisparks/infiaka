@@ -1049,6 +1049,12 @@ function OverviewContent() {
             Pad
           </button>
           <button 
+            onClick={() => router.push(`/rx/canvas?rx=${rxPatientId}`)}
+            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+          >
+            Canvas
+          </button>
+          <button 
             onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
             className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
           >
@@ -1342,7 +1348,7 @@ function OverviewContent() {
                             Sp
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Surgery Performed</div>
+                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Surgery</div>
                             <div className="text-[11.5px] font-bold text-slate-800 leading-tight select-text">
                               {reg.surgery_performed}
                               {reg.surgery_date && <span className="block text-[10px] text-slate-500 font-semibold mt-0.5">Date: {reg.surgery_date}</span>}

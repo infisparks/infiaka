@@ -340,6 +340,12 @@ function EkaCarePageContent() {
           >
             Pad
           </button>
+          <button 
+            onClick={() => router.push(`/rx/canvas?rx=${rxPatientId}`)}
+            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+          >
+            Canvas
+          </button>
           <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">
             EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
           </button>
