@@ -404,16 +404,16 @@ export default function SurgeryPerformedCard({
             )}
           </div>
 
-          {/* Input 3: Surgery Notes (md:col-span-8) */}
+          {/* Input 3: Post Operative Periods (md:col-span-8) */}
           <div className="md:col-span-8">
             <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1 select-none">
-              Surgery Notes
+              Post Operative Periods
             </label>
             <input
               type="text"
               value={surgeryNotes}
               onChange={(e) => setSurgeryNotes(e.target.value)}
-              placeholder="Enter complications or surgery notes..."
+              placeholder="Enter post operative periods..."
               className="w-full px-3 py-2 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
             />
           </div>

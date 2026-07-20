@@ -690,7 +690,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
             const surgDetails = [];
             surgDetails.push({ main: `Surgery Performed: ${surgeryPerformed}`, sub: '' });
             if (surgeryDate) surgDetails.push({ main: `Date of Surgery: ${surgeryDate}`, sub: '' });
-            if (surgeryNotes) surgDetails.push({ main: `Surgery Notes: ${surgeryNotes}`, sub: '' });
+            if (surgeryNotes) surgDetails.push({ main: `Post Operative Periods: ${surgeryNotes}`, sub: '' });
             drawInlineSection("SURGERY", surgDetails);
         }
 
@@ -1208,7 +1208,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
           <div className="text-[11px] font-semibold text-slate-700 space-y-1">
             <div><span className="text-slate-400 font-medium">Surgery Performed:</span> {surgeryPerformed}</div>
             {surgeryDate && <div><span className="text-slate-400 font-medium">Date of Surgery:</span> {surgeryDate}</div>}
-            {surgeryNotes && <div><span className="text-slate-400 font-medium">Surgery Notes:</span> {surgeryNotes}</div>}
+            {surgeryNotes && <div><span className="text-slate-400 font-medium">Post Operative Periods:</span> {surgeryNotes}</div>}
           </div>
         </div>
       )}
