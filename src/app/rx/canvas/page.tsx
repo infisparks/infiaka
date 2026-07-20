@@ -351,7 +351,7 @@ function CanvasPageContent() {
     loadData();
   }, [sessionLoaded, rxPatientId]);
 
-  // Synchronous Full Canvas Redraw Function (Instant rendering from linesRef)
+  // Synchronous Full Canvas Redraw Function with Bezier Curve Smoothing
   const renderCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -387,10 +387,17 @@ function CanvasPageContent() {
 
       if (line.points.length === 1) {
         ctx.lineTo(line.points[0].x + 0.1, line.points[0].y + 0.1);
+      } else if (line.points.length === 2) {
+        ctx.lineTo(line.points[1].x, line.points[1].y);
       } else {
-        for (let i = 1; i < line.points.length; i++) {
-          ctx.lineTo(line.points[i].x, line.points[i].y);
+        // Quadratic Bezier Curve Smoothing for Fluid S-Pen Calligraphy
+        let i = 1;
+        for (i = 1; i < line.points.length - 1; i++) {
+          const xc = (line.points[i].x + line.points[i + 1].x) / 2;
+          const yc = (line.points[i].y + line.points[i + 1].y) / 2;
+          ctx.quadraticCurveTo(line.points[i].x, line.points[i].y, xc, yc);
         }
+        ctx.lineTo(line.points[i].x, line.points[i].y);
       }
 
       ctx.stroke();
@@ -512,10 +519,18 @@ function CanvasPageContent() {
             ctx.strokeStyle = line.color && line.color !== "" ? line.color : "#000000";
           }
 
-          const p1 = line.points[len - 2];
-          const p2 = line.points[len - 1];
-          ctx.moveTo(p1.x, p1.y);
-          ctx.lineTo(p2.x, p2.y);
+          if (len === 2) {
+            ctx.moveTo(line.points[0].x, line.points[0].y);
+            ctx.lineTo(line.points[1].x, line.points[1].y);
+          } else {
+            const p1 = line.points[len - 2];
+            const p2 = line.points[len - 1];
+            const midX = (p1.x + p2.x) / 2;
+            const midY = (p1.y + p2.y) / 2;
+            ctx.moveTo(p1.x, p1.y);
+            ctx.quadraticCurveTo(p1.x, p1.y, midX, midY);
+          }
+
           ctx.stroke();
           ctx.restore();
         }
