@@ -124,25 +124,34 @@ function CanvasPageContent() {
     });
   }, [router]);
 
-  // Suppress iPad Safari text selection globally on selectionchange
+  // Completely block all text selection and drag selection gestures globally
   useEffect(() => {
-    const preventSelection = () => {
+    const killSelection = (e: Event) => {
+      e.preventDefault();
       if (typeof window !== "undefined" && window.getSelection) {
         const sel = window.getSelection();
         if (sel) sel.removeAllRanges();
       }
     };
 
-    document.addEventListener("selectionchange", preventSelection);
-    return () => document.removeEventListener("selectionchange", preventSelection);
+    document.addEventListener("selectstart", killSelection, { capture: true });
+    document.addEventListener("selectionchange", killSelection, { capture: true });
+    document.addEventListener("dragstart", killSelection, { capture: true });
+
+    return () => {
+      document.removeEventListener("selectstart", killSelection, { capture: true });
+      document.removeEventListener("selectionchange", killSelection, { capture: true });
+      document.removeEventListener("dragstart", killSelection, { capture: true });
+    };
   }, []);
 
-  // Attach non-passive touch listeners to canvas to prevent iOS Safari drag-select
+  // Attach non-passive touch listeners to canvas to prevent browser text selection
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const preventTouchSelect = (e: TouchEvent | PointerEvent) => {
+      e.preventDefault();
       if (typeof window !== "undefined" && window.getSelection) {
         const sel = window.getSelection();
         if (sel) sel.removeAllRanges();
@@ -396,11 +405,18 @@ function CanvasPageContent() {
 
   // Pointer Down (Drawing Handler - Only S-Pen / Pen / Mouse)
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // ALWAYS prevent default & stop propagation FIRST to kill browser text selection!
+    e.preventDefault();
+    e.stopPropagation();
     suppressTextSelection();
-    // If it's a finger touch, DO NOT WRITE/DRAW! Hand touches handle Pan & Zoom.
+
+    // If it's a finger touch, DO NOT WRITE! Hand touches handle Pan & Zoom.
     if (!isPenOrStylusInput(e)) return;
 
-    e.preventDefault();
+    try {
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    } catch (err) {}
+
     const pt = getCanvasPoint(e);
     if (!pt) return;
 
@@ -416,11 +432,14 @@ function CanvasPageContent() {
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // ALWAYS prevent default & stop propagation FIRST!
+    e.preventDefault();
+    e.stopPropagation();
+    suppressTextSelection();
+
     if (!isDrawing || !currentLine) return;
     if (!isPenOrStylusInput(e)) return;
 
-    suppressTextSelection();
-    e.preventDefault();
     const pt = getCanvasPoint(e);
     if (!pt) return;
 
@@ -434,9 +453,17 @@ function CanvasPageContent() {
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
-    suppressTextSelection();
     e.preventDefault();
+    e.stopPropagation();
+    suppressTextSelection();
+
+    try {
+      if ((e.target as HTMLElement).hasPointerCapture(e.pointerId)) {
+        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      }
+    } catch (err) {}
+
+    if (!isDrawing) return;
     setIsDrawing(false);
     if (currentLine && currentLine.points.length > 0) {
       const updated = [...lines, currentLine];
