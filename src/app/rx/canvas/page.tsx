@@ -87,6 +87,10 @@ function CanvasPageContent() {
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState<boolean>(false);
 
+  // Full Screen & Header Visibility
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isHeaderVisible, setIsHeaderVisible] = useState<boolean>(true);
+
   // Modals & Notifications
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -118,6 +122,19 @@ function CanvasPageContent() {
       }
     });
   }, [router]);
+
+  // Listen for native fullscreen change events
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        setIsFullscreen(false);
+      } else {
+        setIsFullscreen(true);
+      }
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
 
   // Fetch header counts
   const fetchHeaderCounts = async (patientUhid: string, currentRegId: string | number, name: string, phone: any) => {
@@ -295,6 +312,14 @@ function CanvasPageContent() {
     renderCanvas();
   }, [lines, currentLine]);
 
+  // Clear accidental browser text highlights (Palm Rejection)
+  const suppressTextSelection = () => {
+    if (typeof window !== "undefined" && window.getSelection) {
+      const sel = window.getSelection();
+      if (sel) sel.removeAllRanges();
+    }
+  };
+
   // Transform Screen Point to Fixed Canvas Resolution (1000 x 1414)
   const getCanvasPoint = (e: React.PointerEvent<HTMLCanvasElement> | any): Point | null => {
     const canvas = canvasRef.current;
@@ -332,6 +357,7 @@ function CanvasPageContent() {
 
   // Pointer Down (Drawing Handler - Only S-Pen / Pen / Mouse)
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    suppressTextSelection();
     // If it's a finger touch, DO NOT WRITE/DRAW! Hand touches handle Pan & Zoom.
     if (!isPenOrStylusInput(e)) return;
 
@@ -354,6 +380,7 @@ function CanvasPageContent() {
     if (!isDrawing || !currentLine) return;
     if (!isPenOrStylusInput(e)) return;
 
+    suppressTextSelection();
     e.preventDefault();
     const pt = getCanvasPoint(e);
     if (!pt) return;
@@ -369,6 +396,7 @@ function CanvasPageContent() {
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
+    suppressTextSelection();
     e.preventDefault();
     setIsDrawing(false);
     if (currentLine && currentLine.points.length > 0) {
@@ -381,6 +409,7 @@ function CanvasPageContent() {
 
   // ─── Touch Gestures: 1 Finger Pan & 2 Finger Pinch Zoom ───
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    suppressTextSelection();
     // If drawing with S-Pen, don't pan
     if (isDrawing) return;
 
@@ -404,6 +433,7 @@ function CanvasPageContent() {
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    suppressTextSelection();
     if (isDrawing) return;
 
     if (e.touches.length === 1 && isPanning) {
@@ -427,6 +457,7 @@ function CanvasPageContent() {
   };
 
   const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    suppressTextSelection();
     if (e.touches.length < 2) {
       pinchStartDistRef.current = null;
     }
@@ -448,6 +479,30 @@ function CanvasPageContent() {
     setZoomScale(1.0);
     setPanOffset({ x: 0, y: 0 });
     showToast("Paper view reset to 100%", "info");
+  };
+
+  // Toggle Fullscreen & Collapsible Header Mode
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().then(() => {
+          setIsFullscreen(true);
+          setIsHeaderVisible(false); // Hide header to maximize drawing area
+          showToast("Full Screen Mode Enabled (Header Collapsed)", "info");
+        }).catch(() => {
+          setIsHeaderVisible(!isHeaderVisible);
+          showToast(isHeaderVisible ? "Header Collapsed for Max Space" : "Header Shown", "info");
+        });
+      } else {
+        setIsHeaderVisible(!isHeaderVisible);
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+      setIsFullscreen(false);
+      setIsHeaderVisible(true);
+    }
   };
 
   // Actions
@@ -535,7 +590,15 @@ function CanvasPageContent() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-slate-100 overflow-hidden font-sans select-none">
+    <div
+      onContextMenu={(e) => e.preventDefault()}
+      className="flex flex-col h-screen w-screen bg-slate-100 overflow-hidden font-sans select-none"
+      style={{
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
+      }}
+    >
       {/* Toast Notification */}
       {toast && (
         <div
@@ -551,84 +614,100 @@ function CanvasPageContent() {
         </div>
       )}
 
-      {/* HEADER BAR (Identical Header across all pages) */}
-      <header className="h-12 bg-white border-b border-[#E2E8F0] px-4 flex items-center justify-between shrink-0 z-20">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/")}
-            className="p-1 hover:bg-slate-100 rounded text-slate-600 transition-colors"
-            title="Back to Patients List"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-          </button>
-          {currentRxPatient ? (
-            <div className="text-left leading-tight">
-              <div className="flex items-center gap-2">
-                <span className="text-[12px] font-bold text-slate-900 select-text">{currentRxPatient.name}</span>
-                <span className="text-[11px] font-medium text-[#718096]">
-                  {currentRxPatient.age}y | {currentRxPatient.gender}
+      {/* Floating Restore Header Button (When Header is Collapsed) */}
+      {!isHeaderVisible && (
+        <button
+          onClick={() => setIsHeaderVisible(true)}
+          className="fixed top-3 right-4 z-40 px-3 py-1.5 bg-slate-900/85 hover:bg-slate-900 text-white rounded-full text-xs font-bold shadow-xl backdrop-blur-md flex items-center gap-1.5 transition-all"
+          title="Show Navigation Header"
+        >
+          <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+          Show Header
+        </button>
+      )}
+
+      {/* HEADER BAR (Collapsible for Max Drawing Space) */}
+      {isHeaderVisible && (
+        <header className="h-12 bg-white border-b border-[#E2E8F0] px-4 flex items-center justify-between shrink-0 z-20 transition-all">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push("/")}
+              className="p-1 hover:bg-slate-100 rounded text-slate-600 transition-colors"
+              title="Back to Patients List"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </button>
+            {currentRxPatient ? (
+              <div className="text-left leading-tight">
+                <div className="flex items-center gap-2">
+                  <span className="text-[12px] font-bold text-slate-900 select-none">{currentRxPatient.name}</span>
+                  <span className="text-[11px] font-medium text-[#718096] select-none">
+                    {currentRxPatient.age}y | {currentRxPatient.gender}
+                  </span>
+                </div>
+                <span className="text-[9px] text-[#A0AEC0] font-semibold tracking-tight select-none">
+                  {currentRxPatient.phone}
                 </span>
               </div>
-              <span className="text-[9px] text-[#A0AEC0] font-semibold tracking-tight select-text">
-                {currentRxPatient.phone}
-              </span>
-            </div>
-          ) : (
-            <span className="text-xs font-bold text-slate-700">Patient Canvas</span>
-          )}
-        </div>
+            ) : (
+              <span className="text-xs font-bold text-slate-700 select-none">Patient Canvas</span>
+            )}
+          </div>
 
-        {/* Navigation tab bar in the center */}
-        <div className="flex items-center h-full">
-          <button
-            onClick={() => router.push(`/rx/overview?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
-          >
-            Overview {pastVisitsCount > 0 ? `(${pastVisitsCount})` : `(0)`}
-          </button>
-          {userRole !== "staff" && (
+          {/* Navigation tab bar in the center */}
+          <div className="flex items-center h-full select-none">
             <button
-              onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
+              onClick={() => router.push(`/rx/overview?rx=${rxPatientId}`)}
               className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
             >
-              Pad
+              Overview {pastVisitsCount > 0 ? `(${pastVisitsCount})` : `(0)`}
             </button>
-          )}
-          <button className="h-full px-3 text-[11px] font-bold text-indigo-600 border-b-2 border-indigo-600">
-            Canvas
-          </button>
-          <button
-            onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
-          >
-            EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
-          </button>
-          <button
-            onClick={() => router.push(`/rx/certificate?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
-          >
-            Medical Certificate
-          </button>
-          <button
-            onClick={() => router.push(`/rx/documents?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
-          >
-            Documents
-          </button>
-        </div>
+            {userRole !== "staff" && (
+              <button
+                onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
+                className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+              >
+                Pad
+              </button>
+            )}
+            <button className="h-full px-3 text-[11px] font-bold text-indigo-600 border-b-2 border-indigo-600">
+              Canvas
+            </button>
+            <button
+              onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
+              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            >
+              EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
+            </button>
+            <button
+              onClick={() => router.push(`/rx/certificate?rx=${rxPatientId}`)}
+              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            >
+              Medical Certificate
+            </button>
+            <button
+              onClick={() => router.push(`/rx/documents?rx=${rxPatientId}`)}
+              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            >
+              Documents
+            </button>
+          </div>
 
-        {/* Right Header Controls */}
-        <div className="flex items-center gap-2">
-          <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-[10px] font-extrabold rounded-md flex items-center gap-1 border border-emerald-100">
-            🟢 Active Session
-          </span>
-        </div>
-      </header>
+          {/* Right Header Controls */}
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-[10px] font-extrabold rounded-md flex items-center gap-1 border border-emerald-100">
+              🟢 Active Session
+            </span>
+          </div>
+        </header>
+      )}
 
       {/* CANVAS TOOLBAR */}
-      <div className="bg-white border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-sm z-10">
+      <div className="bg-white border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-sm z-10 select-none">
         {/* Colors & Pen/Eraser Tools */}
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">Color:</span>
@@ -703,8 +782,28 @@ function CanvasPageContent() {
           ))}
         </div>
 
-        {/* Controls: Auto Fit / Reset, Undo, Clear, Save, Print */}
+        {/* Controls: Full Screen, Auto Fit, Undo, Clear, Save, Print */}
         <div className="flex items-center gap-2">
+          {/* FULL SCREEN & MAX SCREEN TOGGLE */}
+          <button
+            onClick={toggleFullScreen}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs ${
+              isFullscreen || !isHeaderVisible
+                ? "bg-indigo-600 text-white"
+                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+            }`}
+            title="Toggle Full Screen (Hides Browser Bar & Header for Maximum Screen Space)"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              {isFullscreen || !isHeaderVisible ? (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 9L4 4m0 0l5 0m-5 0l0 5m11 0l5-5m0 0l-5 0m5 0l0 5M9 15l-5 5m0 0l5 0m-5 0l0-5m11 0l5 5m0 0l-5 0m5 0l0-5" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              )}
+            </svg>
+            {isFullscreen || !isHeaderVisible ? "Exit Fullscreen" : "Full Screen"}
+          </button>
+
           {/* AUTO FIT / RESET VIEWPORT BUTTON */}
           <button
             onClick={handleResetView}
@@ -770,7 +869,13 @@ function CanvasPageContent() {
       {/* CANVAS WORKSPACE AREA (Interactive Pan & Pinch-Zoom Container) */}
       <main
         ref={workspaceRef}
+        onContextMenu={(e) => e.preventDefault()}
         className="flex-1 overflow-hidden p-4 flex justify-center items-center bg-[#E2E8F0] relative select-none touch-none"
+        style={{
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
+        }}
         onWheel={handleWheel}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -778,11 +883,13 @@ function CanvasPageContent() {
       >
         <div
           ref={containerRef}
-          className="relative bg-white shadow-2xl rounded-md border border-slate-300 overflow-hidden origin-center transition-transform duration-75"
+          className="relative bg-white shadow-2xl rounded-md border border-slate-300 overflow-hidden origin-center transition-transform duration-75 select-none"
           style={{
             width: "800px",
             height: "1131px",
             transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
+            userSelect: "none",
+            WebkitUserSelect: "none",
           }}
         >
           {/* Letterhead Background Template */}
@@ -790,6 +897,7 @@ function CanvasPageContent() {
             src="/letterhead.jpg"
             alt="Letterhead Template"
             className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none opacity-95"
+            draggable={false}
           />
 
           {/* HTML5 Canvas (Resolution 1000 x 1414) */}
@@ -801,7 +909,12 @@ function CanvasPageContent() {
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
-            className="w-full h-full cursor-crosshair touch-none relative z-10"
+            className="w-full h-full cursor-crosshair touch-none relative z-10 select-none"
+            style={{
+              userSelect: "none",
+              WebkitUserSelect: "none",
+              WebkitTouchCallout: "none",
+            }}
           />
         </div>
       </main>
