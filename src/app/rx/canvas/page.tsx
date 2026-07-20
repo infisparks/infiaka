@@ -51,7 +51,7 @@ export default function CanvasPage() {
         <div className="flex h-screen w-screen items-center justify-center bg-[#F5F6F8] font-sans select-none">
           <div className="text-center space-y-2">
             <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Loading Medical Canvas Engine...</p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Loading Canvas Workspace...</p>
           </div>
         </div>
       }
@@ -73,37 +73,14 @@ function CanvasPageContent() {
   const [pastVisitsCount, setPastVisitsCount] = useState<number>(0);
   const [legacyVisitsCount, setLegacyVisitsCount] = useState<number>(0);
 
-  // Drawing Tool States
+  // Drawing States
   const [lines, setLines] = useState<DrawingLine[]>([]);
   const [currentColor, setCurrentColor] = useState<string>("#000000");
   const [strokeWidth, setStrokeWidth] = useState<number>(4);
   const [isErasing, setIsErasing] = useState<boolean>(false);
+  const [isDrawing, setIsDrawing] = useState<boolean>(false);
+  const [currentLine, setCurrentLine] = useState<DrawingLine | null>(null);
   const [templateImageUrl, setTemplateImageUrl] = useState<string>("/letterhead.jpg");
-
-  // Synchronous Drawing Refs for 0ms Latency & High-Frequency S-Pen Tracking
-  const linesRef = useRef<DrawingLine[]>([]);
-  const activeLineRef = useRef<DrawingLine | null>(null);
-  const isDrawingRef = useRef<boolean>(false);
-
-  const currentColorRef = useRef<string>(currentColor);
-  const strokeWidthRef = useRef<number>(strokeWidth);
-  const isErasingRef = useRef<boolean>(isErasing);
-
-  useEffect(() => {
-    currentColorRef.current = currentColor;
-  }, [currentColor]);
-
-  useEffect(() => {
-    strokeWidthRef.current = strokeWidth;
-  }, [strokeWidth]);
-
-  useEffect(() => {
-    isErasingRef.current = isErasing;
-  }, [isErasing]);
-
-  useEffect(() => {
-    linesRef.current = lines;
-  }, [lines]);
 
   // Viewport Transform States (Pan & Pinch Zoom)
   const [zoomScale, setZoomScale] = useState<number>(1.0);
@@ -124,7 +101,7 @@ function CanvasPageContent() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
 
-  // Touch gesture refs for pan & pinch zoom
+  // Touch gesture refs
   const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const pinchStartDistRef = useRef<number | null>(null);
   const pinchStartScaleRef = useRef<number>(1.0);
@@ -147,17 +124,10 @@ function CanvasPageContent() {
     });
   }, [router]);
 
-  // Suppress accidental browser text selection
-  const suppressTextSelection = () => {
-    if (typeof window !== "undefined" && window.getSelection) {
-      const sel = window.getSelection();
-      if (sel) sel.removeAllRanges();
-    }
-  };
-
-  // Block browser text selection, context menus, and callouts
+  // Completely block all text selection and drag selection gestures globally
   useEffect(() => {
     const killSelection = (e: Event) => {
+      e.preventDefault();
       if (typeof window !== "undefined" && window.getSelection) {
         const sel = window.getSelection();
         if (sel) sel.removeAllRanges();
@@ -175,152 +145,31 @@ function CanvasPageContent() {
     };
   }, []);
 
-  // Synchronous Canvas Redraw Function with Quadratic Bezier Smoothing
-  const renderCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const allLines = activeLineRef.current
-      ? [...linesRef.current, activeLineRef.current]
-      : linesRef.current;
-
-    allLines.forEach((line) => {
-      if (!line.points || line.points.length < 1) return;
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.lineWidth = line.width || 4;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.globalAlpha = 1.0;
-
-      if (line.isErased) {
-        ctx.globalCompositeOperation = "destination-out";
-        ctx.strokeStyle = "rgba(0,0,0,1)";
-      } else {
-        ctx.globalCompositeOperation = "source-over";
-        const strokeColor = line.color && line.color !== "" ? line.color : "#000000";
-        ctx.strokeStyle = strokeColor;
-      }
-
-      ctx.moveTo(line.points[0].x, line.points[0].y);
-
-      if (line.points.length === 1) {
-        ctx.lineTo(line.points[0].x + 0.1, line.points[0].y + 0.1);
-      } else if (line.points.length === 2) {
-        ctx.lineTo(line.points[1].x, line.points[1].y);
-      } else {
-        // Quadratic Bezier Curve Smoothing
-        let i = 1;
-        for (i = 1; i < line.points.length - 1; i++) {
-          const xc = (line.points[i].x + line.points[i + 1].x) / 2;
-          const yc = (line.points[i].y + line.points[i + 1].y) / 2;
-          ctx.quadraticCurveTo(line.points[i].x, line.points[i].y, xc, yc);
-        }
-        ctx.lineTo(line.points[i].x, line.points[i].y);
-      }
-
-      ctx.stroke();
-      ctx.restore();
-    });
-  };
-
-  useEffect(() => {
-    renderCanvas();
-  }, [lines]);
-
-  // Attach Direct Native Pointer Listeners (Coalesced S-Pen Tracking)
+  // Attach non-passive touch listeners to canvas to prevent browser text selection
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const getCanvasPt = (clientX: number, clientY: number): Point => {
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      return {
-        x: (clientX - rect.left) * scaleX,
-        y: (clientY - rect.top) * scaleY,
-      };
-    };
-
-    const handlePointerDown = (e: PointerEvent) => {
-      if (e.cancelable) e.preventDefault();
-      e.stopPropagation();
-      suppressTextSelection();
-
-      try {
-        canvas.setPointerCapture(e.pointerId);
-      } catch (err) {}
-
-      isDrawingRef.current = true;
-      const pt = getCanvasPt(e.clientX, e.clientY);
-      activeLineRef.current = {
-        id: String(Date.now()) + "_" + Math.random().toString(36).substring(2, 6),
-        points: [pt],
-        color: isErasingRef.current ? "rgba(0,0,0,1)" : currentColorRef.current,
-        width: isErasingRef.current ? strokeWidthRef.current * 6 : strokeWidthRef.current,
-        isErased: isErasingRef.current,
-      };
-
-      renderCanvas();
-    };
-
-    const handlePointerMove = (e: PointerEvent) => {
-      if (!isDrawingRef.current || !activeLineRef.current) return;
-      if (e.cancelable) e.preventDefault();
-      e.stopPropagation();
-      suppressTextSelection();
-
-      // Coalesced Events API for 120Hz/240Hz High-Frequency S-Pen / Apple Pencil hardware tracking
-      const events = (e as any).getCoalescedEvents ? (e as any).getCoalescedEvents() : [e];
-      for (const ev of events) {
-        const pt = getCanvasPt(ev.clientX, ev.clientY);
-        activeLineRef.current.points.push(pt);
+    const preventTouchSelect = (e: TouchEvent | PointerEvent) => {
+      e.preventDefault();
+      if (typeof window !== "undefined" && window.getSelection) {
+        const sel = window.getSelection();
+        if (sel) sel.removeAllRanges();
       }
-
-      renderCanvas();
     };
 
-    const handlePointerUp = (e: PointerEvent) => {
-      if (!isDrawingRef.current) return;
-      if (e.cancelable) e.preventDefault();
-      e.stopPropagation();
-      suppressTextSelection();
-
-      try {
-        if (canvas.hasPointerCapture(e.pointerId)) {
-          canvas.releasePointerCapture(e.pointerId);
-        }
-      } catch (err) {}
-
-      isDrawingRef.current = false;
-      if (activeLineRef.current && activeLineRef.current.points.length > 0) {
-        linesRef.current.push(activeLineRef.current);
-        setLines([...linesRef.current]);
-        if (rxPatientId) {
-          localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(linesRef.current));
-        }
-      }
-      activeLineRef.current = null;
-    };
-
-    canvas.addEventListener("pointerdown", handlePointerDown, { passive: false });
-    canvas.addEventListener("pointermove", handlePointerMove, { passive: false });
-    canvas.addEventListener("pointerup", handlePointerUp, { passive: false });
-    canvas.addEventListener("pointercancel", handlePointerUp, { passive: false });
+    canvas.addEventListener("touchstart", preventTouchSelect, { passive: false });
+    canvas.addEventListener("touchmove", preventTouchSelect, { passive: false });
+    canvas.addEventListener("pointerdown", preventTouchSelect, { passive: false });
+    canvas.addEventListener("pointermove", preventTouchSelect, { passive: false });
 
     return () => {
-      canvas.removeEventListener("pointerdown", handlePointerDown);
-      canvas.removeEventListener("pointermove", handlePointerMove);
-      canvas.removeEventListener("pointerup", handlePointerUp);
-      canvas.removeEventListener("pointercancel", handlePointerUp);
+      canvas.removeEventListener("touchstart", preventTouchSelect);
+      canvas.removeEventListener("touchmove", preventTouchSelect);
+      canvas.removeEventListener("pointerdown", preventTouchSelect);
+      canvas.removeEventListener("pointermove", preventTouchSelect);
     };
-  }, [rxPatientId]);
+  }, []);
 
   // Listen for native fullscreen change events
   useEffect(() => {
@@ -431,10 +280,8 @@ function CanvasPageContent() {
             const parsed = typeof regData.canvas_data === "string" ? JSON.parse(regData.canvas_data) : regData.canvas_data;
             if (Array.isArray(parsed)) {
               setLines(parsed);
-              linesRef.current = parsed;
             } else if (parsed.lines && Array.isArray(parsed.lines)) {
               setLines(parsed.lines);
-              linesRef.current = parsed.lines;
               if (parsed.templateUrl) setTemplateImageUrl(parsed.templateUrl);
             }
           } catch (e) {
@@ -446,10 +293,7 @@ function CanvasPageContent() {
           if (savedLocal) {
             try {
               const parsed = JSON.parse(savedLocal);
-              if (Array.isArray(parsed)) {
-                setLines(parsed);
-                linesRef.current = parsed;
-              }
+              if (Array.isArray(parsed)) setLines(parsed);
             } catch (e) {
               console.error("Error reading local canvas:", e);
             }
@@ -466,18 +310,184 @@ function CanvasPageContent() {
     loadData();
   }, [sessionLoaded, rxPatientId]);
 
+  // Redraw Canvas whenever lines or currentLine changes
+  const renderCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Clear entire canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const allLines = currentLine ? [...lines, currentLine] : lines;
+
+    allLines.forEach((line) => {
+      if (!line.points || line.points.length < 1) return;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.lineWidth = line.width || 4;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.globalAlpha = 1.0;
+
+      if (line.isErased) {
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.strokeStyle = "rgba(0,0,0,1)";
+      } else {
+        ctx.globalCompositeOperation = "source-over";
+        const strokeColor = line.color && line.color !== "" ? line.color : "#000000";
+        ctx.strokeStyle = strokeColor;
+      }
+
+      ctx.moveTo(line.points[0].x, line.points[0].y);
+
+      if (line.points.length === 1) {
+        ctx.lineTo(line.points[0].x + 0.1, line.points[0].y + 0.1);
+      } else {
+        for (let i = 1; i < line.points.length; i++) {
+          ctx.lineTo(line.points[i].x, line.points[i].y);
+        }
+      }
+
+      ctx.stroke();
+      ctx.restore();
+    });
+  };
+
+  useEffect(() => {
+    renderCanvas();
+  }, [lines, currentLine]);
+
+  // Clear accidental browser text highlights (Palm Rejection)
+  const suppressTextSelection = () => {
+    if (typeof window !== "undefined" && window.getSelection) {
+      const sel = window.getSelection();
+      if (sel) sel.removeAllRanges();
+    }
+  };
+
+  // Transform Screen Point to Fixed Canvas Resolution (1000 x 1414)
+  const getCanvasPoint = (e: React.PointerEvent<HTMLCanvasElement> | any): Point | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    let clientX = 0;
+    let clientY = 0;
+
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else if ("clientX" in e) {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    } else {
+      return null;
+    }
+
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
+  };
+
+  // Check if pointer input is S-Pen / Stylus or Desktop Mouse (Finger touches return false)
+  const isPenOrStylusInput = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType === "pen") return true;
+    if (e.pointerType === "mouse") return true; // Allows mouse drawing on desktop
+    return false;
+  };
+
+  // Pointer Down (Drawing Handler - Only S-Pen / Pen / Mouse)
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // ALWAYS prevent default & stop propagation FIRST to kill browser text selection!
+    e.preventDefault();
+    e.stopPropagation();
+    suppressTextSelection();
+
+    // If it's a finger touch, DO NOT WRITE! Hand touches handle Pan & Zoom.
+    if (!isPenOrStylusInput(e)) return;
+
+    try {
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    } catch (err) {}
+
+    const pt = getCanvasPoint(e);
+    if (!pt) return;
+
+    setIsDrawing(true);
+    const newLine: DrawingLine = {
+      id: String(Date.now()),
+      points: [pt],
+      color: currentColor,
+      width: isErasing ? strokeWidth * 6 : strokeWidth,
+      isErased: isErasing,
+    };
+    setCurrentLine(newLine);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // ALWAYS prevent default & stop propagation FIRST!
+    e.preventDefault();
+    e.stopPropagation();
+    suppressTextSelection();
+
+    if (!isDrawing || !currentLine) return;
+    if (!isPenOrStylusInput(e)) return;
+
+    const pt = getCanvasPoint(e);
+    if (!pt) return;
+
+    setCurrentLine((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        points: [...prev.points, pt],
+      };
+    });
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    suppressTextSelection();
+
+    try {
+      if ((e.target as HTMLElement).hasPointerCapture(e.pointerId)) {
+        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      }
+    } catch (err) {}
+
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    if (currentLine && currentLine.points.length > 0) {
+      const updated = [...lines, currentLine];
+      setLines(updated);
+      localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(updated));
+    }
+    setCurrentLine(null);
+  };
+
   // ─── Touch Gestures: 1 Finger Pan & 2 Finger Pinch Zoom ───
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     suppressTextSelection();
-    if (isDrawingRef.current) return;
+    // If drawing with S-Pen, don't pan
+    if (isDrawing) return;
 
     if (e.touches.length === 1) {
+      // 1 Finger: Move / Pan Page
       setIsPanning(true);
       panStartRef.current = {
         x: e.touches[0].clientX - panOffset.x,
         y: e.touches[0].clientY - panOffset.y,
       };
     } else if (e.touches.length === 2) {
+      // 2 Fingers: Pinch Zoom In/Out
       setIsPanning(false);
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
@@ -490,14 +500,16 @@ function CanvasPageContent() {
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     suppressTextSelection();
-    if (isDrawingRef.current) return;
+    if (isDrawing) return;
 
     if (e.touches.length === 1 && isPanning) {
+      // Pan Offset Update
       setPanOffset({
         x: e.touches[0].clientX - panStartRef.current.x,
         y: e.touches[0].clientY - panStartRef.current.y,
       });
     } else if (e.touches.length === 2 && pinchStartDistRef.current) {
+      // Pinch Zoom Scale Update
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
@@ -541,13 +553,14 @@ function CanvasPageContent() {
       if (document.documentElement.requestFullscreen) {
         document.documentElement.requestFullscreen().then(() => {
           setIsFullscreen(true);
-          setIsHeaderVisible(false);
+          setIsHeaderVisible(false); // Hide header to maximize drawing area
           showToast("Full Screen Mode Enabled (Header Collapsed)", "info");
         }).catch(() => {
           setIsHeaderVisible(!isHeaderVisible);
           setShowIpadTip(true);
         });
       } else {
+        // iPad Safari unsupported requestFullscreen fallback
         setIsHeaderVisible(!isHeaderVisible);
         setShowIpadTip(true);
       }
@@ -562,16 +575,13 @@ function CanvasPageContent() {
 
   // Actions
   const handleUndo = () => {
-    if (linesRef.current.length === 0) return;
-    const updated = linesRef.current.slice(0, linesRef.current.length - 1);
-    linesRef.current = updated;
+    if (lines.length === 0) return;
+    const updated = lines.slice(0, lines.length - 1);
     setLines(updated);
     localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(updated));
   };
 
   const handleClearAll = () => {
-    linesRef.current = [];
-    activeLineRef.current = null;
     setLines([]);
     localStorage.removeItem(`saved_canvas_${rxPatientId}`);
     setIsClearModalOpen(false);
@@ -583,7 +593,7 @@ function CanvasPageContent() {
     setSaving(true);
     try {
       const payload = {
-        lines: linesRef.current,
+        lines,
         updated_at: new Date().toISOString(),
       };
 
@@ -594,7 +604,7 @@ function CanvasPageContent() {
 
       if (error) throw error;
 
-      localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(linesRef.current));
+      localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(lines));
       showToast("Canvas Drawing Saved Successfully!");
     } catch (err: any) {
       console.error("Error saving canvas data:", err);
@@ -641,7 +651,7 @@ function CanvasPageContent() {
       <div className="flex h-screen w-screen items-center justify-center bg-[#F5F6F8] font-sans select-none">
         <div className="text-center space-y-2">
           <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Loading Medical Canvas Engine...</p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Loading Patient Canvas...</p>
         </div>
       </div>
     );
@@ -876,7 +886,8 @@ function CanvasPageContent() {
 
           <button
             onClick={handleUndo}
-            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
+            disabled={lines.length === 0}
+            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
             title="Undo last stroke"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -926,16 +937,12 @@ function CanvasPageContent() {
       {/* CANVAS WORKSPACE AREA (Interactive Pan & Pinch-Zoom Container) */}
       <main
         ref={workspaceRef}
-        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-        onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-        onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        onContextMenu={(e) => e.preventDefault()}
         className="flex-1 overflow-hidden p-4 flex justify-center items-center bg-[#E2E8F0] relative select-none touch-none canvas-no-select"
         style={{
           userSelect: "none",
           WebkitUserSelect: "none",
           WebkitTouchCallout: "none",
-          touchAction: "none",
         }}
         onWheel={handleWheel}
         onTouchStart={handleTouchStart}
@@ -944,9 +951,6 @@ function CanvasPageContent() {
       >
         <div
           ref={containerRef}
-          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
           className="relative bg-white shadow-2xl rounded-md border border-slate-300 overflow-hidden origin-center transition-transform duration-75 select-none canvas-no-select"
           style={{
             width: "800px",
@@ -954,7 +958,6 @@ function CanvasPageContent() {
             transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
             userSelect: "none",
             WebkitUserSelect: "none",
-            touchAction: "none",
           }}
         >
           {/* Letterhead Background Template */}
@@ -970,12 +973,15 @@ function CanvasPageContent() {
             ref={canvasRef}
             width={1000}
             height={1414}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerUp}
             className="w-full h-full cursor-crosshair touch-none relative z-10 select-none canvas-no-select"
             style={{
               userSelect: "none",
               WebkitUserSelect: "none",
               WebkitTouchCallout: "none",
-              touchAction: "none",
             }}
           />
         </div>
