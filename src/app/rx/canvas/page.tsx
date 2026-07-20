@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase, getUserRole } from "@/lib/supabase";
-import SignaturePad from "signature_pad";
 
 interface Patient {
   patient_id?: number;
@@ -18,6 +17,19 @@ interface Patient {
     clinic_name?: string;
     treating_doctor?: string;
   };
+}
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface DrawingLine {
+  id: string;
+  points: Point[];
+  color: string;
+  width: number;
+  isErased: boolean;
 }
 
 const COLOR_PRESETS = [
@@ -61,11 +73,37 @@ function CanvasPageContent() {
   const [pastVisitsCount, setPastVisitsCount] = useState<number>(0);
   const [legacyVisitsCount, setLegacyVisitsCount] = useState<number>(0);
 
-  // SignaturePad Medical Engine States
+  // Drawing Tool States
+  const [lines, setLines] = useState<DrawingLine[]>([]);
   const [currentColor, setCurrentColor] = useState<string>("#000000");
   const [strokeWidth, setStrokeWidth] = useState<number>(4);
   const [isErasing, setIsErasing] = useState<boolean>(false);
   const [templateImageUrl, setTemplateImageUrl] = useState<string>("/letterhead.jpg");
+
+  // Synchronous Drawing Refs for 0ms Latency & High-Frequency S-Pen Tracking
+  const linesRef = useRef<DrawingLine[]>([]);
+  const activeLineRef = useRef<DrawingLine | null>(null);
+  const isDrawingRef = useRef<boolean>(false);
+
+  const currentColorRef = useRef<string>(currentColor);
+  const strokeWidthRef = useRef<number>(strokeWidth);
+  const isErasingRef = useRef<boolean>(isErasing);
+
+  useEffect(() => {
+    currentColorRef.current = currentColor;
+  }, [currentColor]);
+
+  useEffect(() => {
+    strokeWidthRef.current = strokeWidth;
+  }, [strokeWidth]);
+
+  useEffect(() => {
+    isErasingRef.current = isErasing;
+  }, [isErasing]);
+
+  useEffect(() => {
+    linesRef.current = lines;
+  }, [lines]);
 
   // Viewport Transform States (Pan & Pinch Zoom)
   const [zoomScale, setZoomScale] = useState<number>(1.0);
@@ -83,7 +121,6 @@ function CanvasPageContent() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const signaturePadRef = useRef<SignaturePad | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
 
@@ -91,7 +128,6 @@ function CanvasPageContent() {
   const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const pinchStartDistRef = useRef<number | null>(null);
   const pinchStartScaleRef = useRef<number>(1.0);
-  const initialPointDataRef = useRef<any[] | null>(null);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type });
@@ -111,7 +147,15 @@ function CanvasPageContent() {
     });
   }, [router]);
 
-  // Block text selection, drag gestures, and browser callouts globally
+  // Suppress accidental browser text selection
+  const suppressTextSelection = () => {
+    if (typeof window !== "undefined" && window.getSelection) {
+      const sel = window.getSelection();
+      if (sel) sel.removeAllRanges();
+    }
+  };
+
+  // Block browser text selection, context menus, and callouts
   useEffect(() => {
     const killSelection = (e: Event) => {
       if (typeof window !== "undefined" && window.getSelection) {
@@ -131,57 +175,152 @@ function CanvasPageContent() {
     };
   }, []);
 
-  // Initialize SignaturePad Industry-Standard Medical Canvas Engine
+  // Synchronous Canvas Redraw Function with Quadratic Bezier Smoothing
+  const renderCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const allLines = activeLineRef.current
+      ? [...linesRef.current, activeLineRef.current]
+      : linesRef.current;
+
+    allLines.forEach((line) => {
+      if (!line.points || line.points.length < 1) return;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.lineWidth = line.width || 4;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.globalAlpha = 1.0;
+
+      if (line.isErased) {
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.strokeStyle = "rgba(0,0,0,1)";
+      } else {
+        ctx.globalCompositeOperation = "source-over";
+        const strokeColor = line.color && line.color !== "" ? line.color : "#000000";
+        ctx.strokeStyle = strokeColor;
+      }
+
+      ctx.moveTo(line.points[0].x, line.points[0].y);
+
+      if (line.points.length === 1) {
+        ctx.lineTo(line.points[0].x + 0.1, line.points[0].y + 0.1);
+      } else if (line.points.length === 2) {
+        ctx.lineTo(line.points[1].x, line.points[1].y);
+      } else {
+        // Quadratic Bezier Curve Smoothing
+        let i = 1;
+        for (i = 1; i < line.points.length - 1; i++) {
+          const xc = (line.points[i].x + line.points[i + 1].x) / 2;
+          const yc = (line.points[i].y + line.points[i + 1].y) / 2;
+          ctx.quadraticCurveTo(line.points[i].x, line.points[i].y, xc, yc);
+        }
+        ctx.lineTo(line.points[i].x, line.points[i].y);
+      }
+
+      ctx.stroke();
+      ctx.restore();
+    });
+  };
+
+  useEffect(() => {
+    renderCanvas();
+  }, [lines]);
+
+  // Attach Direct Native Pointer Listeners (Coalesced S-Pen Tracking)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const signaturePad = new SignaturePad(canvas, {
-      minWidth: strokeWidth * 0.8,
-      maxWidth: strokeWidth * 1.5,
-      penColor: isErasing ? "rgba(0,0,0,1)" : currentColor,
-      backgroundColor: "rgba(0, 0, 0, 0)",
-      velocityFilterWeight: 0.7,
-      minDistance: 1,
-    });
+    const getCanvasPt = (clientX: number, clientY: number): Point => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY,
+      };
+    };
 
-    if (isErasing) {
-      signaturePad.compositeOperation = "destination-out";
-    } else {
-      signaturePad.compositeOperation = "source-over";
-    }
+    const handlePointerDown = (e: PointerEvent) => {
+      if (e.cancelable) e.preventDefault();
+      e.stopPropagation();
+      suppressTextSelection();
 
-    signaturePadRef.current = signaturePad;
-
-    // Load initial data if loaded before init
-    if (initialPointDataRef.current && Array.isArray(initialPointDataRef.current)) {
       try {
-        signaturePad.fromData(initialPointDataRef.current);
-      } catch (e) {
-        console.error("Error loading initial signature_pad data:", e);
+        canvas.setPointerCapture(e.pointerId);
+      } catch (err) {}
+
+      isDrawingRef.current = true;
+      const pt = getCanvasPt(e.clientX, e.clientY);
+      activeLineRef.current = {
+        id: String(Date.now()) + "_" + Math.random().toString(36).substring(2, 6),
+        points: [pt],
+        color: isErasingRef.current ? "rgba(0,0,0,1)" : currentColorRef.current,
+        width: isErasingRef.current ? strokeWidthRef.current * 6 : strokeWidthRef.current,
+        isErased: isErasingRef.current,
+      };
+
+      renderCanvas();
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!isDrawingRef.current || !activeLineRef.current) return;
+      if (e.cancelable) e.preventDefault();
+      e.stopPropagation();
+      suppressTextSelection();
+
+      // Coalesced Events API for 120Hz/240Hz High-Frequency S-Pen / Apple Pencil hardware tracking
+      const events = (e as any).getCoalescedEvents ? (e as any).getCoalescedEvents() : [e];
+      for (const ev of events) {
+        const pt = getCanvasPt(ev.clientX, ev.clientY);
+        activeLineRef.current.points.push(pt);
       }
-    }
+
+      renderCanvas();
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+      if (!isDrawingRef.current) return;
+      if (e.cancelable) e.preventDefault();
+      e.stopPropagation();
+      suppressTextSelection();
+
+      try {
+        if (canvas.hasPointerCapture(e.pointerId)) {
+          canvas.releasePointerCapture(e.pointerId);
+        }
+      } catch (err) {}
+
+      isDrawingRef.current = false;
+      if (activeLineRef.current && activeLineRef.current.points.length > 0) {
+        linesRef.current.push(activeLineRef.current);
+        setLines([...linesRef.current]);
+        if (rxPatientId) {
+          localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(linesRef.current));
+        }
+      }
+      activeLineRef.current = null;
+    };
+
+    canvas.addEventListener("pointerdown", handlePointerDown, { passive: false });
+    canvas.addEventListener("pointermove", handlePointerMove, { passive: false });
+    canvas.addEventListener("pointerup", handlePointerUp, { passive: false });
+    canvas.addEventListener("pointercancel", handlePointerUp, { passive: false });
 
     return () => {
-      signaturePad.off();
+      canvas.removeEventListener("pointerdown", handlePointerDown);
+      canvas.removeEventListener("pointermove", handlePointerMove);
+      canvas.removeEventListener("pointerup", handlePointerUp);
+      canvas.removeEventListener("pointercancel", handlePointerUp);
     };
-  }, []);
-
-  // Dynamically update SignaturePad properties when tool/color/width changes
-  useEffect(() => {
-    const pad = signaturePadRef.current;
-    if (!pad) return;
-
-    pad.minWidth = strokeWidth * 0.8;
-    pad.maxWidth = strokeWidth * 1.5;
-    pad.penColor = isErasing ? "rgba(0,0,0,1)" : currentColor;
-
-    if (isErasing) {
-      pad.compositeOperation = "destination-out";
-    } else {
-      pad.compositeOperation = "source-over";
-    }
-  }, [currentColor, strokeWidth, isErasing]);
+  }, [rxPatientId]);
 
   // Listen for native fullscreen change events
   useEffect(() => {
@@ -286,17 +425,17 @@ function CanvasPageContent() {
         setCurrentRxPatient(mappedPatient);
         fetchHeaderCounts(patientUhid, rxPatientId, pData?.name || "", pData?.number || "");
 
-        // Load Canvas Data into SignaturePad Engine
-        let pointsToLoad: any[] | null = null;
+        // Load Canvas Data from Supabase
         if (regData.canvas_data) {
           try {
             const parsed = typeof regData.canvas_data === "string" ? JSON.parse(regData.canvas_data) : regData.canvas_data;
             if (Array.isArray(parsed)) {
-              pointsToLoad = parsed;
-            } else if (parsed.points && Array.isArray(parsed.points)) {
-              pointsToLoad = parsed.points;
+              setLines(parsed);
+              linesRef.current = parsed;
             } else if (parsed.lines && Array.isArray(parsed.lines)) {
-              pointsToLoad = parsed.lines;
+              setLines(parsed.lines);
+              linesRef.current = parsed.lines;
+              if (parsed.templateUrl) setTemplateImageUrl(parsed.templateUrl);
             }
           } catch (e) {
             console.error("Error parsing canvas data from DB:", e);
@@ -307,20 +446,12 @@ function CanvasPageContent() {
           if (savedLocal) {
             try {
               const parsed = JSON.parse(savedLocal);
-              if (Array.isArray(parsed)) pointsToLoad = parsed;
+              if (Array.isArray(parsed)) {
+                setLines(parsed);
+                linesRef.current = parsed;
+              }
             } catch (e) {
               console.error("Error reading local canvas:", e);
-            }
-          }
-        }
-
-        if (pointsToLoad) {
-          initialPointDataRef.current = pointsToLoad;
-          if (signaturePadRef.current) {
-            try {
-              signaturePadRef.current.fromData(pointsToLoad);
-            } catch (err) {
-              console.error("Error restoring signature pad points:", err);
             }
           }
         }
@@ -335,17 +466,10 @@ function CanvasPageContent() {
     loadData();
   }, [sessionLoaded, rxPatientId]);
 
-  // Clear accidental browser text highlights (Palm Rejection)
-  const suppressTextSelection = () => {
-    if (typeof window !== "undefined" && window.getSelection) {
-      const sel = window.getSelection();
-      if (sel) sel.removeAllRanges();
-    }
-  };
-
   // ─── Touch Gestures: 1 Finger Pan & 2 Finger Pinch Zoom ───
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     suppressTextSelection();
+    if (isDrawingRef.current) return;
 
     if (e.touches.length === 1) {
       setIsPanning(true);
@@ -366,6 +490,7 @@ function CanvasPageContent() {
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     suppressTextSelection();
+    if (isDrawingRef.current) return;
 
     if (e.touches.length === 1 && isPanning) {
       setPanOffset({
@@ -437,38 +562,28 @@ function CanvasPageContent() {
 
   // Actions
   const handleUndo = () => {
-    const pad = signaturePadRef.current;
-    if (!pad) return;
-    const data = pad.toData();
-    if (data && data.length > 0) {
-      data.pop(); // Remove last drawn stroke
-      pad.fromData(data);
-      if (rxPatientId) {
-        localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(data));
-      }
-    }
+    if (linesRef.current.length === 0) return;
+    const updated = linesRef.current.slice(0, linesRef.current.length - 1);
+    linesRef.current = updated;
+    setLines(updated);
+    localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(updated));
   };
 
   const handleClearAll = () => {
-    const pad = signaturePadRef.current;
-    if (pad) pad.clear();
-    if (rxPatientId) {
-      localStorage.removeItem(`saved_canvas_${rxPatientId}`);
-    }
+    linesRef.current = [];
+    activeLineRef.current = null;
+    setLines([]);
+    localStorage.removeItem(`saved_canvas_${rxPatientId}`);
     setIsClearModalOpen(false);
     showToast("Canvas cleared", "info");
   };
 
   const handleSaveData = async () => {
     if (!rxPatientId) return;
-    const pad = signaturePadRef.current;
-    if (!pad) return;
-
     setSaving(true);
     try {
-      const pointData = pad.toData();
       const payload = {
-        points: pointData,
+        lines: linesRef.current,
         updated_at: new Date().toISOString(),
       };
 
@@ -479,7 +594,7 @@ function CanvasPageContent() {
 
       if (error) throw error;
 
-      localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(pointData));
+      localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(linesRef.current));
       showToast("Canvas Drawing Saved Successfully!");
     } catch (err: any) {
       console.error("Error saving canvas data:", err);
@@ -490,9 +605,8 @@ function CanvasPageContent() {
   };
 
   const handlePrintPdf = () => {
-    const pad = signaturePadRef.current;
     const canvas = canvasRef.current;
-    if (!pad || !canvas) return;
+    if (!canvas) return;
 
     const dataUrl = canvas.toDataURL("image/png");
     const printWindow = window.open("", "_blank");
@@ -851,7 +965,7 @@ function CanvasPageContent() {
             draggable={false}
           />
 
-          {/* HTML5 Canvas with SignaturePad Medical Engine (Resolution 1000 x 1414) */}
+          {/* HTML5 Canvas (Resolution 1000 x 1414) */}
           <canvas
             ref={canvasRef}
             width={1000}
