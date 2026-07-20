@@ -78,7 +78,6 @@ function CanvasPageContent() {
   const [currentColor, setCurrentColor] = useState<string>("#000000");
   const [strokeWidth, setStrokeWidth] = useState<number>(4);
   const [isErasing, setIsErasing] = useState<boolean>(false);
-  const [penOnlyMode, setPenOnlyMode] = useState<boolean>(true); // true = S-Pen / Pen only; false = Touch & All Inputs
   const [templateImageUrl, setTemplateImageUrl] = useState<string>("/letterhead.jpg");
 
   // Viewport Transform States (Pan & Pinch Zoom)
@@ -107,7 +106,6 @@ function CanvasPageContent() {
   const currentColorRef = useRef<string>("#000000");
   const strokeWidthRef = useRef<number>(4);
   const isErasingRef = useRef<boolean>(false);
-  const penOnlyModeRef = useRef<boolean>(true);
 
   // Synchronize state with refs for fast event listeners
   useEffect(() => {
@@ -125,10 +123,6 @@ function CanvasPageContent() {
   useEffect(() => {
     isErasingRef.current = isErasing;
   }, [isErasing]);
-
-  useEffect(() => {
-    penOnlyModeRef.current = penOnlyMode;
-  }, [penOnlyMode]);
 
   // Touch gesture refs
   const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -405,25 +399,15 @@ function CanvasPageContent() {
     };
   };
 
-  // Fast Native Pointer Event Listeners (Zero React Latency, Ultra-Smooth Writing)
+  // 100% Reliable Universal Pointer Listener (S-Pen, Apple Pencil, Mouse, Touch)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const isStylusPointer = (e: PointerEvent) => {
-      // In Pen Only Mode, accept pen, mouse, stylus or any stylus pressure/touchType
-      if (!penOnlyModeRef.current) return true; // Draw Anything mode accepts all
-      if (e.pointerType === "pen" || e.pointerType === "mouse") return true;
-      if ((e as any).touchType === "stylus" || e.pressure > 0) return true;
-      return false;
-    };
 
     const handleNativePointerDown = (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
       suppressTextSelection();
-
-      if (!isStylusPointer(e)) return;
 
       try {
         canvas.setPointerCapture(e.pointerId);
@@ -450,7 +434,6 @@ function CanvasPageContent() {
       suppressTextSelection();
 
       if (!isDrawingRef.current || !currentLineRef.current) return;
-      if (!isStylusPointer(e)) return;
 
       const pt = getCanvasPointFromNativeEvent(e);
       if (!pt) return;
@@ -522,7 +505,7 @@ function CanvasPageContent() {
     };
   }, [rxPatientId]);
 
-  // ─── Touch Gestures: 1 Finger Pan & 2 Finger Pinch Zoom ───
+  // ─── Touch Gestures: 1 Finger Pan & 2 Finger Pinch Zoom on Workspace ───
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     suppressTextSelection();
     if (isDrawingRef.current) return;
@@ -844,7 +827,7 @@ function CanvasPageContent() {
 
           <div className="h-5 w-px bg-slate-200 mx-2" />
 
-          {/* Tool Mode: Pen / Eraser / Pen-Only Toggle */}
+          {/* Tool Mode: Pen / Eraser */}
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setIsErasing(false)}
@@ -874,19 +857,6 @@ function CanvasPageContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
               Eraser
-            </button>
-
-            {/* Input Filter: Pen Only vs All Inputs (Finger) */}
-            <button
-              onClick={() => setPenOnlyMode(!penOnlyMode)}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                penOnlyMode
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-300"
-                  : "bg-amber-50 text-amber-800 border-amber-300"
-              }`}
-              title={penOnlyMode ? "S-Pen / Stylus Only Mode Active" : "Touch & All Inputs Mode Active"}
-            >
-              {penOnlyMode ? "✏️ S-Pen Only" : "🖐️ All Inputs (Finger)"}
             </button>
           </div>
         </div>
