@@ -3205,7 +3205,11 @@ function DashboardContent() {
                       className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none cursor-pointer"
                     >
                       <option value="First consultation">First consultation</option>
+                      <option value="Post Op">Post Op</option>
+                      <option value="Follow Up">Follow Up</option>
                       <option value="Follow-up consultation">Follow-up consultation</option>
+                      <option value="Minor Procedure">Minor Procedure</option>
+                      <option value="Emergency">Emergency</option>
                       <option value="Routine Check">Routine Check</option>
                     </select>
                   </div>
