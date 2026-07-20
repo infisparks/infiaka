@@ -82,6 +82,11 @@ function CanvasPageContent() {
   const [currentLine, setCurrentLine] = useState<DrawingLine | null>(null);
   const [templateImageUrl, setTemplateImageUrl] = useState<string>("/letterhead.jpg");
 
+  // Viewport Transform States (Pan & Pinch Zoom)
+  const [zoomScale, setZoomScale] = useState<number>(1.0);
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState<boolean>(false);
+
   // Modals & Notifications
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -89,6 +94,12 @@ function CanvasPageContent() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
+
+  // Touch gesture refs
+  const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const pinchStartDistRef = useRef<number | null>(null);
+  const pinchStartScaleRef = useRef<number>(1.0);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type });
@@ -284,26 +295,26 @@ function CanvasPageContent() {
     renderCanvas();
   }, [lines, currentLine]);
 
-  // Canvas Mouse & Touch Event Handlers
-  const getCanvasPoint = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>): Point | null => {
+  // Transform Screen Point to Fixed Canvas Resolution (1000 x 1414)
+  const getCanvasPoint = (e: React.PointerEvent<HTMLCanvasElement> | any): Point | null => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
 
-    // Scale touch/click position to fixed canvas resolution (1000 x 1414)
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
     let clientX = 0;
     let clientY = 0;
 
-    if ("touches" in e) {
-      if (e.touches.length === 0) return null;
+    if (e.touches && e.touches.length > 0) {
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
-    } else {
+    } else if ("clientX" in e) {
       clientX = e.clientX;
       clientY = e.clientY;
+    } else {
+      return null;
     }
 
     return {
@@ -312,7 +323,18 @@ function CanvasPageContent() {
     };
   };
 
-  const handlePointerDown = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+  // Check if pointer input is S-Pen / Stylus or Desktop Mouse (Finger touches return false)
+  const isPenOrStylusInput = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType === "pen") return true;
+    if (e.pointerType === "mouse") return true; // Allows mouse drawing on desktop
+    return false;
+  };
+
+  // Pointer Down (Drawing Handler - Only S-Pen / Pen / Mouse)
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // If it's a finger touch, DO NOT WRITE/DRAW! Hand touches handle Pan & Zoom.
+    if (!isPenOrStylusInput(e)) return;
+
     e.preventDefault();
     const pt = getCanvasPoint(e);
     if (!pt) return;
@@ -328,8 +350,10 @@ function CanvasPageContent() {
     setCurrentLine(newLine);
   };
 
-  const handlePointerMove = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !currentLine) return;
+    if (!isPenOrStylusInput(e)) return;
+
     e.preventDefault();
     const pt = getCanvasPoint(e);
     if (!pt) return;
@@ -343,17 +367,87 @@ function CanvasPageContent() {
     });
   };
 
-  const handlePointerUp = (e: React.SyntheticEvent) => {
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
     e.preventDefault();
     setIsDrawing(false);
     if (currentLine && currentLine.points.length > 0) {
       const updated = [...lines, currentLine];
       setLines(updated);
-      // Backup to LocalStorage
       localStorage.setItem(`saved_canvas_${rxPatientId}`, JSON.stringify(updated));
     }
     setCurrentLine(null);
+  };
+
+  // ─── Touch Gestures: 1 Finger Pan & 2 Finger Pinch Zoom ───
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    // If drawing with S-Pen, don't pan
+    if (isDrawing) return;
+
+    if (e.touches.length === 1) {
+      // 1 Finger: Move / Pan Page
+      setIsPanning(true);
+      panStartRef.current = {
+        x: e.touches[0].clientX - panOffset.x,
+        y: e.touches[0].clientY - panOffset.y,
+      };
+    } else if (e.touches.length === 2) {
+      // 2 Fingers: Pinch Zoom In/Out
+      setIsPanning(false);
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      pinchStartDistRef.current = dist;
+      pinchStartScaleRef.current = zoomScale;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (isDrawing) return;
+
+    if (e.touches.length === 1 && isPanning) {
+      // Pan Offset Update
+      setPanOffset({
+        x: e.touches[0].clientX - panStartRef.current.x,
+        y: e.touches[0].clientY - panStartRef.current.y,
+      });
+    } else if (e.touches.length === 2 && pinchStartDistRef.current) {
+      // Pinch Zoom Scale Update
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const newScale = Math.min(
+        Math.max(pinchStartScaleRef.current * (dist / pinchStartDistRef.current), 0.3),
+        3.5
+      );
+      setZoomScale(newScale);
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length < 2) {
+      pinchStartDistRef.current = null;
+    }
+    if (e.touches.length === 0) {
+      setIsPanning(false);
+    }
+  };
+
+  // Mouse Wheel / Trackpad Pinch Zoom
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (e.ctrlKey || e.metaKey || e.buttons === 0) {
+      const delta = e.deltaY < 0 ? 0.08 : -0.08;
+      setZoomScale((prev) => Math.min(Math.max(prev + delta, 0.3), 3.5));
+    }
+  };
+
+  // Reset View / Auto Fit Function
+  const handleResetView = () => {
+    setZoomScale(1.0);
+    setPanOffset({ x: 0, y: 0 });
+    showToast("Paper view reset to 100%", "info");
   };
 
   // Actions
@@ -535,7 +629,7 @@ function CanvasPageContent() {
 
       {/* CANVAS TOOLBAR */}
       <div className="bg-white border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-sm z-10">
-        {/* Colors & Eraser */}
+        {/* Colors & Pen/Eraser Tools */}
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">Color:</span>
           {COLOR_PRESETS.map((c) => (
@@ -566,12 +660,12 @@ function CanvasPageContent() {
                   ? "bg-indigo-600 text-white shadow-sm"
                   : "bg-slate-100 text-slate-700 hover:bg-slate-200"
               }`}
-              title="Pen tool"
+              title="S-Pen / Pen tool"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
               </svg>
-              Pen Mode
+              S-Pen Mode
             </button>
 
             <button
@@ -609,8 +703,20 @@ function CanvasPageContent() {
           ))}
         </div>
 
-        {/* Controls: Undo, Clear, Save, Print */}
+        {/* Controls: Auto Fit / Reset, Undo, Clear, Save, Print */}
         <div className="flex items-center gap-2">
+          {/* AUTO FIT / RESET VIEWPORT BUTTON */}
+          <button
+            onClick={handleResetView}
+            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+            title="Auto adjust full paper to screen size (Reset Zoom & Pan)"
+          >
+            <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+            Auto Fit
+          </button>
+
           <button
             onClick={handleUndo}
             disabled={lines.length === 0}
@@ -661,12 +767,23 @@ function CanvasPageContent() {
         </div>
       </div>
 
-      {/* CANVAS DRAWING WORKSPACE AREA (Virtual Size: 1000x1414 A4) */}
-      <main className="flex-1 overflow-auto p-4 flex justify-center items-center bg-[#E2E8F0] relative">
+      {/* CANVAS WORKSPACE AREA (Interactive Pan & Pinch-Zoom Container) */}
+      <main
+        ref={workspaceRef}
+        className="flex-1 overflow-hidden p-4 flex justify-center items-center bg-[#E2E8F0] relative select-none touch-none"
+        onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <div
           ref={containerRef}
-          className="relative bg-white shadow-2xl rounded-md border border-slate-300 overflow-hidden"
-          style={{ width: "800px", height: "1131px" }}
+          className="relative bg-white shadow-2xl rounded-md border border-slate-300 overflow-hidden origin-center transition-transform duration-75"
+          style={{
+            width: "800px",
+            height: "1131px",
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
+          }}
         >
           {/* Letterhead Background Template */}
           <img
@@ -680,14 +797,11 @@ function CanvasPageContent() {
             ref={canvasRef}
             width={1000}
             height={1414}
-            onMouseDown={handlePointerDown}
-            onMouseMove={handlePointerMove}
-            onMouseUp={handlePointerUp}
-            onMouseLeave={handlePointerUp}
-            onTouchStart={handlePointerDown}
-            onTouchMove={handlePointerMove}
-            onTouchEnd={handlePointerUp}
-            className="w-full h-full cursor-crosshair touch-none"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerUp}
+            className="w-full h-full cursor-crosshair touch-none relative z-10"
           />
         </div>
       </main>
