@@ -365,20 +365,8 @@ function EkaCarePageContent() {
 
         {/* Right Header Controls */}
         <div className="flex items-center gap-2">
-          <button className="px-2.5 py-1 border border-primary/20 hover:bg-primary/5 text-primary text-[10px] font-bold rounded">
-            DxaAI Assessments
-          </button>
-          <button className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white text-[10px] font-bold rounded flex items-center gap-1">
-            ✨ DocScribe
-          </button>
-          <button className="px-2 py-1 text-[10.5px] font-semibold text-[#4A5568] hover:bg-gray-100 rounded">
-            Templates
-          </button>
-          <button className="px-2 py-1 text-[10.5px] font-semibold text-[#4A5568] hover:bg-gray-100 rounded flex items-center gap-1">
-            ⚙ Configure
-          </button>
-          <span className="px-2.5 py-1 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded text-[10px] font-bold tracking-wide select-none cursor-pointer">
-            UPGRADE TO PRO
+          <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-[10px] font-extrabold rounded-md flex items-center gap-1 border border-emerald-100">
+            🟢 Active Session
           </span>
         </div>
       </header>
