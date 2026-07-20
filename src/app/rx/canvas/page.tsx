@@ -124,7 +124,7 @@ function CanvasPageContent() {
     });
   }, [router]);
 
-  // Completely block all text selection, drag gestures, and browser double-tap zoom globally
+  // Completely block text selection, drag gestures, and browser double-tap zoom globally
   useEffect(() => {
     let lastTapTime = 0;
 
@@ -156,35 +156,52 @@ function CanvasPageContent() {
     };
   }, []);
 
-  // Attach non-passive touch, pointer, and dblclick listeners directly to canvas
+  // Ignore ALL clicks, long presses, double clicks, and context menus in prescription workspace
   useEffect(() => {
     const canvas = canvasRef.current;
+    const workspace = workspaceRef.current;
     if (!canvas) return;
 
-    const preventTouchEvents = (e: Event) => {
+    const swallowEvent = (e: Event) => {
       if (e.cancelable) e.preventDefault();
+      e.stopPropagation();
       if (typeof window !== "undefined" && window.getSelection) {
         const sel = window.getSelection();
         if (sel) sel.removeAllRanges();
       }
     };
 
-    canvas.addEventListener("touchstart", preventTouchEvents, { passive: false });
-    canvas.addEventListener("touchmove", preventTouchEvents, { passive: false });
-    canvas.addEventListener("touchend", preventTouchEvents, { passive: false });
-    canvas.addEventListener("pointerdown", preventTouchEvents, { passive: false });
-    canvas.addEventListener("pointermove", preventTouchEvents, { passive: false });
-    canvas.addEventListener("pointerup", preventTouchEvents, { passive: false });
-    canvas.addEventListener("dblclick", preventTouchEvents, { capture: true });
+    const eventsToBlock = [
+      "click",
+      "dblclick",
+      "contextmenu",
+      "auxclick",
+      "dragstart",
+      "gesturestart",
+      "gesturechange",
+      "gestureend",
+      "touchstart",
+      "touchmove",
+      "touchend",
+      "pointerdown",
+      "pointermove",
+      "pointerup",
+    ];
+
+    eventsToBlock.forEach((evt) => {
+      canvas.addEventListener(evt, swallowEvent, { capture: true, passive: false });
+      if (workspace && (evt === "click" || evt === "dblclick" || evt === "contextmenu" || evt === "dragstart")) {
+        workspace.addEventListener(evt, swallowEvent, { capture: true, passive: false });
+      }
+    });
 
     return () => {
-      canvas.removeEventListener("touchstart", preventTouchEvents);
-      canvas.removeEventListener("touchmove", preventTouchEvents);
-      canvas.removeEventListener("touchend", preventTouchEvents);
-      canvas.removeEventListener("pointerdown", preventTouchEvents);
-      canvas.removeEventListener("pointermove", preventTouchEvents);
-      canvas.removeEventListener("pointerup", preventTouchEvents);
-      canvas.removeEventListener("dblclick", preventTouchEvents);
+      eventsToBlock.forEach((evt) => {
+        canvas.removeEventListener(evt, swallowEvent, { capture: true });
+        if (workspace && (evt === "click" || evt === "dblclick" || evt === "contextmenu" || evt === "dragstart")) {
+          workspace.removeEventListener(evt, swallowEvent, { capture: true });
+        }
+      });
     };
   }, []);
 
@@ -952,7 +969,10 @@ function CanvasPageContent() {
       {/* CANVAS WORKSPACE AREA (Interactive Pan & Pinch-Zoom Container) */}
       <main
         ref={workspaceRef}
-        onContextMenu={(e) => e.preventDefault()}
+        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
         className="flex-1 overflow-hidden p-4 flex justify-center items-center bg-[#E2E8F0] relative select-none touch-none canvas-no-select"
         style={{
           userSelect: "none",
@@ -967,6 +987,9 @@ function CanvasPageContent() {
       >
         <div
           ref={containerRef}
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
           className="relative bg-white shadow-2xl rounded-md border border-slate-300 overflow-hidden origin-center transition-transform duration-75 select-none canvas-no-select"
           style={{
             width: "800px",
@@ -994,6 +1017,9 @@ function CanvasPageContent() {
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
             className="w-full h-full cursor-crosshair touch-none relative z-10 select-none canvas-no-select"
             style={{
               userSelect: "none",
