@@ -87,9 +87,10 @@ function CanvasPageContent() {
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState<boolean>(false);
 
-  // Full Screen & Header Visibility
+  // Full Screen & Header Visibility & iPad modal
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState<boolean>(true);
+  const [showIpadTip, setShowIpadTip] = useState<boolean>(false);
 
   // Modals & Notifications
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
@@ -122,6 +123,44 @@ function CanvasPageContent() {
       }
     });
   }, [router]);
+
+  // Suppress iPad Safari text selection globally on selectionchange
+  useEffect(() => {
+    const preventSelection = () => {
+      if (typeof window !== "undefined" && window.getSelection) {
+        const sel = window.getSelection();
+        if (sel) sel.removeAllRanges();
+      }
+    };
+
+    document.addEventListener("selectionchange", preventSelection);
+    return () => document.removeEventListener("selectionchange", preventSelection);
+  }, []);
+
+  // Attach non-passive touch listeners to canvas to prevent iOS Safari drag-select
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const preventTouchSelect = (e: TouchEvent | PointerEvent) => {
+      if (typeof window !== "undefined" && window.getSelection) {
+        const sel = window.getSelection();
+        if (sel) sel.removeAllRanges();
+      }
+    };
+
+    canvas.addEventListener("touchstart", preventTouchSelect, { passive: false });
+    canvas.addEventListener("touchmove", preventTouchSelect, { passive: false });
+    canvas.addEventListener("pointerdown", preventTouchSelect, { passive: false });
+    canvas.addEventListener("pointermove", preventTouchSelect, { passive: false });
+
+    return () => {
+      canvas.removeEventListener("touchstart", preventTouchSelect);
+      canvas.removeEventListener("touchmove", preventTouchSelect);
+      canvas.removeEventListener("pointerdown", preventTouchSelect);
+      canvas.removeEventListener("pointermove", preventTouchSelect);
+    };
+  }, []);
 
   // Listen for native fullscreen change events
   useEffect(() => {
@@ -491,10 +530,12 @@ function CanvasPageContent() {
           showToast("Full Screen Mode Enabled (Header Collapsed)", "info");
         }).catch(() => {
           setIsHeaderVisible(!isHeaderVisible);
-          showToast(isHeaderVisible ? "Header Collapsed for Max Space" : "Header Shown", "info");
+          setShowIpadTip(true);
         });
       } else {
+        // iPad Safari unsupported requestFullscreen fallback
         setIsHeaderVisible(!isHeaderVisible);
+        setShowIpadTip(true);
       }
     } else {
       if (document.exitFullscreen) {
@@ -592,7 +633,7 @@ function CanvasPageContent() {
   return (
     <div
       onContextMenu={(e) => e.preventDefault()}
-      className="flex flex-col h-screen w-screen bg-slate-100 overflow-hidden font-sans select-none"
+      className="flex flex-col h-screen w-screen bg-slate-100 overflow-hidden font-sans select-none canvas-no-select"
       style={{
         userSelect: "none",
         WebkitUserSelect: "none",
@@ -618,7 +659,7 @@ function CanvasPageContent() {
       {!isHeaderVisible && (
         <button
           onClick={() => setIsHeaderVisible(true)}
-          className="fixed top-3 right-4 z-40 px-3 py-1.5 bg-slate-900/85 hover:bg-slate-900 text-white rounded-full text-xs font-bold shadow-xl backdrop-blur-md flex items-center gap-1.5 transition-all"
+          className="fixed top-3 right-4 z-40 px-3 py-1.5 bg-slate-900/85 hover:bg-slate-900 text-white rounded-full text-xs font-bold shadow-xl backdrop-blur-md flex items-center gap-1.5 transition-all select-none"
           title="Show Navigation Header"
         >
           <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -630,7 +671,7 @@ function CanvasPageContent() {
 
       {/* HEADER BAR (Collapsible for Max Drawing Space) */}
       {isHeaderVisible && (
-        <header className="h-12 bg-white border-b border-[#E2E8F0] px-4 flex items-center justify-between shrink-0 z-20 transition-all">
+        <header className="h-12 bg-white border-b border-[#E2E8F0] px-4 flex items-center justify-between shrink-0 z-20 transition-all select-none canvas-no-select">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/")}
@@ -662,44 +703,44 @@ function CanvasPageContent() {
           <div className="flex items-center h-full select-none">
             <button
               onClick={() => router.push(`/rx/overview?rx=${rxPatientId}`)}
-              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all select-none"
             >
               Overview {pastVisitsCount > 0 ? `(${pastVisitsCount})` : `(0)`}
             </button>
             {userRole !== "staff" && (
               <button
                 onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
-                className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+                className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all select-none"
               >
                 Pad
               </button>
             )}
-            <button className="h-full px-3 text-[11px] font-bold text-indigo-600 border-b-2 border-indigo-600">
+            <button className="h-full px-3 text-[11px] font-bold text-indigo-600 border-b-2 border-indigo-600 select-none">
               Canvas
             </button>
             <button
               onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
-              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all select-none"
             >
               EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
             </button>
             <button
               onClick={() => router.push(`/rx/certificate?rx=${rxPatientId}`)}
-              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all select-none"
             >
               Medical Certificate
             </button>
             <button
               onClick={() => router.push(`/rx/documents?rx=${rxPatientId}`)}
-              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all select-none"
             >
               Documents
             </button>
           </div>
 
           {/* Right Header Controls */}
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-[10px] font-extrabold rounded-md flex items-center gap-1 border border-emerald-100">
+          <div className="flex items-center gap-2 select-none">
+            <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-[10px] font-extrabold rounded-md flex items-center gap-1 border border-emerald-100 select-none">
               🟢 Active Session
             </span>
           </div>
@@ -707,7 +748,7 @@ function CanvasPageContent() {
       )}
 
       {/* CANVAS TOOLBAR */}
-      <div className="bg-white border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-sm z-10 select-none">
+      <div className="bg-white border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-sm z-10 select-none canvas-no-select">
         {/* Colors & Pen/Eraser Tools */}
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">Color:</span>
@@ -870,7 +911,7 @@ function CanvasPageContent() {
       <main
         ref={workspaceRef}
         onContextMenu={(e) => e.preventDefault()}
-        className="flex-1 overflow-hidden p-4 flex justify-center items-center bg-[#E2E8F0] relative select-none touch-none"
+        className="flex-1 overflow-hidden p-4 flex justify-center items-center bg-[#E2E8F0] relative select-none touch-none canvas-no-select"
         style={{
           userSelect: "none",
           WebkitUserSelect: "none",
@@ -883,7 +924,7 @@ function CanvasPageContent() {
       >
         <div
           ref={containerRef}
-          className="relative bg-white shadow-2xl rounded-md border border-slate-300 overflow-hidden origin-center transition-transform duration-75 select-none"
+          className="relative bg-white shadow-2xl rounded-md border border-slate-300 overflow-hidden origin-center transition-transform duration-75 select-none canvas-no-select"
           style={{
             width: "800px",
             height: "1131px",
@@ -896,7 +937,7 @@ function CanvasPageContent() {
           <img
             src="/letterhead.jpg"
             alt="Letterhead Template"
-            className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none opacity-95"
+            className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none opacity-95 canvas-no-select"
             draggable={false}
           />
 
@@ -909,7 +950,7 @@ function CanvasPageContent() {
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
-            className="w-full h-full cursor-crosshair touch-none relative z-10 select-none"
+            className="w-full h-full cursor-crosshair touch-none relative z-10 select-none canvas-no-select"
             style={{
               userSelect: "none",
               WebkitUserSelect: "none",
@@ -918,6 +959,46 @@ function CanvasPageContent() {
           />
         </div>
       </main>
+
+      {/* IPAD FULLSCREEN & PWA INSTRUCTIONS MODAL */}
+      {showIpadTip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span className="text-base">📱</span> iPad Full Screen Setup
+              </h3>
+              <button
+                onClick={() => setShowIpadTip(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold p-1 rounded-md"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="text-xs text-slate-600 leading-relaxed space-y-2">
+              <p className="font-semibold text-slate-800">
+                To hide Safari's top URL & address bar completely on iPad:
+              </p>
+              <ol className="list-decimal pl-4 space-y-2 font-medium text-slate-700">
+                <li>Tap Safari's <span className="font-bold text-indigo-600">Share Icon</span> (top right of Safari).</li>
+                <li>Scroll down and tap <span className="font-bold text-indigo-600">'Add to Home Screen'</span>.</li>
+                <li>Launch <strong>Infi Canvas</strong> directly from your iPad Home Screen!</li>
+              </ol>
+              <div className="text-[11px] text-slate-600 bg-indigo-50/80 p-3 rounded-lg border border-indigo-100 mt-2">
+                ✨ Opening from your iPad Home Screen runs Canvas in <strong>100% Fullscreen native app mode</strong> with zero Safari browser bars!
+              </div>
+            </div>
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setShowIpadTip(false)}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition-colors shadow-sm"
+              >
+                Got it!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* CLEAR CANVAS CONFIRMATION MODAL */}
       {isClearModalOpen && (

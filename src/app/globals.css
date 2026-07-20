@@ -160,4 +160,15 @@ body {
   animation: slide-in-left 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Disable iPad Safari text selection and touch callouts globally on canvas page */
+.canvas-no-select,
+.canvas-no-select * {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
 
