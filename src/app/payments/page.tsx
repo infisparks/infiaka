@@ -29,6 +29,50 @@ interface Registration {
   patient?: Patient;
   services?: any;
   payments?: any;
+  is_completed?: boolean;
+}
+
+function getRegistrationPaymentDetails(reg: Registration) {
+  const netPaid = Math.max(0, reg.bill_amount - reg.discount_amount);
+  const paymentsList = Array.isArray(reg.payments) ? reg.payments : [];
+  const totalPaymentsSum = paymentsList.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
+
+  let cashPaid = 0;
+  let onlinePaid = 0;
+
+  if (totalPaymentsSum > 0) {
+    paymentsList.forEach((p: any) => {
+      const amount = Number(p.amount) || 0;
+      const ratio = amount / totalPaymentsSum;
+      const allocatedAmount = ratio * netPaid;
+      if (p.mode?.toLowerCase() === "cash") {
+        cashPaid += allocatedAmount;
+      } else {
+        onlinePaid += allocatedAmount;
+      }
+    });
+  } else {
+    const methodLower = (reg.payment_method || "cash").toLowerCase();
+    if (methodLower === "cash") {
+      cashPaid = netPaid;
+    } else if (!methodLower.includes("cash")) {
+      onlinePaid = netPaid;
+    } else {
+      const modes = methodLower.split(",").map((m) => m.trim());
+      const cashModes = modes.filter((m) => m === "cash");
+      const onlineModes = modes.filter((m) => m !== "cash");
+      if (cashModes.length > 0 && onlineModes.length > 0) {
+        cashPaid = netPaid / 2;
+        onlinePaid = netPaid / 2;
+      } else if (cashModes.length > 0) {
+        cashPaid = netPaid;
+      } else {
+        onlinePaid = netPaid;
+      }
+    }
+  }
+
+  return { netPaid, cashPaid, onlinePaid };
 }
 
 function PaymentsContent() {
@@ -48,6 +92,8 @@ function PaymentsContent() {
 
   const [startDate, setStartDate] = useState(getTodayDateStr());
   const [endDate, setEndDate] = useState(getTodayDateStr());
+  const [selectedDoctor, setSelectedDoctor] = useState<string>("all");
+  const [selectedHospital, setSelectedHospital] = useState<string>("all");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
 
   // Force today's date if user is staff
@@ -95,16 +141,16 @@ function PaymentsContent() {
       const start = userRole === "staff" ? todayStr : startDate;
       const end = userRole === "staff" ? todayStr : endDate;
 
-      const startIso = `${start}T00:00:00.000Z`;
-      const endIso = `${end}T23:59:59.999Z`;
+      const startIso = `${start}T00:00:00+05:30`;
+      const endIso = `${end}T23:59:59+05:30`;
 
       const { data: regData, error: regError } = await supabase
         .from("aka_opd_registration")
         .select("*")
-        .gte("created_at", startIso)
-        .lte("created_at", endIso)
+        .gte("appointment_date_time", startIso)
+        .lte("appointment_date_time", endIso)
         .or("is_deleted.is.null,is_deleted.eq.false")
-        .order("created_at", { ascending: false });
+        .order("registration_id", { ascending: false });
 
       if (regError) throw regError;
 
@@ -130,6 +176,18 @@ function PaymentsContent() {
 
         // If user is adminnocash, hide appointments paid only in cash
         if (userRole === "adminnocash" && isPaidOnlyCash) {
+          return null;
+        }
+
+        // Check if the appointment is completed (either in DB or localStorage)
+        let isComp = reg.is_completed || false;
+        if (typeof window !== "undefined" && !isComp) {
+          const completedList = JSON.parse(localStorage.getItem("completed_appointments") || "[]");
+          isComp = completedList.includes(String(reg.registration_id));
+        }
+
+        // Only count and show completed appointments
+        if (!isComp) {
           return null;
         }
 
@@ -180,6 +238,7 @@ function PaymentsContent() {
           patient: patientObj,
           services: reg.services,
           payments: reg.payments,
+          is_completed: true,
         } as Registration;
       }).filter((r): r is Registration => r !== null);
 
@@ -193,7 +252,26 @@ function PaymentsContent() {
 
   useEffect(() => {
     fetchBillingData();
+    setSelectedDoctor("all");
+    setSelectedHospital("all");
   }, [sessionLoaded, startDate, endDate, userRole]);
+
+  // Unique doctors and hospitals computed from registrations
+  const uniqueDoctors = useMemo(() => {
+    return Array.from(new Set(registrations.map((r) => r.treating_doctor).filter(Boolean))) as string[];
+  }, [registrations]);
+
+  const uniqueHospitals = useMemo(() => {
+    return Array.from(new Set(registrations.map((r) => r.clinic_name).filter(Boolean))) as string[];
+  }, [registrations]);
+
+  const filteredRegistrations = useMemo(() => {
+    return registrations.filter((reg) => {
+      const matchesDoc = selectedDoctor === "all" || reg.treating_doctor === selectedDoctor;
+      const matchesHosp = selectedHospital === "all" || reg.clinic_name === selectedHospital;
+      return matchesDoc && matchesHosp;
+    });
+  }, [registrations, selectedDoctor, selectedHospital]);
 
   // Aggregate totals
   const totals = useMemo(() => {
@@ -201,27 +279,15 @@ function PaymentsContent() {
     let online = 0;
     let total = 0;
 
-    registrations.forEach((reg) => {
-      const paymentsList = Array.isArray(reg.payments) ? reg.payments : [];
-      if (paymentsList.length > 0) {
-        paymentsList.forEach((p: any) => {
-          const amount = Number(p.amount) || 0;
-          if (p.mode?.toLowerCase() === "cash") {
-            cash += amount;
-          } else {
-            online += amount;
-          }
-          total += amount;
-        });
-      } else {
-        const netAmount = Math.max(0, reg.bill_amount - reg.discount_amount);
-        cash += netAmount;
-        total += netAmount;
-      }
+    filteredRegistrations.forEach((reg) => {
+      const { netPaid, cashPaid, onlinePaid } = getRegistrationPaymentDetails(reg);
+      cash += cashPaid;
+      online += onlinePaid;
+      total += netPaid;
     });
 
     return { cash, online, total };
-  }, [registrations]);
+  }, [filteredRegistrations]);
 
   // Trigger browser blob url PDF export
   const exportPDF = () => {
@@ -243,7 +309,8 @@ function PaymentsContent() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(100, 116, 139); // slate-500
-    doc.text(`Generated on: ${new Date().toLocaleString("en-IN")}  |  Audit Period: ${formattedRange}`, 14, 23);
+    const filterText = `Doctor: ${selectedDoctor === "all" ? "All" : selectedDoctor} | Hospital: ${selectedHospital === "all" ? "All" : selectedHospital}`;
+    doc.text(`Generated on: ${new Date().toLocaleString("en-IN")}  |  Audit Period: ${formattedRange}  |  ${filterText}`, 14, 23);
 
     // Divider Line
     doc.setDrawColor(226, 232, 240);
@@ -265,8 +332,8 @@ function PaymentsContent() {
 
     // Table Content
     const tableHeaders = [["OPD ID", "Patient Name", "UHID", "Method", "Discount", "Net Paid", "Date"]];
-    const tableRows = registrations.map((reg) => {
-      const netPaid = Math.max(0, reg.bill_amount - reg.discount_amount);
+    const tableRows = filteredRegistrations.map((reg) => {
+      const { netPaid } = getRegistrationPaymentDetails(reg);
       const visitDate = new Date(reg.created_at).toLocaleDateString("en-IN", {
         day: "numeric",
         month: "short",
@@ -359,6 +426,40 @@ function PaymentsContent() {
               />
             </div>
 
+            {/* Doctor Filter */}
+            <div className="flex items-center gap-1.5 border border-[#E5E7EB] bg-white rounded-lg px-2.5 py-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase">Doctor</span>
+              <select
+                value={selectedDoctor}
+                onChange={(e) => setSelectedDoctor(e.target.value)}
+                className="text-[11px] font-semibold text-[#111827] focus:outline-none bg-transparent cursor-pointer max-w-[120px]"
+              >
+                <option value="all">All Doctors</option>
+                {uniqueDoctors.map((doc) => (
+                  <option key={doc} value={doc}>
+                    {doc}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Hospital/Clinic Filter */}
+            <div className="flex items-center gap-1.5 border border-[#E5E7EB] bg-white rounded-lg px-2.5 py-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase">Hospital</span>
+              <select
+                value={selectedHospital}
+                onChange={(e) => setSelectedHospital(e.target.value)}
+                className="text-[11px] font-semibold text-[#111827] focus:outline-none bg-transparent cursor-pointer max-w-[120px]"
+              >
+                <option value="all">All Hospitals</option>
+                {uniqueHospitals.map((hosp) => (
+                  <option key={hosp} value={hosp}>
+                    {hosp}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Export PDF Button */}
             <button
               onClick={exportPDF}
@@ -378,7 +479,7 @@ function PaymentsContent() {
           <div className="bg-white p-4.5 rounded-xl border border-[#E5E7EB] shadow-2xs text-left">
             <span className="text-[10px] font-extrabold text-[#A0AEC0] uppercase tracking-wider block">Total Invoices</span>
             <div className="flex items-baseline gap-1.5 mt-1.5">
-              <span className="text-[20px] font-black text-slate-800 leading-none">{registrations.length}</span>
+              <span className="text-[20px] font-black text-slate-800 leading-none">{filteredRegistrations.length}</span>
               <span className="text-[10px] font-bold text-slate-400">Bills Raised</span>
             </div>
           </div>
@@ -429,7 +530,7 @@ function PaymentsContent() {
                   <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                   <p className="mt-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Fetching ledger...</p>
                 </div>
-              ) : registrations.length === 0 ? (
+              ) : filteredRegistrations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-28 text-slate-350 bg-[#FAFBFC]">
                   <span className="text-3xl mb-1.5">📊</span>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">No Transactions In Date Range</span>
@@ -450,9 +551,9 @@ function PaymentsContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E2E8F0] text-[12px] font-medium text-slate-650">
-                    {registrations.map((reg) => {
+                    {filteredRegistrations.map((reg) => {
                       const isCash = reg.payment_method?.toLowerCase() === "cash";
-                      const netPaid = Math.max(0, reg.bill_amount - reg.discount_amount);
+                      const { netPaid } = getRegistrationPaymentDetails(reg);
                       const formattedTime = new Date(reg.created_at).toLocaleDateString("en-IN", {
                         day: "2-digit",
                         month: "short",
@@ -477,9 +578,16 @@ function PaymentsContent() {
                             </div>
                           </td>
                           <td className="py-2.5 px-4 select-none">
-                            <span className="px-2 py-0.5 bg-[#EEF2F6] text-[#475569] text-[9.5px] font-bold rounded-full">
-                              {reg.visit_category || "General"}
-                            </span>
+                            <div className="flex flex-col gap-0.5 items-start">
+                              <span className="px-2 py-0.5 bg-[#EEF2F6] text-[#475569] text-[9.5px] font-bold rounded-full">
+                                {reg.visit_category || "General"}
+                              </span>
+                              {(reg.treating_doctor || reg.clinic_name) && (
+                                <span className="text-[9.5px] text-slate-400 font-semibold mt-0.5 leading-none">
+                                  {reg.treating_doctor || ""}{reg.treating_doctor && reg.clinic_name ? " | " : ""}{reg.clinic_name || ""}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-2.5 px-4 text-slate-500 font-semibold">
                             {formattedTime}

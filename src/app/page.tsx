@@ -670,7 +670,7 @@ function DashboardContent() {
   const [referringDoctor, setReferringDoctor] = useState("");
   const [discountAmount, setDiscountAmount] = useState<number | "">("");
 
-  const [servicesRows, setServicesRows] = useState<Array<{ id: string; name: string; fee: number; qty?: number; type?: 'service' | 'product' }>>([
+  const [servicesRows, setServicesRows] = useState<Array<{ id: string; name: string; fee: number | string; qty?: number; type?: 'service' | 'product' }>>([
     { id: "1", name: "First consultation", fee: 2000, qty: 1, type: "service" }
   ]);
   const [paymentsRows, setPaymentsRows] = useState<Array<{ id: string; mode: string; amount: number }>>([
@@ -1231,7 +1231,7 @@ function DashboardContent() {
     }
   };
 
-  const handleSelectService = (rowId: string, rowFee: number, val: string) => {
+  const handleSelectService = (rowId: string, rowFee: number | string, val: string) => {
     const isCreateService = val.startsWith('+ Create "') && val.endsWith('" (Service)');
     const isCreateProduct = val.startsWith('+ Create "') && val.endsWith('" (Product)');
     let finalVal = val;
@@ -1243,17 +1243,17 @@ function DashboardContent() {
       if (type === "product") {
         supabase
           .from("aka_inventory_products")
-          .insert({ name: finalVal.trim(), qty: 0, selling_price: rowFee })
+          .insert({ name: finalVal.trim(), qty: 0, selling_price: Number(rowFee) || 0 })
           .then(({ error }) => {
             if (error) console.error("Error creating new inventory product:", error);
           });
       } else {
-        incrementOption(164, finalVal, { type, price: rowFee });
+        incrementOption(164, finalVal, { type, price: Number(rowFee) || 0 });
       }
 
       setServiceCache((prev) => {
         if (prev.some(s => s.name.toLowerCase() === finalVal.toLowerCase())) return prev;
-        return [...prev, { name: finalVal.trim(), price: rowFee, type }];
+        return [...prev, { name: finalVal.trim(), price: Number(rowFee) || 0, type }];
       });
 
       updateServiceRow(rowId, finalVal, rowFee, type);
@@ -1270,7 +1270,7 @@ function DashboardContent() {
 
   // Services dynamic totals calculations
   const totalServiceFees = useMemo(() => {
-    return servicesRows.reduce((acc, row) => acc + (row.fee || 0) * (row.type === "product" ? (row.qty || 1) : 1), 0);
+    return servicesRows.reduce((acc, row) => acc + (Number(row.fee) || 0) * (row.type === "product" ? (row.qty || 1) : 1), 0);
   }, [servicesRows]);
 
   const totalPaid = useMemo(() => {
@@ -1427,7 +1427,7 @@ function DashboardContent() {
   // Dynamic Add / Remove Service Rows
   const addServiceRow = () => {
     const newId = Date.now().toString();
-    setServicesRows([...servicesRows, { id: newId, name: "", fee: 0, qty: 1, type: "service" }]);
+    setServicesRows([...servicesRows, { id: newId, name: "", fee: "", qty: 1, type: "service" }]);
   };
 
   const removeServiceRow = (id: string) => {
@@ -1438,7 +1438,7 @@ function DashboardContent() {
   const updateServiceRow = (
     id: string,
     name: string,
-    fee: number,
+    fee: number | string,
     type?: "service" | "product",
     qty?: number
   ) => {
@@ -3427,7 +3427,7 @@ function DashboardContent() {
                             min="0"
                             value={row.fee}
                             onWheel={(e) => e.currentTarget.blur()}
-                            onChange={(e) => updateServiceRow(row.id, row.name, Number(e.target.value))}
+                            onChange={(e) => updateServiceRow(row.id, row.name, e.target.value === "" ? "" : Number(e.target.value))}
                             placeholder="2000"
                             className="w-full h-7 px-2 border border-[#CBD5E0] rounded text-[11px] bg-white focus:outline-none text-right font-bold"
                           />
