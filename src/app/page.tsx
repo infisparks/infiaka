@@ -1515,7 +1515,7 @@ function DashboardContent() {
     }
     servicesRows.forEach((row) => {
       if (row.name.trim() && !serviceCache.find((s) => s.name.toLowerCase() === row.name.toLowerCase())) {
-        setServiceCache((prev) => [...prev, { name: row.name.trim(), price: row.fee, type: row.type || "service" }]);
+        setServiceCache((prev) => [...prev, { name: row.name.trim(), price: Number(row.fee) || 0, type: row.type || "service" }]);
       }
     });
 
@@ -1537,13 +1537,13 @@ function DashboardContent() {
             if (!exists) {
               supabase
                 .from("aka_inventory_products")
-                .insert({ name: row.name.trim(), qty: 0, selling_price: row.fee })
+                .insert({ name: row.name.trim(), qty: 0, selling_price: Number(row.fee) || 0 })
                 .then(({ error }) => {
                   if (error) console.error("Error creating typed inventory product:", error);
                 });
             }
           } else {
-            incrementOption(164, row.name, { type: row.type || "service", price: row.fee });
+            incrementOption(164, row.name, { type: row.type || "service", price: Number(row.fee) || 0 });
           }
         }
       });
