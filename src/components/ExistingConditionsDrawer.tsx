@@ -18,6 +18,15 @@ const DEFAULT_NAMES = [
 const DEFAULT_STATUSES = ["Yes (Active)", "No (Inactive)", "Controlled", "Resolved"];
 const DEFAULT_NOTES = ["On daily medication", "Under control", "Monitored weekly"];
 
+const DEFAULT_SINCE = [
+  "Since childhood",
+  "1 Year",
+  "2 Years",
+  "3 Years",
+  "5 Years",
+  "10 Years"
+];
+
 /* ─── Supabase helpers ──────────────────────────────────────────── */
 async function fetchOptions(categoryId: number, defaults: string[]): Promise<string[]> {
   try {
@@ -88,6 +97,7 @@ export default function ExistingConditionsDrawer({
   const [suggestedNames, setSuggestedNames] = useState<string[]>(DEFAULT_NAMES);
   const [suggestedStatuses, setSuggestedStatuses] = useState<string[]>(DEFAULT_STATUSES);
   const [suggestedNotes, setSuggestedNotes] = useState<string[]>(DEFAULT_NOTES);
+  const [suggestedSince, setSuggestedSince] = useState<string[]>(DEFAULT_SINCE);
 
   /* search bar */
   const [searchVal, setSearchVal]   = useState("");
@@ -122,28 +132,22 @@ export default function ExistingConditionsDrawer({
     }, 180);
   };
 
-  const handleSinceBlur = () => {
-    blurTimeoutRef.current = setTimeout(() => {
-      setFocusId(null);
-      setFocusField(null);
-      setRowHi(-1);
-    }, 180);
-  };
-
   // Load from Supabase on mount
   useEffect(() => {
     if (!isOpen) return;
     let active = true;
     const load = async () => {
-      const [names, statuses, notes] = await Promise.all([
+      const [names, statuses, notes, sinces] = await Promise.all([
         fetchOptions(70, DEFAULT_NAMES),
         fetchOptions(71, DEFAULT_STATUSES),
-        fetchOptions(72, DEFAULT_NOTES)
+        fetchOptions(72, DEFAULT_NOTES),
+        fetchOptions(73, DEFAULT_SINCE)
       ]);
       if (active) {
         setSuggestedNames(names);
         setSuggestedStatuses(statuses);
         setSuggestedNotes(notes);
+        setSuggestedSince(sinces);
       }
     };
     load();
@@ -183,56 +187,13 @@ export default function ExistingConditionsDrawer({
   };
   const onDragEnd = () => { dragIdx.current = null; };
 
-  /* dynamic relative to absolute date calculation */
-  const calculateSinceDate = (val: string): string => {
-    const match = val.trim().match(/^(\d+)\s*(day|week|month|year)s?$/i);
-    if (!match) return val;
-    const amount = parseInt(match[1], 10);
-    const unit = match[2].toLowerCase();
-    const target = new Date();
-    if (unit.startsWith("day")) {
-      target.setDate(target.getDate() - amount);
-    } else if (unit.startsWith("week")) {
-      target.setDate(target.getDate() - amount * 7);
-    } else if (unit.startsWith("month")) {
-      target.setMonth(target.getMonth() - amount);
-    } else if (unit.startsWith("year")) {
-      target.setFullYear(target.getFullYear() - amount);
-    }
-    const day = target.getDate();
-    const fullMonths = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
-    return `${day} ${fullMonths[target.getMonth()]} ${target.getFullYear()}`;
-  };
-
-  const getSinceOptions = (val: string): string[] => {
-    const clean = val.trim();
-    if (!clean) {
-      return ["Since childhood", "1 Year", "2 Years", "3 Years", "5 Years", "10 Years"];
-    }
-    const match = clean.match(/^(\d+)/);
-    if (match) {
-      const num = parseInt(match[1], 10);
-      const isSingular = num === 1;
-      return [
-        `${num} ${isSingular ? "Day" : "Days"}`,
-        `${num} ${isSingular ? "Week" : "Weeks"}`,
-        `${num} ${isSingular ? "Month" : "Months"}`,
-        `${num} ${isSingular ? "Year" : "Years"}`
-      ];
-    }
-    return ["Since childhood", "1 Year", "2 Years", "3 Years", "5 Years", "10 Years"].filter((o) =>
-      o.toLowerCase().includes(clean.toLowerCase())
-    );
-  };
-
   /* inline suggestions list component */
   const InlineDD = ({ id, field, opts, val }: { id: string; field: string; opts: string[]; val: string }) => {
     if (focusId !== id || focusField !== field) return null;
-    const actualOpts = field === "since" ? getSinceOptions(val) : opts;
-    let list = actualOpts.filter((o) => field === "since" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    let list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
     
-    // Add "+ Create" option if not a perfect match in options list (and not since column)
-    if (val && val.trim() && !actualOpts.some(o => o.toLowerCase() === val.trim().toLowerCase()) && field !== "since") {
+    // Add "+ Create" option if not a perfect match in options list
+    if (val && val.trim() && !opts.some(o => o.toLowerCase() === val.trim().toLowerCase())) {
       list = [...list, `+ Create "${val.trim()}"`];
     }
 
@@ -249,12 +210,9 @@ export default function ExistingConditionsDrawer({
           return (
             <div key={opt}
               onMouseDown={() => {
-                const finalVal = field === "since" ? calculateSinceDate(opt) : displayVal;
-                patch(id, { [field]: finalVal });
-                if (isCreate) {
-                  const catId = field === "name" ? 70 : field === "status" ? 71 : 72;
-                  incrementOption(catId, displayVal);
-                }
+                patch(id, { [field]: displayVal });
+                const catId = field === "name" ? 70 : field === "status" ? 71 : field === "notes" ? 72 : 73;
+                incrementOption(catId, displayVal);
                 setFocusId(null);
                 setFocusField(null);
                 setRowHi(-1);
@@ -275,10 +233,9 @@ export default function ExistingConditionsDrawer({
   };
 
   const handleRowKey = (e: React.KeyboardEvent, id: string, field: string, opts: string[], val: string) => {
-    const actualOpts = field === "since" ? getSinceOptions(val) : opts;
-    let list = actualOpts.filter((o) => field === "since" || !val || o.toLowerCase().includes(val.toLowerCase()));
+    let list = opts.filter((o) => !val || o.toLowerCase().includes(val.toLowerCase()));
     
-    if (val && val.trim() && !actualOpts.some(o => o.toLowerCase() === val.trim().toLowerCase()) && field !== "since") {
+    if (val && val.trim() && !opts.some(o => o.toLowerCase() === val.trim().toLowerCase())) {
       list = [...list, `+ Create "${val.trim()}"`];
     }
 
@@ -293,12 +250,10 @@ export default function ExistingConditionsDrawer({
         if (isCreate) {
           const match = selectedOpt.match(/\+ Create "(.*)"/);
           finalVal = match ? match[1] : selectedOpt;
-          const catId = field === "name" ? 70 : field === "status" ? 71 : 72;
-          incrementOption(catId, finalVal);
-        } else if (field === "since") {
-          finalVal = calculateSinceDate(selectedOpt);
         }
         patch(id, { [field]: finalVal });
+        const catId = field === "name" ? 70 : field === "status" ? 71 : field === "notes" ? 72 : 73;
+        incrementOption(catId, finalVal);
         setFocusId(null);
         setFocusField(null);
         setRowHi(-1);
@@ -448,12 +403,12 @@ export default function ExistingConditionsDrawer({
                         <input type="text" value={cond.since}
                           onChange={(e) => patch(cond.id, { since: e.target.value })}
                           onFocus={() => handleInputFocus(cond.id, "since")}
-                          onBlur={handleSinceBlur}
-                          onKeyDown={(e) => handleRowKey(e, cond.id, "since", [], cond.since)}
+                          onBlur={() => handleInputBlur(73, cond.since)}
+                          onKeyDown={(e) => handleRowKey(e, cond.id, "since", suggestedSince, cond.since)}
                           placeholder="Since"
                           className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                         />
-                        <InlineDD id={cond.id} field="since" opts={[]} val={cond.since} />
+                        <InlineDD id={cond.id} field="since" opts={suggestedSince} val={cond.since} />
                       </div>
 
                       {/* status */}

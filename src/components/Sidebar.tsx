@@ -100,19 +100,19 @@ export default function Sidebar({ active, onQueueClick, onBookClick }: SidebarPr
           </Link>
         )}
 
-        {/* Upcoming Tab */}
+        {/* Upcoming Follow-up Tab */}
         <Link
           href="/upcoming"
           className={`w-11 py-1.5 rounded-lg flex flex-col items-center justify-center transition-colors ${
             active === "upcoming" ? "text-primary bg-primary/10" : "text-[#718096] hover:bg-gray-100"
           }`}
-          title="Upcoming Appointments & Follow-ups"
+          title="Upcoming Follow-up"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90 leading-none text-center">
-            Upcoming
+          <span className="text-[8px] font-semibold mt-0.5 tracking-tight leading-tight text-center">
+            Upcoming Follow-up
           </span>
         </Link>
 

@@ -939,12 +939,19 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         <span className="font-bold text-primary mr-1">{title}:</span>
         <span className="text-[#334155]">
           {items.map((item) => {
-            const name = item.name || item.medicineName || item.relation || item.condition || item.item || item.title || "";
+            const name = item.name || item.medicineName || item.relation || item.condition || item.item || item.title || item.destination || "";
             const details = [];
+            if (item.member) details.push(`Member: ${item.member}`);
             if (item.severity) details.push(`Severity: ${item.severity}`);
             if (item.duration) details.push(`Duration: ${item.duration}`);
             if (item.since) details.push(`Since: ${item.since}`);
+            if (item.dose) details.push(`Dose: ${item.dose}`);
+            if (item.freq) details.push(`Freq: ${item.freq}`);
+            if (item.timing) details.push(`Timing: ${item.timing}`);
+            if (item.date) details.push(`Date: ${item.date}`);
+            if (item.travelDate) details.push(`Date: ${item.travelDate}`);
             if (item.relation) details.push(`Relation: ${item.relation}`);
+            if (item.notes) details.push(`Note: ${item.notes}`);
             
             return name + (details.length > 0 ? ` (${details.join(", ")})` : "");
           }).join(" | ")}

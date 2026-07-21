@@ -30,6 +30,16 @@ interface Registration {
   patient?: Patient;
 }
 
+const getTodayStr = () => {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(new Date());
+};
+
 export default function UpcomingPage() {
   const router = useRouter();
   const [sessionLoaded, setSessionLoaded] = useState(false);
@@ -41,6 +51,18 @@ export default function UpcomingPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDoctorFilter, setSelectedDoctorFilter] = useState("All");
   const [selectedClinicFilter, setSelectedClinicFilter] = useState("All");
+  const [startDate, setStartDate] = useState(() => getTodayStr());
+  const [endDate, setEndDate] = useState(() => getTodayStr());
+
+  // Check URL tab param on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "BOOKED") {
+        setActiveTab("BOOKED");
+      }
+    }
+  }, []);
 
   // Auth session check
   useEffect(() => {
@@ -71,23 +93,9 @@ export default function UpcomingPage() {
       try {
         setLoading(true);
 
-        // Get Kolkata local date string today (YYYY-MM-DD)
-        const formatter = new Intl.DateTimeFormat("en-CA", {
-          timeZone: "Asia/Kolkata",
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        });
-        const todayStr = formatter.format(new Date());
-
-        // Fetch all registrations that either have a future follow_up date
-        // or a future appointment_date_time (or today's start)
-        const startRange = `${todayStr}T00:00:00+05:30`;
-
         const { data: regData, error: regError } = await supabase
           .from("aka_opd_registration")
           .select("*")
-          .or(`follow_up.gte.${todayStr},appointment_date_time.gte.${startRange}`)
           .or("is_deleted.is.null,is_deleted.eq.false");
 
         if (regError) throw regError;
@@ -175,22 +183,15 @@ export default function UpcomingPage() {
     return new Date(todayStr);
   }, []);
 
-  // Filter and split registrations based on activeTab, filters, and search
+  // Filter and split registrations based on activeTab, filters, date range, and search
   const displayedRegistrations = useMemo(() => {
     return registrations.filter((reg) => {
       // 1. Tab filter
       if (activeTab === "FOLLOW_UPS") {
         if (!reg.follow_up) return false;
-        // Check if follow_up date is today or in the future
-        const fDate = new Date(reg.follow_up);
-        if (fDate < todayDateObj) return false;
       } else {
         if (reg.is_completed) return false;
         if (!reg.appointment_date_time) return false;
-        // Check if appointment is today or in the future
-        const aDate = new Date(reg.appointment_date_time);
-        // Compare with current time
-        if (aDate < new Date()) return false;
       }
 
       // 2. Doctor Filter
@@ -203,7 +204,20 @@ export default function UpcomingPage() {
         if (reg.clinic_name !== selectedClinicFilter) return false;
       }
 
-      // 4. Global Search Query
+      // 4. Date Range Filter
+      if (startDate || endDate) {
+        let itemDate = "";
+        if (activeTab === "FOLLOW_UPS") {
+          itemDate = reg.follow_up ? reg.follow_up.slice(0, 10) : "";
+        } else {
+          itemDate = reg.appointment_date_time ? reg.appointment_date_time.slice(0, 10) : "";
+        }
+        if (!itemDate) return false;
+        if (startDate && itemDate < startDate) return false;
+        if (endDate && itemDate > endDate) return false;
+      }
+
+      // 5. Global Search Query
       if (searchQuery.trim() !== "") {
         const query = searchQuery.toLowerCase();
         const pName = reg.patient?.name.toLowerCase() || "";
@@ -226,25 +240,29 @@ export default function UpcomingPage() {
         return dateA - dateB;
       }
     });
-  }, [registrations, activeTab, selectedDoctorFilter, selectedClinicFilter, searchQuery, todayDateObj]);
+  }, [registrations, activeTab, selectedDoctorFilter, selectedClinicFilter, startDate, endDate, searchQuery]);
 
   // Tab counts
   const followUpsCount = useMemo(() => {
     return registrations.filter((reg) => {
       if (!reg.follow_up) return false;
-      const fDate = new Date(reg.follow_up);
-      return fDate >= todayDateObj;
+      const itemDate = reg.follow_up.slice(0, 10);
+      if (startDate && itemDate < startDate) return false;
+      if (endDate && itemDate > endDate) return false;
+      return true;
     }).length;
-  }, [registrations, todayDateObj]);
+  }, [registrations, startDate, endDate]);
 
   const bookedCount = useMemo(() => {
     return registrations.filter((reg) => {
       if (reg.is_completed) return false;
       if (!reg.appointment_date_time) return false;
-      const aDate = new Date(reg.appointment_date_time);
-      return aDate >= new Date();
+      const itemDate = reg.appointment_date_time.slice(0, 10);
+      if (startDate && itemDate < startDate) return false;
+      if (endDate && itemDate > endDate) return false;
+      return true;
     }).length;
-  }, [registrations]);
+  }, [registrations, startDate, endDate]);
 
   // Formatter for follow-up dates
   const formatFollowUpDate = (dateStr: string) => {
@@ -339,6 +357,52 @@ export default function UpcomingPage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Start & End Date Range Filter */}
+            <div className="flex items-center gap-1.5 border border-[#E5E7EB] rounded-md bg-white px-2 py-0.5 hover:bg-gray-50 text-[11px] font-semibold text-foreground">
+              <svg className="w-3.5 h-3.5 text-indigo-500 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-[10px] text-gray-500 font-bold">From:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent cursor-pointer"
+                title="Start Date"
+              />
+              <span className="text-[10px] text-gray-500 font-bold ml-1">To:</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent cursor-pointer"
+                title="End Date"
+              />
+              <button
+                onClick={() => {
+                  const today = getTodayStr();
+                  setStartDate(today);
+                  setEndDate(today);
+                }}
+                className="ml-1 px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded text-[9.5px] font-extrabold transition-colors shrink-0"
+                title="Set date range to Today"
+              >
+                Today
+              </button>
+              {(startDate || endDate) && (
+                <button
+                  onClick={() => {
+                    setStartDate("");
+                    setEndDate("");
+                  }}
+                  className="ml-0.5 text-[10px] text-gray-400 hover:text-red-500 font-bold px-1"
+                  title="Clear Date Filter"
+                >
+                  ✕ Clear
+                </button>
+              )}
             </div>
           </div>
 

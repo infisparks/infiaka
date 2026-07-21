@@ -667,7 +667,7 @@ function DashboardContent() {
   const [clinicName, setClinicName] = useState("DLPC - Dadar");
   const [treatingDoctor, setTreatingDoctor] = useState("Dr Laxman Salve");
   const [visitCategory, setVisitCategory] = useState("First consultation");
-  const [referringDoctor, setReferringDoctor] = useState("Dadar East");
+  const [referringDoctor, setReferringDoctor] = useState("");
   const [discountAmount, setDiscountAmount] = useState<number | "">("");
 
   const [servicesRows, setServicesRows] = useState<Array<{ id: string; name: string; fee: number; qty?: number; type?: 'service' | 'product' }>>([
@@ -796,7 +796,7 @@ function DashboardContent() {
     setClinicName("DLPC - Dadar");
     setTreatingDoctor("Dr Laxman Salve");
     setVisitCategory("First consultation");
-    setReferringDoctor("Dadar East");
+    setReferringDoctor("");
     setDiscountAmount(0);
     setServicesRows([{ id: "1", name: "First consultation", fee: 2000, qty: 1, type: "service" }]);
     setPaymentsRows([{ id: "1", mode: "Cash", amount: 0 }]);
@@ -839,7 +839,7 @@ function DashboardContent() {
         setClinicName(reg.clinic_name || "DLPC - Dadar");
         setTreatingDoctor(reg.treating_doctor || "DR. LAXMAN SALVE");
         setVisitCategory(reg.visit_category || "First consultation");
-        setReferringDoctor(reg.referring_doctor || "Dadar East");
+        setReferringDoctor(reg.referring_doctor || "");
         setDiscountAmount(Number(reg.discount_amount) || 0);
         
         if (reg.services && reg.services.length > 0) {
@@ -2244,6 +2244,14 @@ function DashboardContent() {
             >
               COMPLETED ({completedPatientsCount.toString().padStart(2, "0")})
             </button>
+
+            <Link
+              href="/upcoming?tab=BOOKED"
+              className="h-full px-4 text-[11px] font-bold transition-colors flex items-center justify-center text-gray-200 hover:text-white hover:bg-slate-600/30"
+              title="Upcoming Appointments"
+            >
+              UPCOMING APPOINTMENTS
+            </Link>
           </div>
 
           <div className="flex items-center gap-3">
@@ -2358,7 +2366,7 @@ function DashboardContent() {
                     <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-text-secondary font-medium pt-0.5">
                       {patient.opdRegistration?.treating_doctor && (
                         <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-sm">
-                          Dr: <span className="font-bold">{patient.opdRegistration.treating_doctor}</span>
+                          <span className="font-bold">{patient.opdRegistration.treating_doctor}</span>
                         </span>
                       )}
                       {(patient.localAddress || patient.permanentAddress) && (
@@ -2451,18 +2459,16 @@ function DashboardContent() {
                     </button>
 
                     {/* Print Prescription Button */}
-                    {userRole !== "staff" && (
-                      <button
-                        onClick={() => handlePrintPrescription(patient.id, patient.opdRegistration?.registration_id)}
-                        className="px-2 h-6 border border-[#CBD5E0] hover:bg-gray-50 rounded text-[10px] font-bold text-[#4A5568] flex items-center gap-1 transition-colors shrink-0"
-                        title="Print Prescription"
-                      >
-                        <svg className="w-2.5 h-2.5 text-[#4A5568]" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        Print Prescription
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handlePrintPrescription(patient.id, patient.opdRegistration?.registration_id)}
+                      className="px-2 h-6 border border-[#CBD5E0] hover:bg-gray-50 rounded text-[10px] font-bold text-[#4A5568] flex items-center gap-1 transition-colors shrink-0"
+                      title="Print Prescription"
+                    >
+                      <svg className="w-2.5 h-2.5 text-[#4A5568]" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Print Prescription
+                    </button>
 
                     {/* Delete Appointment Button */}
                     <button
@@ -2505,14 +2511,12 @@ function DashboardContent() {
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
               Meet DocAssist AI
             </button>
-            {userRole !== "staff" && (
-              <button className="px-2 py-0.5 bg-[#F5F3FF] border border-[#DDD6FE] text-[#7C3AED] hover:bg-[#ECE9FE] rounded text-[9px] font-bold flex items-center gap-1 shadow-xs transition-colors">
-                <svg className="w-2.5 h-2.5 text-[#7C3AED] animate-pulse" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                </svg>
-                Generate prescription from voice
-              </button>
-            )}
+            <button className="px-2 py-0.5 bg-[#F5F3FF] border border-[#DDD6FE] text-[#7C3AED] hover:bg-[#ECE9FE] rounded text-[9px] font-bold flex items-center gap-1 shadow-xs transition-colors">
+              <svg className="w-2.5 h-2.5 text-[#7C3AED] animate-pulse" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+              Generate prescription from voice
+            </button>
           </div>
         </footer>
 
@@ -3121,7 +3125,7 @@ function DashboardContent() {
                   </div>
 
                   <div className="space-y-1 relative">
-                    <label className="text-[10px] font-bold text-[#4A5568]">Treating Doctor *</label>
+                    <label className="text-[10px] font-bold text-[#4A5568]">Consultant *</label>
                     <input
                       type="text"
                       required
@@ -3155,7 +3159,7 @@ function DashboardContent() {
                           if (activeDDFocus === "doctor") setActiveDDFocus(null);
                         }, 200);
                       }}
-                      placeholder="Type doctor name"
+                      placeholder="Type consultant name"
                       className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none focus:border-primary placeholder:text-gray-300"
                     />
 

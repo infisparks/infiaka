@@ -128,8 +128,12 @@ function DocumentsPageContent() {
         router.push("/login");
       } else {
         const role = await getUserRole(session.user?.email || "");
-        setUserRole(role);
-        setSessionLoaded(true);
+        if (role === "staff") {
+          router.push("/");
+        } else {
+          setUserRole(role);
+          setSessionLoaded(true);
+        }
       }
     });
 
@@ -138,8 +142,12 @@ function DocumentsPageContent() {
         router.push("/login");
       } else {
         const role = await getUserRole(session.user?.email || "");
-        setUserRole(role);
-        setSessionLoaded(true);
+        if (role === "staff") {
+          router.push("/");
+        } else {
+          setUserRole(role);
+          setSessionLoaded(true);
+        }
       }
     });
 
@@ -464,14 +472,12 @@ function DocumentsPageContent() {
           >
             Overview {pastVisitsCount > 0 ? `(${pastVisitsCount})` : `(0)`}
           </button>
-          {userRole !== "staff" && (
-            <button
-              onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
-              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
-            >
-              Pad
-            </button>
-          )}
+          <button
+            onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
+            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+          >
+            Pad
+          </button>
           <button 
             onClick={() => router.push(`/rx/canvas?rx=${rxPatientId}`)}
             className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
@@ -484,14 +490,12 @@ function DocumentsPageContent() {
           >
             EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
           </button>
-          {userRole !== "staff" && (
-            <button 
-              onClick={() => router.push(`/rx/certificate?rx=${rxPatientId}`)}
-              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
-            >
-              Medical Certificate
-            </button>
-          )}
+          <button 
+            onClick={() => router.push(`/rx/certificate?rx=${rxPatientId}`)}
+            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+          >
+            Medical Certificate
+          </button>
           <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">
             Documents
           </button>

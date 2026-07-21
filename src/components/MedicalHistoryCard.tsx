@@ -246,7 +246,8 @@ export default function MedicalHistoryCard({
           <div className="flex flex-wrap gap-5 flex-1 min-w-0">
             {conditions.map((cond) => {
               const details = [
-                cond.since ? `Since: ${cond.since}` : ""
+                cond.since ? `Since: ${cond.since}` : "",
+                cond.notes ? `Note: ${cond.notes}` : ""
               ].filter(Boolean).join(" | ");
 
               const isActive = cond.status === "Yes (Active)";
@@ -304,7 +305,8 @@ export default function MedicalHistoryCard({
           <div className="flex flex-wrap gap-5 flex-1 min-w-0">
             {allergies.map((item) => {
               const details = [
-                item.since ? `Since: ${item.since}` : ""
+                item.since ? `Since: ${item.since}` : "",
+                item.notes ? `Note: ${item.notes}` : ""
               ].filter(Boolean).join(" | ");
 
               const isActive = item.status === "Yes (Active)";
@@ -364,7 +366,8 @@ export default function MedicalHistoryCard({
           <div className="flex flex-wrap gap-5 flex-1 min-w-0">
             {procedures.map((proc) => {
               const details = [
-                proc.date ? `Date: ${proc.date}` : ""
+                proc.date ? `Date: ${proc.date}` : "",
+                proc.notes ? `Note: ${proc.notes}` : ""
               ].filter(Boolean).join(" | ");
 
               const isActive = proc.status === "Yes (Active)";
@@ -427,7 +430,8 @@ export default function MedicalHistoryCard({
                 med.since ? `Since: ${med.since}` : "",
                 med.dose ? `Dose: ${med.dose}` : "",
                 med.freq ? `Freq: ${med.freq}` : "",
-                med.timing ? `Timing: ${med.timing}` : ""
+                med.timing ? `Timing: ${med.timing}` : "",
+                med.notes ? `Note: ${med.notes}` : ""
               ].filter(Boolean).join(" | ");
 
               const isActive = med.status === "Yes (Active)";
@@ -487,7 +491,8 @@ export default function MedicalHistoryCard({
             {habits.map((h) => {
               const details = [
                 h.since ? `Since: ${h.since}` : "",
-                h.frequency ? `Freq: ${h.frequency}` : ""
+                h.frequency ? `Freq: ${h.frequency}` : "",
+                h.notes ? `Note: ${h.notes}` : ""
               ].filter(Boolean).join(" | ");
               const isActive = h.status === "Yes (Active)";
               const isNo = h.status === "No (Inactive)" || h.status.toLowerCase().startsWith("no");
@@ -535,6 +540,10 @@ export default function MedicalHistoryCard({
           </div>
           <div className="flex flex-wrap gap-5 flex-1 min-w-0">
             {foodAllergies.map((f) => {
+              const details = [
+                f.since ? `Since: ${f.since}` : "",
+                f.notes ? `Note: ${f.notes}` : ""
+              ].filter(Boolean).join(" | ");
               const isActive = f.status === "Yes (Active)";
               const isNo = f.status === "No (Inactive)" || f.status.toLowerCase().startsWith("no");
               let badgeText = "-"; let badgeClass = "bg-slate-50 border-slate-200 text-slate-400";
@@ -551,7 +560,7 @@ export default function MedicalHistoryCard({
                   </div>
                   <div onClick={onOpenFoodAllergies} className="cursor-pointer hover:opacity-85">
                     <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{f.name}</p>
-                    {f.since && <p className="text-[9.5px] text-[#8A95A5] font-semibold mt-0.5 leading-none">Since: {f.since}</p>}
+                    {details && <p className="text-[9.5px] text-[#8A95A5] font-semibold mt-0.5 leading-none">{details}</p>}
                   </div>
                 </div>
               );
@@ -572,12 +581,20 @@ export default function MedicalHistoryCard({
             {otherHistoryTitle || "OTHER MED. HISTORY"}
           </div>
           <div onClick={onOpenOtherHistory} className="flex flex-wrap gap-4 flex-1 min-w-0 cursor-pointer hover:opacity-85">
-            {otherHistory.map((o) => (
-              <div key={o.id} className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />
-                <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{o.name}</p>
-              </div>
-            ))}
+            {otherHistory.map((o) => {
+              const details = [
+                o.notes ? `Note: ${o.notes}` : ""
+              ].filter(Boolean).join(" | ");
+              return (
+                <div key={o.id} className="flex flex-col">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />
+                    <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{o.name}</p>
+                  </div>
+                  {details && <p className="text-[9.5px] text-[#8A95A5] font-semibold mt-0.5 leading-none pl-3">{details}</p>}
+                </div>
+              );
+            })}
           </div>
           <button type="button" onClick={onOpenOtherHistory}
             className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-[10px] font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none">+ Add</button>

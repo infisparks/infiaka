@@ -247,8 +247,7 @@ export default function DrugAllergiesDrawer({
           return (
             <div key={opt}
               onMouseDown={() => {
-                const finalVal = field === "since" ? calculateSinceDate(opt) : displayVal;
-                patch(id, { [field]: finalVal });
+                patch(id, { [field]: displayVal });
                 if (isCreate) {
                   const catId = field === "name" ? 120 : field === "status" ? 121 : 122;
                   incrementOption(catId, displayVal);

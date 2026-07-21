@@ -21,12 +21,8 @@ export default function PrescriptionDetailPage() {
         router.push("/login");
       } else {
         const role = await getUserRole(session.user?.email || "");
-        if (role === "staff") {
-          router.push("/");
-        } else {
-          setUserRole(role);
-          setSessionLoaded(true);
-        }
+        setUserRole(role);
+        setSessionLoaded(true);
       }
     });
 
@@ -35,12 +31,8 @@ export default function PrescriptionDetailPage() {
         router.push("/login");
       } else {
         const role = await getUserRole(session.user?.email || "");
-        if (role === "staff") {
-          router.push("/");
-        } else {
-          setUserRole(role);
-          setSessionLoaded(true);
-        }
+        setUserRole(role);
+        setSessionLoaded(true);
       }
     });
 

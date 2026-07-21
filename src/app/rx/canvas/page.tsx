@@ -118,8 +118,12 @@ function CanvasPageContent() {
         router.push("/login");
       } else {
         const role = await getUserRole(session.user?.email || "");
-        setUserRole(role);
-        setSessionLoaded(true);
+        if (role === "staff") {
+          router.push("/");
+        } else {
+          setUserRole(role);
+          setSessionLoaded(true);
+        }
       }
     });
   }, [router]);
@@ -734,14 +738,12 @@ function CanvasPageContent() {
             >
               Overview {pastVisitsCount > 0 ? `(${pastVisitsCount})` : `(0)`}
             </button>
-            {userRole !== "staff" && (
-              <button
-                onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
-                className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all select-none"
-              >
-                Pad
-              </button>
-            )}
+            <button
+              onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
+              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all select-none"
+            >
+              Pad
+            </button>
             <button className="h-full px-3 text-[11px] font-bold text-indigo-600 border-b-2 border-indigo-600 select-none">
               Canvas
             </button>
