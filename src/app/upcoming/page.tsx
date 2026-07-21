@@ -30,14 +30,16 @@ interface Registration {
   patient?: Patient;
 }
 
-const getTodayStr = () => {
+const getDateOffsetStr = (offsetDays: number = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
-  return formatter.format(new Date());
+  return formatter.format(d);
 };
 
 export default function UpcomingPage() {
@@ -51,8 +53,8 @@ export default function UpcomingPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDoctorFilter, setSelectedDoctorFilter] = useState("All");
   const [selectedClinicFilter, setSelectedClinicFilter] = useState("All");
-  const [startDate, setStartDate] = useState(() => getTodayStr());
-  const [endDate, setEndDate] = useState(() => getTodayStr());
+  const [startDate, setStartDate] = useState(() => getDateOffsetStr(0));
+  const [endDate, setEndDate] = useState(() => getDateOffsetStr(0));
 
   // Check URL tab param on mount
   useEffect(() => {
@@ -380,29 +382,53 @@ export default function UpcomingPage() {
                 className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent cursor-pointer"
                 title="End Date"
               />
-              <button
-                onClick={() => {
-                  const today = getTodayStr();
-                  setStartDate(today);
-                  setEndDate(today);
-                }}
-                className="ml-1 px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded text-[9.5px] font-extrabold transition-colors shrink-0"
-                title="Set date range to Today"
-              >
-                Today
-              </button>
-              {(startDate || endDate) && (
+              <div className="flex items-center gap-1 ml-1 shrink-0">
                 <button
                   onClick={() => {
-                    setStartDate("");
-                    setEndDate("");
+                    const today = getDateOffsetStr(0);
+                    setStartDate(today);
+                    setEndDate(today);
                   }}
-                  className="ml-0.5 text-[10px] text-gray-400 hover:text-red-500 font-bold px-1"
-                  title="Clear Date Filter"
+                  className={`px-1.5 py-0.5 rounded text-[9.5px] font-extrabold transition-colors ${
+                    startDate === getDateOffsetStr(0) && endDate === getDateOffsetStr(0)
+                      ? "bg-indigo-600 text-white"
+                      : "bg-indigo-50 hover:bg-indigo-100 text-indigo-600"
+                  }`}
+                  title="Today"
                 >
-                  ✕ Clear
+                  Today
                 </button>
-              )}
+                <button
+                  onClick={() => {
+                    const tomorrow = getDateOffsetStr(1);
+                    setStartDate(tomorrow);
+                    setEndDate(tomorrow);
+                  }}
+                  className={`px-1.5 py-0.5 rounded text-[9.5px] font-extrabold transition-colors ${
+                    startDate === getDateOffsetStr(1) && endDate === getDateOffsetStr(1)
+                      ? "bg-indigo-600 text-white"
+                      : "bg-indigo-50 hover:bg-indigo-100 text-indigo-600"
+                  }`}
+                  title="Tomorrow"
+                >
+                  Tomorrow
+                </button>
+                <button
+                  onClick={() => {
+                    const dayAfter = getDateOffsetStr(2);
+                    setStartDate(dayAfter);
+                    setEndDate(dayAfter);
+                  }}
+                  className={`px-1.5 py-0.5 rounded text-[9.5px] font-extrabold transition-colors ${
+                    startDate === getDateOffsetStr(2) && endDate === getDateOffsetStr(2)
+                      ? "bg-indigo-600 text-white"
+                      : "bg-indigo-50 hover:bg-indigo-100 text-indigo-600"
+                  }`}
+                  title="Day After Tomorrow"
+                >
+                  Day After Tomorrow
+                </button>
+              </div>
             </div>
           </div>
 
