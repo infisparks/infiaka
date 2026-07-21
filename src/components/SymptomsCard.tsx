@@ -149,7 +149,7 @@ function ChipTagField({
 
   return (
     <div className="space-y-1 relative primereact-autocomplete-custom">
-      <label className="block text-[11px] font-semibold text-[#64748B]">{label}</label>
+      <label className="block text-sm font-semibold text-[#64748B]">{label}</label>
       <div className="border border-[#E2E8F0] focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100 rounded-lg bg-white min-h-[36px] transition-all cursor-text flex items-center">
         <AutoComplete
           ref={autoRef}
@@ -165,9 +165,9 @@ function ChipTagField({
           }}
           itemTemplate={itemTemplate}
           placeholder={selected.length === 0 ? label : ""}
-          inputClassName="w-full text-[11px] font-semibold text-[#1e293b] focus:outline-none placeholder:text-[#C0CADC] bg-transparent border-0 shadow-none p-1.5 focus:ring-0"
+          inputClassName="w-full text-sm font-semibold text-[#1e293b] focus:outline-none placeholder:text-[#C0CADC] bg-transparent border-0 shadow-none p-1.5 focus:ring-0"
           className="w-full"
-          panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+          panelClassName="custom-autocomplete-panel text-sm font-semibold"
         />
       </div>
     </div>
@@ -250,18 +250,18 @@ function AutoInput({
       const match = item.match(/\+ Create "(.*)"/);
       const custom = match ? match[1] : item;
       return (
-        <span className="text-blue-600 font-bold flex items-center gap-1 text-[11px]">
+        <span className="text-blue-600 font-bold flex items-center gap-1 text-sm">
           <span>+ Create</span>
           <span className="italic">"{custom}"</span>
         </span>
       );
     }
-    return <span className="text-[11px] font-semibold text-[#334155]">{item}</span>;
+    return <span className="text-sm font-semibold text-[#334155]">{item}</span>;
   };
 
   return (
     <div className="space-y-1 relative primereact-autocomplete-custom">
-      <label className="block text-[11px] font-semibold text-[#64748B]">{label}</label>
+      <label className="block text-sm font-semibold text-[#64748B]">{label}</label>
       <div className="relative">
         <AutoComplete
           ref={autoRef}
@@ -278,9 +278,9 @@ function AutoInput({
           }}
           itemTemplate={itemTemplate}
           placeholder={placeholder ?? label}
-          inputClassName="w-full h-9 px-3 pr-8 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[12.5px] bg-white focus:outline-none font-extrabold text-[#090d16] placeholder:text-slate-400 transition-all"
+          inputClassName="w-full h-9 px-3 pr-8 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-sm bg-white focus:outline-none font-extrabold text-[#090d16] placeholder:text-slate-400 transition-all"
           className="w-full"
-          panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+          panelClassName="custom-autocomplete-panel text-sm font-semibold"
         />
         {clearable && value && (
           <button type="button" onMouseDown={() => onChange("")}
@@ -368,13 +368,13 @@ function InlineAutoComplete({
       const match = item.match(/\+ Create "(.*)"/);
       const custom = match ? match[1] : item;
       return (
-        <span className="text-blue-600 font-bold flex items-center gap-1 text-[11px]">
+        <span className="text-blue-600 font-bold flex items-center gap-1 text-sm">
           <span>+ Create</span>
           <span className="italic">"{custom}"</span>
         </span>
       );
     }
-    return <span className="text-[11px] font-semibold text-[#334155]">{item}</span>;
+    return <span className="text-sm font-semibold text-[#334155]">{item}</span>;
   };
 
   return (
@@ -394,9 +394,9 @@ function InlineAutoComplete({
         }}
         itemTemplate={itemTemplate}
         placeholder={placeholder}
-        inputClassName="w-full h-full border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] px-2 font-semibold text-[#334155] bg-white focus:outline-none placeholder:text-[#CBD5E0] transition-all"
+        inputClassName="w-full h-full border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-sm px-2 font-semibold text-[#334155] bg-white focus:outline-none placeholder:text-[#CBD5E0] transition-all"
         className="w-full h-full"
-        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+        panelClassName="custom-autocomplete-panel text-sm font-semibold"
       />
     </div>
   );
@@ -562,8 +562,8 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
               <path d="M192 104.8c0-9.2-5.8-17.3-13.5-21.8L64.9 15.8C58.7 12.2 51.5 12.4 45.5 16.2c-6 3.8-9.5 10.5-9.5 17.7V96H16c-8.8 0-16 7.2-16 16s7.2 16 16 16h20v62.3c0 7.2 3.5 13.9 9.5 17.7c6 3.8 13.2 4 19.4.4L178.5 146c7.7-4.5 13.5-12.6 13.5-21.8v-19.4zM400 64h-80v32h80c26.5 0 48 21.5 48 48v192c0 26.5-21.5 48-48 48H112c-26.5 0-48-21.5-48-48V336H32v48c0 44.2 35.8 80 80 80h288c44.2 0 80-35.8 80-80V144c0-44.2-35.8-80-80-80z"/>
             </svg>
           </div>
-          <span className="text-[12px] font-bold text-[#1E293B] tracking-tight">Symptoms</span>
-          <span className="text-[9px] bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded font-bold tracking-widest uppercase">ICD-10</span>
+          <span className="text-sm font-bold text-[#1E293B] tracking-tight">Symptoms</span>
+          <span className="text-xs bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded font-bold tracking-widest uppercase">ICD-10</span>
         </div>
         <div className="flex items-center gap-1.5">
           <button className="w-7 h-7 rounded-lg bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] flex items-center justify-center transition-colors">
@@ -580,10 +580,10 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
           {/* column labels */}
           <div className="flex items-center gap-2 px-1 pb-1 border-b border-[#F8FAFC]">
             <div className="w-4 shrink-0" />
-            <div className="w-[26%] shrink-0 text-[9px] font-bold text-[#94A3B8] uppercase tracking-widest">Symptom</div>
-            <div className="flex-1 text-[9px] font-bold text-[#94A3B8] uppercase tracking-widest">Duration</div>
-            <div className="flex-1 text-[9px] font-bold text-[#94A3B8] uppercase tracking-widest">Severity</div>
-            <div className="flex-1 text-[9px] font-bold text-[#94A3B8] uppercase tracking-widest hidden lg:block">Details</div>
+            <div className="w-[26%] shrink-0 text-xs font-bold text-[#94A3B8] uppercase tracking-widest">Symptom</div>
+            <div className="flex-1 text-xs font-bold text-[#94A3B8] uppercase tracking-widest">Duration</div>
+            <div className="flex-1 text-xs font-bold text-[#94A3B8] uppercase tracking-widest">Severity</div>
+            <div className="flex-1 text-xs font-bold text-[#94A3B8] uppercase tracking-widest hidden lg:block">Details</div>
             <div className="w-16 shrink-0" />
           </div>
 
@@ -650,27 +650,27 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                   {hasDetails ? (
                     <div className="flex flex-wrap gap-1">
                       {(sym.headacheSites ?? []).map((s) => (
-                        <span key={s} className="text-[9px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded-md leading-none">{s}</span>
+                        <span key={s} className="text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded-md leading-none">{s}</span>
                       ))}
                       {(sym.painTypes ?? []).map((pt) => (
-                        <span key={pt} className="text-[9px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded-md leading-none">{pt}</span>
+                        <span key={pt} className="text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded-md leading-none">{pt}</span>
                       ))}
                       {sym.clinicalCourse && (
-                        <span className="text-[9px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-md leading-none">{sym.clinicalCourse}</span>
+                        <span className="text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-md leading-none">{sym.clinicalCourse}</span>
                       )}
                       {sym.note && (
-                        <span className="text-[9px] font-semibold bg-gray-100 text-gray-700 border border-gray-300 px-1.5 py-0.5 rounded-md leading-none max-w-[150px] truncate" title={sym.note}>
+                        <span className="text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-300 px-1.5 py-0.5 rounded-md leading-none max-w-[150px] truncate" title={sym.note}>
                           Note: {sym.note}
                         </span>
                       )}
                     </div>
-                  ) : <span className="text-[10px] text-[#CBD5E0]">—</span>}
+                  ) : <span className="text-xs text-[#CBD5E0]">—</span>}
                 </div>
 
                 {/* actions */}
                 <div className="flex items-center gap-1 shrink-0 w-16 justify-end">
                   <button type="button" onClick={() => openModal(sym)}
-                    className="h-6 px-2 text-[9px] font-bold text-[#64748B] border border-[#E2E8F0] rounded-md hover:bg-[#F1F5F9] hover:border-[#CBD5E0] transition-all uppercase tracking-wide"
+                    className="h-6 px-2 text-xs font-bold text-[#64748B] border border-[#E2E8F0] rounded-md hover:bg-[#F1F5F9] hover:border-[#CBD5E0] transition-all uppercase tracking-wide"
                   >More</button>
                   <button type="button" onClick={() => remove(sym.id)}
                     className="w-5 h-5 flex items-center justify-center text-[#CBD5E0] hover:text-red-400 transition-colors rounded">
@@ -699,11 +699,11 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
             onFocus={() => { setSearchOpen(true); setSearchHi(-1); }}
             onBlur={() => setTimeout(() => { setSearchOpen(false); setSearchHi(-1); }, 160)}
             onKeyDown={handleSearchKey}
-            className="w-full h-8 pl-8 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-medium transition-all"
+            className="w-full h-8 pl-8 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-sm bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-medium transition-all"
           />
           {searchVal.trim() && (
             <button type="button" onClick={() => addSymptom(searchVal)}
-              className="absolute right-2 text-blue-600 hover:text-blue-700 text-[10px] font-bold tracking-wide">+ Add</button>
+              className="absolute right-2 text-blue-600 hover:text-blue-700 text-xs font-bold tracking-wide">+ Add</button>
           )}
         </div>
 
@@ -732,15 +732,15 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                   <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center text-[8px] font-extrabold text-blue-700 shrink-0 leading-none">
                     {initials(opt) || "Sx"}
                   </div>
-                  <span className="text-[11.5px] font-semibold text-[#1E293B]">{opt}</span>
+                  <span className="text-sm font-semibold text-[#1E293B]">{opt}</span>
                 </div>
               ))}
               {hasCustomVal && (
                 <div
                   onMouseDown={() => addSymptom(searchVal)}
-                  className="px-3 py-2.5 text-[11.5px] font-bold text-blue-600 hover:bg-blue-50 border-t border-[#F8FAFC] cursor-pointer flex items-center gap-2.5"
+                  className="px-3 py-2.5 text-sm font-bold text-blue-600 hover:bg-blue-50 border-t border-[#F8FAFC] cursor-pointer flex items-center gap-2.5"
                 >
-                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-extrabold text-blue-700 shrink-0 leading-none">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-extrabold text-blue-700 shrink-0 leading-none">
                     +
                   </div>
                   <span>Create "{searchVal.trim()}"</span>
@@ -759,13 +759,13 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
             {/* header */}
             <div className="px-5 py-3.5 border-b border-[#F1F5F9] flex items-center justify-between shrink-0 bg-[#FAFBFC]">
               <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center text-[10px] font-extrabold text-blue-700 shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center text-xs font-extrabold text-blue-700 shrink-0">
                   {initials(activeSym.name) || "Sx"}
                 </div>
                 <div>
-                  <p className="text-[13px] font-extrabold text-[#1E293B] leading-none">{activeSym.name || "Symptom"}</p>
+                  <p className="text-sm font-extrabold text-[#1E293B] leading-none">{activeSym.name || "Symptom"}</p>
                   {(activeSym.duration || activeSym.severity) && (
-                    <p className="text-[10px] text-[#94A3B8] font-medium mt-0.5">
+                    <p className="text-xs text-[#94A3B8] font-medium mt-0.5">
                       {[activeSym.duration, activeSym.severity].filter(Boolean).join(" · ")}
                     </p>
                   )}
@@ -784,7 +784,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
 
               {/* Severity */}
               <div className="space-y-1 relative">
-                <label className="block text-[11px] font-semibold text-[#64748B]">Severity</label>
+                <label className="block text-sm font-semibold text-[#64748B]">Severity</label>
                 <div className="relative">
                   <input type="text" value={mSeverity}
                     onChange={(e) => setMSeverity(e.target.value)}
@@ -796,7 +796,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                       }
                     }}
                     placeholder="Severity"
-                    className="w-full h-9 px-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-white focus:outline-none font-semibold text-[#334155] placeholder:text-[#C0CADC] transition-all"
+                    className="w-full h-9 px-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-sm bg-white focus:outline-none font-semibold text-[#334155] placeholder:text-[#C0CADC] transition-all"
                   />
                 </div>
                 <div className="flex gap-1.5 flex-wrap pt-0.5">
@@ -807,7 +807,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                         await incrementOption(3, s);
                         refreshAllOptions();
                       }}
-                      className={`text-[9.5px] font-bold px-2.5 py-0.5 rounded-full border transition-all ${
+                      className={`text-xs font-bold px-2.5 py-0.5 rounded-full border transition-all ${
                         mSeverity === s ? severityColor(s) : "bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0] hover:border-[#CBD5E0]"
                       }`}
                     >{s}</button>
@@ -864,16 +864,16 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
               {/* Note */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-semibold text-[#64748B]">Note</label>
-                  <span className="text-[9px] text-[#CBD5E0]">ⓘ</span>
+                  <label className="block text-sm font-semibold text-[#64748B]">Note</label>
+                  <span className="text-xs text-[#CBD5E0]">ⓘ</span>
                 </div>
                 <div className="border border-[#E2E8F0] focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100 rounded-lg overflow-hidden bg-white transition-all">
                   <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-[#F1F5F9] bg-[#FAFBFC]">
-                    <button type="button" className="w-6 h-5 flex items-center justify-center text-[11px] font-extrabold text-[#94A3B8] hover:bg-[#E2E8F0] rounded">B</button>
-                    <button type="button" className="w-6 h-5 flex items-center justify-center text-[11px] italic font-bold text-[#94A3B8] hover:bg-[#E2E8F0] rounded">I</button>
-                    <button type="button" className="w-6 h-5 flex items-center justify-center text-[10px] text-[#94A3B8] hover:bg-[#E2E8F0] rounded">≡ ▾</button>
+                    <button type="button" className="w-6 h-5 flex items-center justify-center text-sm font-extrabold text-[#94A3B8] hover:bg-[#E2E8F0] rounded">B</button>
+                    <button type="button" className="w-6 h-5 flex items-center justify-center text-sm italic font-bold text-[#94A3B8] hover:bg-[#E2E8F0] rounded">I</button>
+                    <button type="button" className="w-6 h-5 flex items-center justify-center text-xs text-[#94A3B8] hover:bg-[#E2E8F0] rounded">≡ ▾</button>
                     <div className="flex-1" />
-                    <button type="button" className="text-[10px] text-[#CBD5E0] hover:text-[#94A3B8] px-1">⤢</button>
+                    <button type="button" className="text-xs text-[#CBD5E0] hover:text-[#94A3B8] px-1">⤢</button>
                   </div>
                   <textarea rows={3} value={mNote}
                     onChange={(e) => setMNote(e.target.value)}
@@ -885,7 +885,7 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
                       }
                     }}
                     placeholder="Add clinical notes, findings or observations…"
-                    className="w-full px-3 py-2 text-[11px] focus:outline-none bg-white font-medium text-[#475569] resize-none placeholder:text-[#CBD5E0]"
+                    className="w-full px-3 py-2 text-sm focus:outline-none bg-white font-medium text-[#475569] resize-none placeholder:text-[#CBD5E0]"
                   />
                 </div>
               </div>
@@ -894,10 +894,10 @@ export default function SymptomsCard({ symptoms, setSymptoms }: SymptomsCardProp
             {/* footer */}
             <div className="px-5 py-3 border-t border-[#F1F5F9] bg-[#FAFBFC] flex items-center justify-end gap-2 shrink-0">
               <button type="button" onClick={() => setModalId(null)}
-                className="px-4 py-1.5 border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[11px] font-bold text-[#64748B] rounded-lg transition-all"
+                className="px-4 py-1.5 border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-sm font-bold text-[#64748B] rounded-lg transition-all"
               >Cancel</button>
               <button type="button" onClick={saveModal}
-                className="px-5 py-1.5 bg-blue-600 hover:bg-blue-700 text-[11px] font-extrabold text-white rounded-lg transition-all shadow-sm"
+                className="px-5 py-1.5 bg-blue-600 hover:bg-blue-700 text-sm font-extrabold text-white rounded-lg transition-all shadow-sm"
               >Save</button>
             </div>
           </div>

@@ -35,24 +35,33 @@ const getTodayLabel = (): string => {
   return `Tdy, ${day} ${month}`;
 };
 
-const getInitialAppointmentDateTime = (): string => {
+const getInitialAppointmentDate = (): string => {
   const date = new Date();
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Kolkata',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
   });
   const parts = formatter.formatToParts(date);
   const yyyy = parts.find(p => p.type === 'year')?.value || '2026';
   const mm = parts.find(p => p.type === 'month')?.value || '07';
   const dd = parts.find(p => p.type === 'day')?.value || '12';
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const getCurrentTimeHHMM = (): string => {
+  const date = new Date();
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(date);
   const hh = parts.find(p => p.type === 'hour')?.value || '12';
   const min = parts.find(p => p.type === 'minute')?.value || '00';
-  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  return `${hh}:${min}`;
 };
 
 interface Patient {
@@ -663,7 +672,7 @@ function DashboardContent() {
   const [state, setState] = useState("Maharashtra");
 
   // DB Map: public.visits
-  const [appointmentDateTime, setAppointmentDateTime] = useState(() => getInitialAppointmentDateTime());
+  const [appointmentDate, setAppointmentDate] = useState(() => getInitialAppointmentDate());
   const [clinicName, setClinicName] = useState("DLPC - Dadar");
   const [treatingDoctor, setTreatingDoctor] = useState("Dr Laxman Salve");
   const [visitCategory, setVisitCategory] = useState("First consultation");
@@ -792,7 +801,7 @@ function DashboardContent() {
     setLocalAddress("");
     setCountry("India");
     setState("Maharashtra");
-    setAppointmentDateTime(getInitialAppointmentDateTime());
+    setAppointmentDate(getInitialAppointmentDate());
     setClinicName("DLPC - Dadar");
     setTreatingDoctor("Dr Laxman Salve");
     setVisitCategory("First consultation");
@@ -834,7 +843,7 @@ function DashboardContent() {
       if (selectedBookingPatient.opdRegistration) {
         const reg = selectedBookingPatient.opdRegistration;
         if (reg.appointment_date_time) {
-          setAppointmentDateTime(reg.appointment_date_time.slice(0, 16));
+          setAppointmentDate(reg.appointment_date_time.slice(0, 10));
         }
         setClinicName(reg.clinic_name || "DLPC - Dadar");
         setTreatingDoctor(reg.treating_doctor || "DR. LAXMAN SALVE");
@@ -1603,12 +1612,14 @@ function DashboardContent() {
         targetUhid = newP.uhid;
       }
 
+      const formattedAppointmentDateTime = appointmentDate ? `${appointmentDate}T${getCurrentTimeHHMM()}:00+05:30` : null;
+
       if (isUpdate && selectedBookingPatient!.opdRegistration?.registration_id) {
         // Update existing registration details
         const { error: rError } = await supabase
           .from("aka_opd_registration")
           .update({
-            appointment_date_time: appointmentDateTime ? `${appointmentDateTime}:00+05:30` : null,
+            appointment_date_time: formattedAppointmentDateTime,
             clinic_name: clinicName,
             treating_doctor: treatingDoctor,
             visit_category: visitCategory,
@@ -1630,7 +1641,7 @@ function DashboardContent() {
           .from("aka_opd_registration")
           .insert({
             patient_uhid: targetUhid,
-            appointment_date_time: appointmentDateTime ? `${appointmentDateTime}:00+05:30` : null,
+            appointment_date_time: formattedAppointmentDateTime,
             clinic_name: clinicName,
             treating_doctor: treatingDoctor,
             visit_category: visitCategory,
@@ -3104,13 +3115,13 @@ function DashboardContent() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-[#4A5568]">Appointment Date & Time *</label>
+                    <label className="text-[10px] font-bold text-[#4A5568]">Appointment Date *</label>
                     <input
-                      type="datetime-local"
+                      type="date"
                       required
-                      value={appointmentDateTime}
-                      onChange={(e) => setAppointmentDateTime(e.target.value)}
-                      className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none text-center"
+                      value={appointmentDate}
+                      onChange={(e) => setAppointmentDate(e.target.value)}
+                      className="w-full h-8 px-2.5 border border-[#CBD5E0] rounded-md text-[11px] bg-white focus:outline-none text-center cursor-pointer font-bold"
                     />
                   </div>
 

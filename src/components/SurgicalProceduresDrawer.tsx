@@ -305,7 +305,7 @@ export default function SurgicalProceduresDrawer({
                 setFocusField(null);
                 setRowHi(-1);
               }}
-              className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
+              className={`px-3 py-[7px] text-sm font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
                 ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
             >
               {isCreate ? (
@@ -378,7 +378,7 @@ export default function SurgicalProceduresDrawer({
             <div className="w-6.5 h-6.5 rounded-md bg-rose-100 flex items-center justify-center text-rose-700 text-xs shadow-sm">
               📕
             </div>
-            <span className="text-[13px] font-extrabold text-[#1E293B]">Surgical History</span>
+            <span className="text-sm font-extrabold text-[#1E293B]">Surgical History</span>
           </div>
           <button type="button" onClick={onClose}
             className="w-7 h-7 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] flex items-center justify-center text-[#94A3B8] hover:text-[#475569] transition-all">
@@ -405,11 +405,11 @@ export default function SurgicalProceduresDrawer({
                 onFocus={() => { setSearchOpen(true); setSearchHi(-1); }}
                 onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
                 onKeyDown={handleSearchKey}
-                className="w-full h-9 pl-9 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-semibold transition-all"
+                className="w-full h-9 pl-9 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-sm bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-semibold transition-all"
               />
               {searchVal.trim() && (
                 <button type="button" onClick={() => addProcedure(searchVal)}
-                  className="absolute right-3 text-blue-600 hover:text-blue-700 text-[10px] font-bold tracking-wide">+ Add</button>
+                  className="absolute right-3 text-blue-600 hover:text-blue-700 text-xs font-bold tracking-wide">+ Add</button>
               )}
             </div>
 
@@ -424,7 +424,7 @@ export default function SurgicalProceduresDrawer({
                       className={`flex items-center gap-2.5 px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors
                         ${i === searchHi ? "bg-blue-50" : "hover:bg-[#F8FAFC]"}`}
                     >
-                      <span className="text-[11.5px] font-semibold text-[#1E293B]">{opt}</span>
+                      <span className="text-sm font-semibold text-[#1E293B]">{opt}</span>
                     </div>
                   ))}
                 </div>
@@ -436,7 +436,7 @@ export default function SurgicalProceduresDrawer({
           <div className="flex-1 border border-[#E2E8F0] rounded-xl overflow-y-auto min-h-0 bg-[#FAFBFC]">
             
             {/* Headers row */}
-            <div className="flex items-stretch border-b border-[#E2E8F0] bg-white text-[9px] font-extrabold text-[#718096] uppercase sticky top-0 z-30 select-none py-1 h-9">
+            <div className="flex items-stretch border-b border-[#E2E8F0] bg-white text-sm font-extrabold text-[#718096] uppercase sticky top-0 z-30 select-none py-1 h-10">
               <div className="w-8 shrink-0" />
               <div className="w-[28%] shrink-0 border-r border-[#E2E8F0] px-3 flex items-center">Name</div>
               <div className="w-[22%] shrink-0 border-r border-[#E2E8F0] px-3 flex items-center">Date</div>
@@ -449,7 +449,7 @@ export default function SurgicalProceduresDrawer({
             {procedures.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-[#CBD5E0]">
                 <span className="text-3xl mb-1.5">📋</span>
-                <span className="text-[11px] font-bold uppercase tracking-wider">No surgical procedures added yet</span>
+                <span className="text-sm font-bold uppercase tracking-wider">No surgical procedures added yet</span>
               </div>
             ) : (
               <div className="p-3.5 space-y-2">
@@ -484,7 +484,7 @@ export default function SurgicalProceduresDrawer({
                           onBlur={() => handleInputBlur(130, proc.name)}
                           onKeyDown={(e) => handleRowKey(e, proc.id, "name", suggestedNames, proc.name)}
                           placeholder="Name"
-                          className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-355"
+                          className="w-full h-full border-0 focus:ring-0 px-3 text-sm font-bold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-355"
                         />
                         <InlineDD id={proc.id} field="name" opts={suggestedNames} val={proc.name} />
                       </div>
@@ -499,7 +499,7 @@ export default function SurgicalProceduresDrawer({
                           onBlur={handleSinceBlur}
                           onKeyDown={(e) => handleRowKey(e, proc.id, "date", SUGGESTED_SINCE, proc.date)}
                           placeholder="Date"
-                          className="w-full h-full border-0 focus:ring-0 pl-3 pr-7 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
+                          className="w-full h-full border-0 focus:ring-0 pl-3 pr-7 text-sm font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                         />
                         <div className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center cursor-pointer text-slate-350 hover:text-slate-500 transition-colors z-10">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
@@ -530,7 +530,7 @@ export default function SurgicalProceduresDrawer({
                           onBlur={() => handleInputBlur(131, proc.status)}
                           onKeyDown={(e) => handleRowKey(e, proc.id, "status", suggestedStatuses, proc.status)}
                           placeholder="Status"
-                          className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-emerald-600 bg-transparent outline-none placeholder:text-slate-350"
+                          className="w-full h-full border-0 focus:ring-0 px-3 text-sm font-bold text-emerald-600 bg-transparent outline-none placeholder:text-slate-350"
                         />
                         <InlineDD id={proc.id} field="status" opts={suggestedStatuses} val={proc.status} />
                       </div>
@@ -543,7 +543,7 @@ export default function SurgicalProceduresDrawer({
                           onBlur={() => handleInputBlur(132, proc.notes)}
                           onKeyDown={(e) => handleRowKey(e, proc.id, "notes", suggestedNotes, proc.notes)}
                           placeholder="Add notes here"
-                          className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-355"
+                          className="w-full h-full border-0 focus:ring-0 px-3 text-sm font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-355"
                         />
                         <InlineDD id={proc.id} field="notes" opts={suggestedNotes} val={proc.notes} />
                       </div>
@@ -567,10 +567,10 @@ export default function SurgicalProceduresDrawer({
         {/* Footer controls */}
         <div className="px-5 py-4.5 border-t border-[#F1F5F9] bg-[#FAFBFC] flex items-center justify-end gap-2.5 shrink-0">
           <button type="button" onClick={onClose}
-            className="px-4 py-2 border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[11.5px] font-bold text-[#64748B] rounded-lg transition-all"
+            className="px-4 py-2 border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-sm font-bold text-[#64748B] rounded-lg transition-all"
           >Cancel</button>
           <button type="button" onClick={onClose}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-[11.5px] font-extrabold text-white rounded-lg transition-all shadow-md"
+            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-sm font-extrabold text-white rounded-lg transition-all shadow-md"
           >Save & Close</button>
         </div>
 

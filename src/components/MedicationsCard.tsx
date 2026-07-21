@@ -400,13 +400,13 @@ function InlineAutoComplete({
       const match = item.match(/\+ Create "(.*)"/);
       const custom = match ? match[1] : item;
       return (
-        <span className="text-blue-600 font-bold flex items-center gap-1 text-[11px]">
+        <span className="text-blue-600 font-bold flex items-center gap-1 text-sm">
           <span>+ Create</span>
           <span className="italic">"{custom}"</span>
         </span>
       );
     }
-    return <span className="text-[11px] font-semibold text-[#334155]">{item}</span>;
+    return <span className="text-sm font-semibold text-[#334155]">{item}</span>;
   };
 
   return (
@@ -427,9 +427,9 @@ function InlineAutoComplete({
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
-        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[12.5px] font-bold text-[#090d16] bg-transparent outline-none placeholder:text-slate-400"
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-sm font-bold text-[#090d16] bg-transparent outline-none placeholder:text-slate-400"
         className="w-full h-full"
-        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+        panelClassName="custom-autocomplete-panel text-sm font-semibold"
       />
     </div>
   );
@@ -472,12 +472,6 @@ function InlineMedicineAutoComplete({
   };
 
   const handleSelect = (e: { value: MedicineItem }) => {
-    const added = isAlreadyAdded ? isAlreadyAdded(e.value.name, e.value.id) : false;
-    if (added) {
-      dropdownClicked.current = false;
-      onChange(""); // reset/clear out duplicate entry
-      return;
-    }
     dropdownClicked.current = true;
     onSelect(e.value);
     // Auto-focus dose field after medicine is selected
@@ -497,18 +491,12 @@ function InlineMedicineAutoComplete({
   };
 
   const itemTemplate = (item: MedicineItem) => {
-    const added = isAlreadyAdded ? isAlreadyAdded(item.name, item.id) : false;
     return (
-      <div className={`p-1.5 flex items-center justify-between w-full ${added ? "opacity-60 cursor-not-allowed bg-slate-50/50" : ""}`}>
+      <div className="p-1.5 flex items-center justify-between w-full">
         <div className="flex-1 min-w-0">
-          <div className={`text-[11px] font-bold ${added ? "text-slate-400 line-through" : "text-[#1e293b]"}`}>{item.name}</div>
+          <div className="text-sm font-bold text-[#1e293b]">{item.name}</div>
           <div className="text-[8px] text-[#A0AEC0] uppercase font-semibold truncate">{item.generic}</div>
         </div>
-        {added && (
-          <span className="text-[7.5px] font-extrabold text-amber-700 bg-amber-50 border border-amber-250 px-1 py-0.2 rounded uppercase select-none shrink-0">
-            Added
-          </span>
-        )}
       </div>
     );
   };
@@ -538,9 +526,9 @@ function InlineMedicineAutoComplete({
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
-        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[12.5px] font-extrabold text-[#090d16] bg-transparent outline-none p-0 placeholder:text-slate-400"
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-sm font-extrabold text-[#090d16] bg-transparent outline-none p-0 placeholder:text-slate-400"
         className="w-full h-full"
-        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+        panelClassName="custom-autocomplete-panel text-sm font-semibold"
       />
     </div>
   );
@@ -620,18 +608,6 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
     let name = med.name.trim();
     if (!name) return;
 
-    // Prevent duplicate addition
-    const isDuplicate = medications.some(m => 
-      m.name.trim().toLowerCase() === name.toLowerCase() ||
-      (med.id && m.medicineId === med.id)
-    );
-    if (isDuplicate) {
-      setMedInput("");
-      setMedInputFocused(false);
-      setSearchHi(-1);
-      return;
-    }
-
     let generic = med.generic ? med.generic.trim() : "";
     let form = med.form ?? "tablet";
 
@@ -657,7 +633,7 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
     }
 
     const newMed = {
-      id: Date.now().toString(),
+      id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       medicineId,
       name,
       generic,
@@ -723,10 +699,10 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
           <div className="w-6 h-6 rounded-md bg-gradient-to-br from-rose-500 to-rose-700 flex items-center justify-center text-white text-xs shadow-sm">
             💊
           </div>
-          <span className="text-[12px] font-bold text-[#1E293B] tracking-tight">Medications</span>
+          <span className="text-sm font-bold text-[#1E293B] tracking-tight">Medications</span>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-[10px] font-bold text-[#4A5568] bg-[#F1F5F9] px-2.5 py-1 rounded-md border border-[#E2E8F0]">
+          <div className="flex items-center gap-2 text-xs font-bold text-[#4A5568] bg-[#F1F5F9] px-2.5 py-1 rounded-md border border-[#E2E8F0]">
             <span className="text-slate-400">ⓘ Default Instructions:</span>
             <select className="bg-transparent text-blue-600 cursor-pointer focus:outline-none font-extrabold">
               <option value="off">Off</option>
@@ -740,7 +716,7 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
             </svg>
           </button>
           <button className="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 flex flex-col items-center justify-center text-rose-600 transition-colors relative">
-            <span className="text-[9px] font-extrabold">Mx</span>
+            <span className="text-xs font-extrabold">Mx</span>
           </button>
           <button className="w-7 h-7 rounded-lg bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] flex items-center justify-center transition-colors">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5 text-slate-400">
@@ -752,50 +728,50 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
       </div>
 
       {/* Columns Header Grid */}
-      <div className="flex items-stretch border-b border-[#E2E8F0] bg-slate-50/50 text-[10.5px] font-extrabold text-[#090d16] uppercase select-none">
+      <div className="flex items-stretch border-b border-[#E2E8F0] bg-slate-50/50 text-sm font-extrabold text-[#090d16] uppercase select-none">
         {/* drag grip blank */}
         <div className="w-7 shrink-0 border-r border-[#E2E8F0]" />
         
         {/* Col 1: Medicine */}
         <div className="w-[27%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Medicine</div>
-          <div className="text-[9.5px] text-slate-700 lowercase font-semibold">Generic</div>
+          <div className="text-sm text-slate-700 lowercase font-semibold">Generic</div>
         </div>
         
         {/* Col 2: Dose */}
         <div className="w-[10%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Dose</div>
-          <div className="text-[9.5px] text-slate-700 lowercase font-semibold">eg. 1 tablet</div>
+          <div className="text-sm text-slate-700 lowercase font-semibold">eg. 1 tablet</div>
         </div>
 
         {/* Col 3: Frequency */}
         <div className="w-[10%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Frequency</div>
-          <div className="text-[9.5px] text-slate-700 lowercase font-semibold">eg. 1-0-1 etc</div>
+          <div className="text-sm text-slate-700 lowercase font-semibold">eg. 1-0-1 etc</div>
         </div>
 
         {/* Col 4: Timing */}
         <div className="w-[10%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Timing</div>
-          <div className="text-[9.5px] text-slate-700 lowercase font-semibold">eg. After meal</div>
+          <div className="text-sm text-slate-700 lowercase font-semibold">eg. After meal</div>
         </div>
 
         {/* Col 5: Duration */}
         <div className="w-[10%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Duration</div>
-          <div className="text-[9.5px] text-slate-700 lowercase font-semibold">eg. 3 days</div>
+          <div className="text-sm text-slate-700 lowercase font-semibold">eg. 3 days</div>
         </div>
 
         {/* Col 6: Start From */}
         <div className="w-[10%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Start From</div>
-          <div className="text-[9.5px] text-slate-700 lowercase font-semibold">eg. 1, 3, 5 etc</div>
+          <div className="text-sm text-slate-700 lowercase font-semibold">eg. 1, 3, 5 etc</div>
         </div>
 
         {/* Col 7: Instructions */}
         <div className="w-[18%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Instructions</div>
-          <div className="text-[9.5px] text-slate-700 lowercase font-semibold">if any..</div>
+          <div className="text-sm text-slate-700 lowercase font-semibold">if any..</div>
         </div>
 
         {/* Action blank */}
@@ -935,7 +911,7 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                           }
                         }}
                         placeholder="Generic composition"
-                        className="flex-1 min-w-0 border border-indigo-300 rounded px-1.5 py-0.5 text-[9px] font-semibold text-[#334155] outline-none focus:ring-1 focus:ring-indigo-200 bg-white"
+                        className="flex-1 min-w-0 border border-indigo-300 rounded px-1.5 py-0.5 text-sm font-semibold text-[#334155] outline-none focus:ring-1 focus:ring-indigo-200 bg-white"
                       />
                       <button type="button" onMouseDown={async () => {
                         patch(med.id, { generic: editingGenericVal });
@@ -1064,9 +1040,9 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
             onFocus={() => { setMedInputFocused(true); setSearchHi(-1); }}
             onBlur={() => setTimeout(() => setMedInputFocused(false), 200)}
             onKeyDown={handleSearchKey}
-            className="w-full h-11 pl-10 pr-16 border-2 border-[#E2E8F0] focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl text-[13px] bg-white focus:outline-none placeholder:text-slate-400 font-semibold transition-all shadow-xs"
+            className="w-full h-11 pl-10 pr-16 border-2 border-[#E2E8F0] focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl text-sm bg-white focus:outline-none placeholder:text-slate-400 font-semibold transition-all shadow-xs"
           />
-          <div className="absolute right-3.5 flex items-center gap-1 text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded uppercase pointer-events-none select-none">
+          <div className="absolute right-3.5 flex items-center gap-1 text-xs font-bold text-slate-400 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded uppercase pointer-events-none select-none">
             Enter ↵
           </div>
         </div>
@@ -1078,73 +1054,48 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
           if (list.length === 0 && !hasCustomVal) return null;
           return (
             <div className="absolute left-4 right-4 bottom-full mb-1 z-50 bg-white border-2 border-indigo-100 rounded-xl shadow-2xl overflow-hidden max-h-72 overflow-y-auto p-1.5 space-y-0.5 animate-fade-in-up">
-              <div className="px-3 py-1 bg-indigo-50/60 text-indigo-700 rounded-lg text-[9px] font-extrabold uppercase tracking-wider mb-1.5 select-none inline-block">
+              <div className="px-3 py-1 bg-indigo-50/60 text-indigo-700 rounded-lg text-xs font-extrabold uppercase tracking-wider mb-1.5 select-none inline-block">
                 Select Medicine to Add
               </div>
               {list.map((med, i) => {
-                const added = medications.some(m => 
-                  m.name.trim().toLowerCase() === med.name.trim().toLowerCase() ||
-                  (med.id && m.medicineId === med.id)
-                );
                 return (
                   <div
-                    key={med.name}
+                    key={`${med.name}-${i}`}
                     onMouseDown={() => {
-                      if (!added) {
-                        addMedicine(med);
-                      }
+                      addMedicine(med);
                     }}
-                    className={`p-2.5 px-3.5 text-left rounded-lg border-b border-[#F8FAFC] last:border-b-0 flex items-center justify-between transition-colors
-                      ${added 
-                        ? "bg-slate-50/60 cursor-not-allowed opacity-60" 
-                        : i === searchHi 
-                          ? "bg-indigo-50/80 text-indigo-950 font-black border-indigo-100 cursor-pointer" 
-                          : "hover:bg-slate-50 text-slate-700 cursor-pointer"
-                      }`}
+                    className={`p-2.5 px-3.5 text-left rounded-lg border-b border-[#F8FAFC] last:border-b-0 flex items-center justify-between transition-colors ${
+                      i === searchHi 
+                        ? "bg-indigo-50/80 text-indigo-950 font-black border-indigo-100 cursor-pointer" 
+                        : "hover:bg-slate-50 text-slate-700 cursor-pointer"
+                    }`}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className={`text-[12px] font-bold tracking-tight ${added ? "text-slate-400 line-through" : ""}`}>{med.name}</div>
-                      {med.generic && <div className="text-[9.5px] text-[#A0AEC0] uppercase font-bold tracking-wide mt-0.5 truncate">{med.generic}</div>}
+                      <div className="text-sm font-bold tracking-tight text-[#1e293b]">{med.name}</div>
+                      {med.generic && <div className="text-xs text-[#A0AEC0] uppercase font-bold tracking-wide mt-0.5 truncate">{med.generic}</div>}
                     </div>
-                    {added ? (
-                      <span className="text-[9px] text-amber-700 font-extrabold shrink-0 bg-amber-50 border border-amber-250 px-2 py-0.5 rounded uppercase tracking-wider">
-                        Added
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-slate-400 font-bold shrink-0 bg-slate-100 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100">
-                        + Add
-                      </span>
-                    )}
+                    <span className="text-xs text-indigo-600 font-bold shrink-0 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded">
+                      + Add
+                    </span>
                   </div>
                 );
               })}
-              {hasCustomVal && (() => {
-                const added = medications.some(m => m.name.trim().toLowerCase() === medInput.trim().toLowerCase());
-                return (
-                  <div
-                    onMouseDown={() => {
-                      if (!added) {
-                        addMedicine({ name: medInput, generic: "" });
-                      }
-                    }}
-                    className={`p-2.5 px-3.5 text-left rounded-lg border-t border-[#F8FAFC] flex items-center justify-between
-                      ${added 
-                        ? "bg-slate-50/60 cursor-not-allowed opacity-60" 
-                        : "hover:bg-indigo-50 text-indigo-650 font-extrabold cursor-pointer"
-                      }`}
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className={`text-[12px] ${added ? "text-slate-400 line-through" : ""}`}>+ Create new medicine</span>
-                      <span className={`italic text-[12px] font-semibold truncate ${added ? "text-slate-450" : "text-slate-500"}`}>"{medInput.trim()}"</span>
-                    </div>
-                    {added && (
-                      <span className="text-[9px] text-amber-700 font-extrabold shrink-0 bg-amber-50 border border-amber-250 px-2 py-0.5 rounded uppercase tracking-wider">
-                        Added
-                      </span>
-                    )}
+              {hasCustomVal && (
+                <div
+                  onMouseDown={() => {
+                    addMedicine({ name: medInput, generic: "" });
+                  }}
+                  className="p-2.5 px-3.5 text-left rounded-lg border-t border-[#F8FAFC] flex items-center justify-between hover:bg-indigo-50 text-indigo-650 font-extrabold cursor-pointer"
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-sm">+ Create new medicine</span>
+                    <span className="italic text-sm font-semibold truncate text-slate-500">"{medInput.trim()}"</span>
                   </div>
-                );
-              })()}
+                  <span className="text-xs text-indigo-600 font-bold shrink-0 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded">
+                    + Add
+                  </span>
+                </div>
+              )}
             </div>
           );
         })()}
@@ -1224,7 +1175,7 @@ function FormSelectDropdown({
               placeholder="Search form..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full text-[10px] px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 font-semibold placeholder:text-slate-350 bg-slate-50/50"
+              className="w-full text-sm px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 font-semibold placeholder:text-slate-350 bg-slate-50/50"
             />
           </div>
 
@@ -1239,7 +1190,7 @@ function FormSelectDropdown({
                     setIsOpen(false);
                     onAfterSelect?.();
                   }}
-                  className={`px-2 py-1 text-[10.5px] font-bold rounded-lg cursor-pointer transition-colors flex items-center justify-between
+                  className={`px-2 py-1 text-xs font-bold rounded-lg cursor-pointer transition-colors flex items-center justify-between
                     ${opt.toLowerCase() === displayValue.toLowerCase() 
                       ? "bg-indigo-50 text-indigo-700" 
                       : "hover:bg-slate-50 text-slate-700"
@@ -1254,7 +1205,7 @@ function FormSelectDropdown({
                 </div>
               ))
             ) : (
-              <div className="px-2 py-1.5 text-[9px] font-bold text-slate-400 italic">
+              <div className="px-2 py-1.5 text-xs font-bold text-slate-400 italic">
                 No match found
               </div>
             )}
@@ -1266,7 +1217,7 @@ function FormSelectDropdown({
                   e.stopPropagation();
                   setIsExpanded(true);
                 }}
-                className="px-2 py-1 text-[9px] text-indigo-600 font-extrabold rounded-lg hover:bg-indigo-50 cursor-pointer border-t border-slate-100 mt-1 select-none"
+                className="px-2 py-1 text-xs text-indigo-600 font-extrabold rounded-lg hover:bg-indigo-50 cursor-pointer border-t border-slate-100 mt-1 select-none"
               >
                 + More Options...
               </div>

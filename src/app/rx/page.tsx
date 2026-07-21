@@ -146,7 +146,7 @@ function RxPageContent() {
   const compileHistoryText = (items: any[], title: string) => {
     if (!items || items.length === 0) return null;
     return (
-      <div className="text-[11px] leading-relaxed">
+      <div className="text-xs leading-relaxed">
         <span className="font-bold text-primary mr-1">{title}:</span>
         <span className="text-[#334155]">
           {items.map((item: any) => {
@@ -498,8 +498,8 @@ function RxPageContent() {
           age: pData.age || 25,
           ageUnit: pData.age_unit || "Year",
           dob: pData.dob || "",
-          permanentAddress: pData.address || "",
-          localAddress: pData.local_address || "",
+          permanentAddress: pData.address || pData.permanent_address || "",
+          localAddress: pData.local_address || pData.address || pData.permanent_address || "",
           country: pData.country || "India",
           state: pData.state || "Maharashtra",
           statusTags: ["Ongoing"],
@@ -2164,15 +2164,25 @@ function RxPageContent() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
-          <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-[12px]">
+          <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-xs">
             {currentRxPatient.name.charAt(0).toUpperCase()}
           </div>
           <div className="text-left leading-tight">
             <div className="flex items-center gap-2">
-              <span className="text-[12px] font-bold text-slate-900 select-text">{currentRxPatient.name}</span>
-              <span className="text-[11px] font-bold text-slate-900">{currentRxPatient.age}y | {currentRxPatient.gender}</span>
+              <span className="text-sm font-bold text-slate-900 select-text">{currentRxPatient.name}</span>
+              <span className="text-xs font-bold text-slate-900">{currentRxPatient.age}y | {currentRxPatient.gender}</span>
             </div>
-            <span className="text-[9.5px] text-slate-800 font-bold tracking-tight select-text">{currentRxPatient.phone}</span>
+            <div className="flex items-center gap-1.5 text-xs text-slate-800 font-bold tracking-tight">
+              <span className="select-text">{currentRxPatient.phone}</span>
+              {(currentRxPatient.localAddress || currentRxPatient.permanentAddress) && (
+                <>
+                  <span className="text-slate-400 font-normal">•</span>
+                  <span className="select-text text-slate-600 font-medium truncate max-w-[280px]" title={currentRxPatient.localAddress || currentRxPatient.permanentAddress}>
+                    {currentRxPatient.localAddress || currentRxPatient.permanentAddress}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -2180,32 +2190,32 @@ function RxPageContent() {
         <div className="flex items-center h-full">
           <button 
             onClick={() => router.push(`/rx/overview?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-extrabold text-slate-800 hover:text-black transition-all"
+            className="h-full px-3 text-xs font-extrabold text-slate-800 hover:text-black transition-all"
           >
             Overview {pastVisitsCount > 0 ? `(${pastVisitsCount})` : `(0)`}
           </button>
-          <button className="h-full px-3 text-[11px] font-extrabold text-primary border-b-2 border-primary">Pad</button>
+          <button className="h-full px-3 text-xs font-extrabold text-primary border-b-2 border-primary">Pad</button>
           <button 
             onClick={() => router.push(`/rx/canvas?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-extrabold text-slate-800 hover:text-black transition-all"
+            className="h-full px-3 text-xs font-extrabold text-slate-800 hover:text-black transition-all"
           >
             Canvas
           </button>
           <button 
             onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-extrabold text-slate-800 hover:text-black transition-all"
+            className="h-full px-3 text-xs font-extrabold text-slate-800 hover:text-black transition-all"
           >
             EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
           </button>
           <button 
             onClick={() => router.push(`/rx/certificate?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-extrabold text-slate-800 hover:text-black transition-all"
+            className="h-full px-3 text-xs font-extrabold text-slate-800 hover:text-black transition-all"
           >
             Medical Certificate
           </button>
           <button 
             onClick={() => router.push(`/rx/documents?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-extrabold text-slate-800 hover:text-black transition-all"
+            className="h-full px-3 text-xs font-extrabold text-slate-800 hover:text-black transition-all"
           >
             Documents
           </button>
@@ -2213,7 +2223,7 @@ function RxPageContent() {
 
         {/* Right Header Controls */}
         <div className="flex items-center gap-2">
-          <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-[10px] font-extrabold rounded-md flex items-center gap-1 border border-emerald-100">
+          <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-xs font-extrabold rounded-md flex items-center gap-1 border border-emerald-100">
             🟢 Active Session
           </span>
         </div>
@@ -2452,13 +2462,13 @@ function RxPageContent() {
               setBp(""); setPulse(""); setWeight(""); setSpo2(""); setSugar("");
               setSymptoms([]); setDiagnoses([]); setMedications([]); setLabs([]); setLabResults([]);
             }}
-            className="px-3 py-1 bg-slate-700/50 hover:bg-slate-700 text-white rounded text-[10px] font-bold border border-slate-700 transition-colors"
+            className="px-3 py-1 bg-slate-700/50 hover:bg-slate-700 text-white rounded text-xs font-bold border border-slate-700 transition-colors"
           >
             Clear
           </button>
         </div>
 
-        <div className="text-[10px] text-slate-400 font-bold tracking-wide">
+        <div className="text-xs text-slate-400 font-bold tracking-wide">
           Push Updates: Live
         </div>
 
@@ -2474,7 +2484,7 @@ function RxPageContent() {
           </button>
           <button
             onClick={handleFinishPrescription}
-            className="px-5 py-1.5 bg-primary hover:bg-primary-hover text-white rounded text-[11px] font-extrabold shadow-md transition-colors"
+            className="px-5 py-1.5 bg-primary hover:bg-primary-hover text-white rounded text-sm font-extrabold shadow-md transition-colors"
           >
             Finish Prescription
           </button>
@@ -2489,14 +2499,14 @@ function RxPageContent() {
             <div className="bg-white border-b border-[#E2E8F0] px-5 py-3 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-extrabold text-[#1E293B]">Prescription Preview</span>
-                <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                <span className="text-xs bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                   Professional Print Layout
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleFinishPrescription}
-                  className="px-3.5 py-1.5 bg-primary hover:bg-primary-hover text-white text-[11px] font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition-colors"
+                  className="px-3.5 py-1.5 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -2519,8 +2529,8 @@ function RxPageContent() {
               {/* Left Settings Sidebar */}
               <div className="w-72 bg-white border-r border-[#E2E8F0] p-5 flex flex-col gap-6 overflow-y-auto shrink-0 text-left select-none no-print">
                 <div>
-                  <h4 className="text-[12px] font-black text-slate-700 uppercase tracking-wider mb-2">Print Adjustments</h4>
-                  <p className="text-[10px] text-slate-400 font-medium leading-relaxed mb-4">
+                  <h4 className="text-sm font-black text-slate-700 uppercase tracking-wider mb-2">Print Adjustments</h4>
+                  <p className="text-xs text-slate-400 font-medium leading-relaxed mb-4">
                     Adjust space to align the print precisely with your pre-printed prescription pad/stationery.
                   </p>
                 </div>
@@ -2528,7 +2538,7 @@ function RxPageContent() {
                 {/* Letterhead Background Settings */}
                 <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-700">Use Letterhead Background</span>
+                    <span className="text-xs font-bold text-slate-700">Use Letterhead Background</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input 
                         type="checkbox" 
@@ -2548,7 +2558,7 @@ function RxPageContent() {
                 {/* Header Settings */}
                 <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-700">Show Header</span>
+                    <span className="text-xs font-bold text-slate-700">Show Header</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input 
                         type="checkbox" 
@@ -2566,7 +2576,7 @@ function RxPageContent() {
                   
                   {!printShowHeader && (
                     <div className="space-y-1.5 pt-1 border-t border-slate-150 mt-1">
-                      <div className="flex justify-between text-[10px] font-bold text-slate-555">
+                      <div className="flex justify-between text-xs font-bold text-slate-555">
                         <span>Header Space Height</span>
                         <span className="text-primary">{printHeaderHeight} mm</span>
                       </div>
@@ -2590,7 +2600,7 @@ function RxPageContent() {
                 {/* Footer Settings */}
                 <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-700">Show Footer & Sign</span>
+                    <span className="text-xs font-bold text-slate-700">Show Footer & Sign</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input 
                         type="checkbox" 
@@ -2608,7 +2618,7 @@ function RxPageContent() {
                   
                   {!printShowFooter && (
                     <div className="space-y-1.5 pt-1 border-t border-slate-150 mt-1">
-                      <div className="flex justify-between text-[10px] font-bold text-slate-555">
+                      <div className="flex justify-between text-xs font-bold text-slate-555">
                         <span>Footer Space Height</span>
                         <span className="text-primary">{printFooterHeight} mm</span>
                       </div>
@@ -2631,8 +2641,8 @@ function RxPageContent() {
 
                 {/* Second Page Adjustments Separator */}
                 <div className="border-t border-[#E2E8F0] pt-4 mt-2">
-                  <h4 className="text-[12px] font-black text-slate-700 uppercase tracking-wider mb-2">Second Page Adjustments</h4>
-                  <p className="text-[10px] text-slate-400 font-medium leading-relaxed mb-4">
+                  <h4 className="text-sm font-black text-slate-700 uppercase tracking-wider mb-2">Second Page Adjustments</h4>
+                  <p className="text-xs text-slate-400 font-medium leading-relaxed mb-4">
                     Customize layouts for content overflowing onto Page 2 and subsequent pages.
                   </p>
                 </div>
@@ -2640,7 +2650,7 @@ function RxPageContent() {
                 {/* Page 2 Letterhead Settings */}
                 <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-700">Use Background on Page 2</span>
+                    <span className="text-xs font-bold text-slate-700">Use Background on Page 2</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input 
                         type="checkbox" 
@@ -2660,7 +2670,7 @@ function RxPageContent() {
                 {/* Page 2 Header Settings */}
                 <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-700">Show Header on Page 2</span>
+                    <span className="text-xs font-bold text-slate-700">Show Header on Page 2</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input 
                         type="checkbox" 
@@ -2678,7 +2688,7 @@ function RxPageContent() {
                   
                   {!printShowHeaderPage2 && (
                     <div className="space-y-1.5 pt-1 border-t border-slate-150 mt-1">
-                      <div className="flex justify-between text-[10px] font-bold text-slate-555">
+                      <div className="flex justify-between text-xs font-bold text-slate-555">
                         <span>Header Space Height</span>
                         <span className="text-primary">{printHeaderHeightPage2} mm</span>
                       </div>
@@ -2702,7 +2712,7 @@ function RxPageContent() {
                 {/* Page 2 Footer Settings */}
                 <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-700">Show Footer on Page 2</span>
+                    <span className="text-xs font-bold text-slate-700">Show Footer on Page 2</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input 
                         type="checkbox" 
@@ -2720,7 +2730,7 @@ function RxPageContent() {
                   
                   {!printShowFooterPage2 && (
                     <div className="space-y-1.5 pt-1 border-t border-slate-150 mt-1">
-                      <div className="flex justify-between text-[10px] font-bold text-slate-555">
+                      <div className="flex justify-between text-xs font-bold text-slate-555">
                         <span>Footer Space Height</span>
                         <span className="text-primary">{printFooterHeightPage2} mm</span>
                       </div>
@@ -2742,7 +2752,7 @@ function RxPageContent() {
                 </div>
 
                 <div className="mt-auto border-t border-slate-100 pt-3 text-center">
-                  <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                  <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">
                     Prescription Pad Controls
                   </div>
                 </div>
@@ -2767,12 +2777,12 @@ function RxPageContent() {
                           <div className="text-[20px] font-black text-primary tracking-tight uppercase">
                             {currentRxPatient.opdRegistration?.clinic_name || "OPD CLINIC"}
                           </div>
-                          <p className="m-0 text-[#718096] text-[11px] font-semibold mt-0.5">
+                          <p className="m-0 text-[#718096] text-xs font-semibold mt-0.5">
                             Comprehensive & Advanced Healthcare Clinic
                           </p>
                         </div>
-                        <div className="text-right text-[11px] text-[#4A5568] leading-normal font-semibold">
-                          <strong className="text-primary text-[13px] block mb-0.5">
+                        <div className="text-right text-xs text-[#4A5568] leading-normal font-semibold">
+                          <strong className="text-primary text-sm block mb-0.5">
                             {currentRxPatient.opdRegistration?.treating_doctor || "DR. TREATING DOCTOR"}
                           </strong>
                           <span>MBBS, MD (Medicine)</span><br />
@@ -2780,13 +2790,13 @@ function RxPageContent() {
                         </div>
                       </div>
                     ) : (
-                      <div style={{ height: `${printHeaderHeight}mm` }} className="w-full shrink-0 border-b border-dashed border-slate-200 mb-5 flex items-center justify-center text-[10px] text-slate-400 select-none">
+                      <div style={{ height: `${printHeaderHeight}mm` }} className="w-full shrink-0 border-b border-dashed border-slate-200 mb-5 flex items-center justify-center text-xs text-slate-400 select-none">
                         [Pre-printed Letterhead Header Space: {printHeaderHeight}mm]
                       </div>
                     )}
 
                   {/* Patient Info Bar */}
-                  <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-[#E2E8F0] p-4 rounded-lg text-[11.5px] font-semibold mb-6">
+                  <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-[#E2E8F0] p-4 rounded-lg text-sm font-semibold mb-6">
                     <div className="space-y-1">
                       <div>
                         <span className="text-[#718096]">Patient Name:</span>{" "}
@@ -2832,36 +2842,36 @@ function RxPageContent() {
                   {/* Vitals Ribbon */}
                   {(bp || pulse || weight || spo2 || sugar) && (
                     <div className="mb-6">
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">Vitals</div>
+                      <div className="text-xs font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">Vitals</div>
                       <div className="grid grid-cols-5 gap-3 bg-[#F8FAFC] border border-[#E2E8F0] px-3 py-2 rounded-lg text-center select-text">
                         {bp && (
                           <div>
-                            <div className="text-[9px] font-bold text-[#718096] uppercase">BP</div>
-                            <div className="text-[12px] font-extrabold text-[#2D3748]">{bp} <span className="text-[9px] font-semibold text-slate-400">mmHg</span></div>
+                            <div className="text-xs font-bold text-[#718096] uppercase">BP</div>
+                            <div className="text-sm font-extrabold text-[#2D3748]">{bp} <span className="text-xs font-semibold text-slate-400">mmHg</span></div>
                           </div>
                         )}
                         {pulse && (
                           <div>
-                            <div className="text-[9px] font-bold text-[#718096] uppercase">Pulse</div>
-                            <div className="text-[12px] font-extrabold text-[#2D3748]">{pulse} <span className="text-[9px] font-semibold text-slate-400">bpm</span></div>
+                            <div className="text-xs font-bold text-[#718096] uppercase">Pulse</div>
+                            <div className="text-sm font-extrabold text-[#2D3748]">{pulse} <span className="text-xs font-semibold text-slate-400">bpm</span></div>
                           </div>
                         )}
                         {weight && (
                           <div>
-                            <div className="text-[9px] font-bold text-[#718096] uppercase">Weight</div>
-                            <div className="text-[12px] font-extrabold text-[#2D3748]">{weight} <span className="text-[9px] font-semibold text-slate-400">kg</span></div>
+                            <div className="text-xs font-bold text-[#718096] uppercase">Weight</div>
+                            <div className="text-sm font-extrabold text-[#2D3748]">{weight} <span className="text-xs font-semibold text-slate-400">kg</span></div>
                           </div>
                         )}
                         {spo2 && (
                           <div>
-                            <div className="text-[9px] font-bold text-[#718096] uppercase">SpO2</div>
-                            <div className="text-[12px] font-extrabold text-[#2D3748]">{spo2}<span className="text-[9px] font-semibold text-slate-400">%</span></div>
+                            <div className="text-xs font-bold text-[#718096] uppercase">SpO2</div>
+                            <div className="text-sm font-extrabold text-[#2D3748]">{spo2}<span className="text-xs font-semibold text-slate-400">%</span></div>
                           </div>
                         )}
                         {sugar && (
                           <div>
-                            <div className="text-[9px] font-bold text-[#718096] uppercase">Sugar</div>
-                            <div className="text-[12px] font-extrabold text-[#2D3748]">{sugar} <span className="text-[9px] font-semibold text-slate-400">mg/dL</span></div>
+                            <div className="text-xs font-bold text-[#718096] uppercase">Sugar</div>
+                            <div className="text-sm font-extrabold text-[#2D3748]">{sugar} <span className="text-xs font-semibold text-slate-400">mg/dL</span></div>
                           </div>
                         )}
                       </div>
@@ -2871,10 +2881,10 @@ function RxPageContent() {
                   {/* 2. Symptoms */}
                   {symptoms.length > 0 && (
                     <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-white">
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
                         Symptoms / Complaints
                       </div>
-                      <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+                      <ul className="list-disc pl-4 space-y-1 text-sm font-semibold text-slate-700">
                         {symptoms.map((s, idx) => (
                           <li key={idx}>
                             {s.name}{" "}
@@ -2882,7 +2892,7 @@ function RxPageContent() {
                               <span className="text-slate-400 font-medium">({s.duration})</span>
                             )}{" "}
                             {s.severity && (
-                              <span className="text-[9.5px] uppercase font-bold text-[#718096] bg-slate-100 px-1.5 py-0.5 rounded ml-1">
+                              <span className="text-xs uppercase font-bold text-[#718096] bg-slate-100 px-1.5 py-0.5 rounded ml-1">
                                 {s.severity}
                               </span>
                             )}
@@ -2895,7 +2905,7 @@ function RxPageContent() {
                   {/* 3. Patient Medical History */}
                   {(!histNoKnown || familyItems.length > 0 || conditions.length > 0 || allergies.length > 0 || procedures.length > 0 || currentMeds.length > 0 || habits.length > 0 || foodAllergies.length > 0 || travelHistory.length > 0 || otherHistory.length > 0) && (
                     <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-slate-50/50 space-y-1.5">
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
                         Patient Medical History
                       </div>
                       {conditions.length > 0 && compileHistoryText(conditions, "Patient Medical History")}
@@ -2913,10 +2923,10 @@ function RxPageContent() {
                   {/* 4. Examination Findings */}
                   {examinationFindings && (
                     <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-slate-50/50">
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
                         Examination Findings
                       </div>
-                      <div className="text-[11.5px] font-medium text-slate-700 whitespace-pre-line leading-relaxed font-sans">
+                      <div className="text-sm font-medium text-slate-700 whitespace-pre-line leading-relaxed font-sans">
                         {examinationFindings}
                       </div>
                     </div>
@@ -2925,17 +2935,17 @@ function RxPageContent() {
                   {/* 5. Lab Results */}
                   {labResults.length > 0 && (
                     <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-white">
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
                         Lab Results
                       </div>
-                      <div className="grid grid-cols-2 gap-4 text-[10.5px] font-semibold text-slate-700">
+                      <div className="grid grid-cols-2 gap-4 text-sm font-semibold text-slate-700">
                         {labResults.map((r, idx) => (
                           <div key={idx} className="border-b pb-1.5 last:border-0">
                             <div className="font-bold text-[#1a202c]">{r.name}</div>
-                            <div className="flex gap-2 text-[10px] text-slate-500 mt-0.5">
+                            <div className="flex gap-2 text-xs text-slate-500 mt-0.5">
                               <span>Reading: <strong className="text-slate-700">{r.reading} {r.unit}</strong></span>
                               {r.interpretation && (
-                                <span className={`px-1 rounded font-bold text-[9px] uppercase ${
+                                <span className={`px-1 rounded font-bold text-xs uppercase ${
                                   r.interpretation.toLowerCase() === "high" ? "bg-red-50 text-red-600" :
                                   r.interpretation.toLowerCase() === "low" ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600"
                                 }`}>
@@ -2943,7 +2953,7 @@ function RxPageContent() {
                                 </span>
                               )}
                             </div>
-                            {r.notes && <div className="text-[9.5px] text-slate-400 mt-0.5 italic">Note: {r.notes}</div>}
+                            {r.notes && <div className="text-xs text-slate-400 mt-0.5 italic">Note: {r.notes}</div>}
                           </div>
                         ))}
                       </div>
@@ -2953,10 +2963,10 @@ function RxPageContent() {
                   {/* 6. Diagnoses */}
                   {diagnoses.length > 0 && (
                     <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-white">
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
                         Diagnoses
                       </div>
-                      <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+                      <ul className="list-disc pl-4 space-y-1 text-sm font-semibold text-slate-700">
                         {diagnoses.map((d, idx) => (
                           <li key={idx}>
                             {d.name}{" "}
@@ -2972,10 +2982,10 @@ function RxPageContent() {
                   {/* 7. Surgery */}
                   {surgeryPerformed && (
                     <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-slate-50/50">
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-1.5 mb-1">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wider border-b pb-1.5 mb-1">
                         Surgery
                       </div>
-                      <div className="text-[11px] font-semibold text-slate-700 space-y-1">
+                      <div className="text-sm font-semibold text-slate-700 space-y-1">
                         <div><span className="text-slate-400 font-medium">Surgery Performed:</span> {surgeryPerformed}</div>
                         {surgeryDate && <div><span className="text-slate-400 font-medium">Date of Surgery:</span> {surgeryDate}</div>}
                         {surgeryNotes && <div><span className="text-slate-400 font-medium">Post Operative Periods:</span> {surgeryNotes}</div>}
@@ -2985,21 +2995,21 @@ function RxPageContent() {
 
                   {/* 8. Medications */}
                   <div className="mb-5">
-                    <div className="text-[32px] font-bold text-primary font-serif -mt-2 leading-none">Rₓ</div>
+                    <div className="text-[36px] font-bold text-primary font-serif -mt-2 leading-none">Rₓ</div>
                     {medications.length > 0 ? (
                       <div className="space-y-3 mt-2">
                         {medications.map((m, idx) => (
                           <div key={idx} className="border-l-4 border-primary pl-3 py-1 space-y-0.5 bg-slate-50/50 rounded-r-md">
-                            <div className="text-[12.5px] font-bold text-[#1E293B]">{m.name}</div>
-                            {m.generic && <div className="text-[9.5px] text-[#718096] uppercase font-semibold">{m.generic}</div>}
-                            <div className="text-[11px] font-semibold text-slate-700 flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+                            <div className="text-sm font-bold text-[#1E293B]">{m.name}</div>
+                            {m.generic && <div className="text-xs text-[#718096] uppercase font-semibold">{m.generic}</div>}
+                            <div className="text-sm font-semibold text-slate-700 flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
                               <span><strong>Dose:</strong> {m.dose}</span>
                               <span><strong>Frequency:</strong> {m.freq}</span>
                               <span><strong>Timing:</strong> {m.timing}</span>
                               {m.duration && <span><strong>Duration:</strong> {m.duration}</span>}
                             </div>
                             {m.instr && (
-                              <div className="text-[10px] text-slate-500 italic mt-0.5">
+                              <div className="text-xs text-slate-500 italic mt-0.5">
                                 Instruction: {m.instr}
                               </div>
                             )}
@@ -3007,17 +3017,17 @@ function RxPageContent() {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-[11px] text-slate-400 italic">No medications prescribed.</div>
+                      <div className="text-xs text-slate-400 italic">No medications prescribed.</div>
                     )}
                   </div>
 
                   {/* 9. Advised Investigations */}
                   {labs.length > 0 && (
                     <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-white">
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wider mb-2 border-b pb-1">
                         Advised Investigations (Lab/Radiology)
                       </div>
-                      <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+                      <ul className="list-disc pl-4 space-y-1 text-sm font-semibold text-slate-700">
                         {labs.map((l, idx) => (
                           <li key={idx}>
                             {l.name}{" "}
@@ -3033,10 +3043,10 @@ function RxPageContent() {
                   {/* 10. Plan / Surgery Advised */}
                   {planSurgeryAdvised && (
                     <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-slate-50/50">
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
                         Plan / Surgery Advised
                       </div>
-                      <div className="text-[11.5px] font-medium text-slate-700 whitespace-pre-line leading-relaxed font-sans">
+                      <div className="text-sm font-medium text-slate-700 whitespace-pre-line leading-relaxed font-sans">
                         {planSurgeryAdvised}
                       </div>
                     </div>
@@ -3047,8 +3057,8 @@ function RxPageContent() {
                     <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-white space-y-3">
                       {followUpVal && (
                         <div>
-                          <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5 border-b pb-1">Follow Up</strong>
-                          <div className="text-[11px] font-semibold text-slate-700 mt-1">
+                          <strong className="text-primary text-xs uppercase block tracking-wider mb-0.5 border-b pb-1">Follow Up</strong>
+                          <div className="text-sm font-semibold text-slate-700 mt-1">
                             {followUpVal}{" "}
                             {followUpNotes && <span className="text-slate-500">({followUpNotes})</span>}
                           </div>
@@ -3057,10 +3067,10 @@ function RxPageContent() {
 
                       {(advicesInput || advRest || advWater) && (
                         <div>
-                          <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5 border-b pb-1">General Advice</strong>
-                          <div className="space-y-1 text-[11px] font-semibold text-[#1a202c] mt-1">
+                          <strong className="text-primary text-xs uppercase block tracking-wider mb-0.5 border-b pb-1">General Advice</strong>
+                          <div className="space-y-1 text-sm font-semibold text-[#1a202c] mt-1">
                             {advicesInput && <div className="whitespace-pre-line">{advicesInput}</div>}
-                            <div className="flex gap-3 text-[10px] font-bold text-slate-500 mt-1">
+                            <div className="flex gap-3 text-xs font-bold text-slate-500 mt-1">
                               {advRest && <span className="bg-slate-100 px-2 py-0.5 rounded">🛌 Rest Recommended</span>}
                               {advWater && <span className="bg-slate-100 px-2 py-0.5 rounded">💧 Drink Plentiful Water</span>}
                             </div>
@@ -3073,10 +3083,10 @@ function RxPageContent() {
                   {/* 12. Notes / Remarks */}
                   {notesForPatient && (
                     <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-slate-50/50">
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
                         Doctor Notes for Patient
                       </div>
-                      <div className="text-[11.5px] font-medium text-slate-700 whitespace-pre-line leading-relaxed font-sans">
+                      <div className="text-sm font-medium text-slate-700 whitespace-pre-line leading-relaxed font-sans">
                         {notesForPatient}
                       </div>
                     </div>
@@ -3085,10 +3095,10 @@ function RxPageContent() {
                   {/* 13. Procedure Done */}
                   {procedureDone && (
                     <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-slate-50/50">
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
                         Procedure Done
                       </div>
-                      <div className="text-[11.5px] font-medium text-slate-700 whitespace-pre-line leading-relaxed font-sans">
+                      <div className="text-sm font-medium text-slate-700 whitespace-pre-line leading-relaxed font-sans">
                         {procedureDone}
                       </div>
                     </div>
@@ -3097,10 +3107,10 @@ function RxPageContent() {
                   {/* 14. Refer to Specialist */}
                   {referrals && referrals.length > 0 && (
                     <div className="mb-5 border border-[#E2E8F0] p-3 rounded-lg bg-white">
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wider border-b pb-1 mb-1">
                         Refer To Specialist
                       </div>
-                      <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700 mt-1">
+                      <ul className="list-disc pl-4 space-y-1 text-sm font-semibold text-slate-700 mt-1">
                         {referrals.map((ref, idx) => (
                           <li key={idx}>
                             {ref.doctorName}{" "}
@@ -3115,17 +3125,17 @@ function RxPageContent() {
 
                   {/* Sign-off row */}
                   {printShowFooter ? (
-                    <div className="flex justify-between items-end pt-5 border-t border-[#F1F5F9] text-[10.5px] font-semibold text-slate-400 relative z-10">
+                    <div className="flex justify-between items-end pt-5 border-t border-[#F1F5F9] text-xs font-semibold text-slate-400 relative z-10">
                       <div>
                         <span>Generated by DLPC Clinic Portal</span>
                       </div>
                       <div className="text-center w-40">
                         <div className="border-b border-[#CBD5E0] h-8"></div>
-                        <div className="text-[9.5px] uppercase font-bold text-slate-500 mt-1">Doctor Signature</div>
+                        <div className="text-xs uppercase font-bold text-slate-500 mt-1">Doctor Signature</div>
                       </div>
                     </div>
                   ) : (
-                    <div style={{ height: `${printFooterHeight}mm` }} className="w-full shrink-0 border-t border-dashed border-slate-200 mt-5 flex items-center justify-center text-[10px] text-slate-400 select-none relative z-10">
+                    <div style={{ height: `${printFooterHeight}mm` }} className="w-full shrink-0 border-t border-dashed border-slate-200 mt-5 flex items-center justify-center text-xs text-slate-400 select-none relative z-10">
                       [Pre-printed Letterhead Footer Space: {printFooterHeight}mm]
                     </div>
                   )}

@@ -716,12 +716,12 @@ function CanvasPageContent() {
             {currentRxPatient ? (
               <div className="text-left leading-tight">
                 <div className="flex items-center gap-2">
-                  <span className="text-[12px] font-bold text-slate-900 select-none">{currentRxPatient.name}</span>
-                  <span className="text-[11px] font-medium text-[#718096] select-none">
+                  <span className="text-sm font-bold text-slate-900 select-none">{currentRxPatient.name}</span>
+                  <span className="text-sm font-medium text-[#718096] select-none">
                     {currentRxPatient.age}y | {currentRxPatient.gender}
                   </span>
                 </div>
-                <span className="text-[9px] text-[#A0AEC0] font-semibold tracking-tight select-none">
+                <span className="text-xs text-[#A0AEC0] font-semibold tracking-tight select-none">
                   {currentRxPatient.phone}
                 </span>
               </div>
@@ -734,34 +734,34 @@ function CanvasPageContent() {
           <div className="flex items-center h-full select-none">
             <button
               onClick={() => router.push(`/rx/overview?rx=${rxPatientId}`)}
-              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all select-none"
+              className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all select-none"
             >
               Overview {pastVisitsCount > 0 ? `(${pastVisitsCount})` : `(0)`}
             </button>
             <button
               onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
-              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all select-none"
+              className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all select-none"
             >
               Pad
             </button>
-            <button className="h-full px-3 text-[11px] font-bold text-indigo-600 border-b-2 border-indigo-600 select-none">
+            <button className="h-full px-3 text-sm font-bold text-indigo-600 border-b-2 border-indigo-600 select-none">
               Canvas
             </button>
             <button
               onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
-              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all select-none"
+              className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all select-none"
             >
               EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
             </button>
             <button
               onClick={() => router.push(`/rx/certificate?rx=${rxPatientId}`)}
-              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all select-none"
+              className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all select-none"
             >
               Medical Certificate
             </button>
             <button
               onClick={() => router.push(`/rx/documents?rx=${rxPatientId}`)}
-              className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all select-none"
+              className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all select-none"
             >
               Documents
             </button>
@@ -769,7 +769,7 @@ function CanvasPageContent() {
 
           {/* Right Header Controls */}
           <div className="flex items-center gap-2 select-none">
-            <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-[10px] font-extrabold rounded-md flex items-center gap-1 border border-emerald-100 select-none">
+            <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-xs font-extrabold rounded-md flex items-center gap-1 border border-emerald-100 select-none">
               🟢 Active Session
             </span>
           </div>
@@ -780,7 +780,7 @@ function CanvasPageContent() {
       <div className="bg-white border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-sm z-10 select-none canvas-no-select">
         {/* Colors & Pen/Eraser Tools */}
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">Color:</span>
+          <span className="text-sm font-bold text-slate-500 uppercase tracking-wider mr-1">Color:</span>
           {COLOR_PRESETS.map((c) => (
             <button
               key={c.value}
@@ -836,7 +836,7 @@ function CanvasPageContent() {
 
         {/* Brush Size */}
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">Size:</span>
+          <span className="text-sm font-bold text-slate-500 uppercase tracking-wider mr-1">Size:</span>
           {STROKE_WIDTHS.map((w) => (
             <button
               key={w}
@@ -1013,7 +1013,7 @@ function CanvasPageContent() {
                 <li>Scroll down and tap <span className="font-bold text-indigo-600">'Add to Home Screen'</span>.</li>
                 <li>Launch <strong>Infi Canvas</strong> directly from your iPad Home Screen!</li>
               </ol>
-              <div className="text-[11px] text-slate-600 bg-indigo-50/80 p-3 rounded-lg border border-indigo-100 mt-2">
+              <div className="text-sm text-slate-600 bg-indigo-50/80 p-3 rounded-lg border border-indigo-100 mt-2">
                 ✨ Opening from your iPad Home Screen runs Canvas in <strong>100% Fullscreen native app mode</strong> with zero Safari browser bars!
               </div>
             </div>

@@ -147,7 +147,7 @@ function ChipTagField({
 
   return (
     <div className="space-y-1 relative primereact-autocomplete-custom text-left">
-      <label className="block text-[11px] font-semibold text-[#556376]">{label}</label>
+      <label className="block text-sm font-semibold text-[#556376]">{label}</label>
       <div className="border border-[#E2E8F0] focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100 rounded-md bg-white min-h-[36px] transition-all cursor-text flex items-center">
         <AutoComplete
           ref={autoRef}
@@ -163,9 +163,9 @@ function ChipTagField({
           }}
           itemTemplate={itemTemplate}
           placeholder={selected.length === 0 ? label : ""}
-          inputClassName="w-full text-[11px] font-semibold text-[#1e293b] focus:outline-none placeholder:text-[#C0CADC] bg-transparent border-0 shadow-none p-1.5 focus:ring-0"
+          inputClassName="w-full text-sm font-semibold text-[#1e293b] focus:outline-none placeholder:text-[#C0CADC] bg-transparent border-0 shadow-none p-1.5 focus:ring-0"
           className="w-full"
-          panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+          panelClassName="custom-autocomplete-panel text-sm font-semibold"
         />
       </div>
     </div>
@@ -248,18 +248,18 @@ function AutoInput({
       const match = item.match(/\+ Create "(.*)"/);
       const custom = match ? match[1] : item;
       return (
-        <span className="text-blue-600 font-bold flex items-center gap-1 text-[11px]">
+        <span className="text-blue-600 font-bold flex items-center gap-1 text-sm">
           <span>+ Create</span>
           <span className="italic">"{custom}"</span>
         </span>
       );
     }
-    return <span className="text-[11px] font-semibold text-[#334155]">{item}</span>;
+    return <span className="text-sm font-semibold text-[#334155]">{item}</span>;
   };
 
   return (
     <div className="space-y-1 relative primereact-autocomplete-custom text-left">
-      <label className="block text-[11px] font-semibold text-[#556376]">{label}</label>
+      <label className="block text-sm font-semibold text-[#556376]">{label}</label>
       <div className="relative">
         <AutoComplete
           ref={autoRef}
@@ -276,9 +276,9 @@ function AutoInput({
           }}
           itemTemplate={itemTemplate}
           placeholder={placeholder ?? label}
-          inputClassName="w-full h-8.5 px-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[12.5px] bg-white focus:outline-none font-extrabold text-[#090d16] placeholder:text-slate-400 transition-all"
+          inputClassName="w-full h-8.5 px-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-sm bg-white focus:outline-none font-extrabold text-[#090d16] placeholder:text-slate-400 transition-all"
           className="w-full"
-          panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+          panelClassName="custom-autocomplete-panel text-sm font-semibold"
         />
         {clearable && value && (
           <button type="button" onMouseDown={() => onChange("")}
@@ -366,13 +366,13 @@ function InlineAutoComplete({
       const match = item.match(/\+ Create "(.*)"/);
       const custom = match ? match[1] : item;
       return (
-        <span className="text-blue-600 font-bold flex items-center gap-1 text-[11px]">
+        <span className="text-blue-600 font-bold flex items-center gap-1 text-sm">
           <span>+ Create</span>
           <span className="italic">"{custom}"</span>
         </span>
       );
     }
-    return <span className="text-[11px] font-semibold text-[#334155]">{item}</span>;
+    return <span className="text-sm font-semibold text-[#334155]">{item}</span>;
   };
 
   return (
@@ -392,9 +392,9 @@ function InlineAutoComplete({
         }}
         itemTemplate={itemTemplate}
         placeholder={placeholder}
-        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-300"
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-sm font-semibold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-300"
         className="w-full h-full"
-        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+        panelClassName="custom-autocomplete-panel text-sm font-semibold"
       />
     </div>
   );
@@ -563,8 +563,8 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
           <div className="w-6 h-6 rounded-md bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-sm text-white text-xs">
             📋
           </div>
-          <span className="text-[12px] font-bold text-[#1E293B] tracking-tight">Diagnosis</span>
-          <span className="text-[9px] bg-purple-50 text-purple-600 border border-purple-200 px-1.5 py-0.5 rounded font-bold tracking-widest uppercase">ICD-10</span>
+          <span className="text-sm font-bold text-[#1E293B] tracking-tight">Diagnosis</span>
+          <span className="text-xs bg-purple-50 text-purple-600 border border-purple-200 px-1.5 py-0.5 rounded font-bold tracking-widest uppercase">ICD-10</span>
         </div>
         <div className="flex items-center space-x-3 mr-2">
           <button className="w-7 h-7 rounded-lg bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] flex items-center justify-center transition-colors">
@@ -640,7 +640,7 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
                   {/* more options (18%) */}
                   <div className="w-[18%] shrink-0 border-r border-[#E2E8F0] flex items-center justify-center bg-white px-2">
                     <button type="button" onClick={() => openModal(diag)}
-                      className="w-full h-6 border border-blue-400 hover:bg-blue-50 text-[9px] font-bold text-blue-500 rounded transition-colors uppercase tracking-wider leading-none"
+                      className="w-full h-6 border border-blue-400 hover:bg-blue-50 text-xs font-bold text-blue-500 rounded transition-colors uppercase tracking-wider leading-none"
                     >More Options</button>
                   </div>
 
@@ -658,31 +658,31 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
                 {hasDetails && (
                   <div className="flex flex-wrap gap-1.5 mt-1.5 pl-9">
                     {diag.severity && (
-                      <span className="text-[9px] font-bold bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded leading-none">{diag.severity}</span>
+                      <span className="text-xs font-bold bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded leading-none">{diag.severity}</span>
                     )}
                     {diag.abdominalRegions && diag.abdominalRegions.length > 0 && (
-                      <span className="text-[9px] font-bold bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded leading-none">Region: {diag.abdominalRegions.join(", ")}</span>
+                      <span className="text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded leading-none">Region: {diag.abdominalRegions.join(", ")}</span>
                     )}
                     {diag.painTypes && diag.painTypes.length > 0 && (
-                      <span className="text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded leading-none">Pain: {diag.painTypes.join(", ")}</span>
+                      <span className="text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded leading-none">Pain: {diag.painTypes.join(", ")}</span>
                     )}
                     {diag.relievedBy && diag.relievedBy.length > 0 && (
-                      <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded leading-none">Relieved: {diag.relievedBy.join(", ")}</span>
+                      <span className="text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded leading-none">Relieved: {diag.relievedBy.join(", ")}</span>
                     )}
                     {diag.abdominalTenderness && (
-                      <span className="text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded leading-none">Tenderness: {diag.abdominalTenderness}</span>
+                      <span className="text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded leading-none">Tenderness: {diag.abdominalTenderness}</span>
                     )}
                     {diag.palpations && diag.palpations.length > 0 && (
-                      <span className="text-[9px] font-bold bg-pink-50 text-pink-700 border border-pink-200 px-1.5 py-0.5 rounded leading-none">Palpation: {diag.palpations.join(", ")}</span>
+                      <span className="text-xs font-bold bg-pink-50 text-pink-700 border border-pink-200 px-1.5 py-0.5 rounded leading-none">Palpation: {diag.palpations.join(", ")}</span>
                     )}
                     {diag.auscultations && diag.auscultations.length > 0 && (
-                      <span className="text-[9px] font-bold bg-teal-50 text-teal-700 border border-teal-200 px-1.5 py-0.5 rounded leading-none">Auscultation: {diag.auscultations.join(", ")}</span>
+                      <span className="text-xs font-bold bg-teal-50 text-teal-700 border border-teal-200 px-1.5 py-0.5 rounded leading-none">Auscultation: {diag.auscultations.join(", ")}</span>
                     )}
                     {diag.clinicalCourse && (
-                      <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded leading-none">{diag.clinicalCourse}</span>
+                      <span className="text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded leading-none">{diag.clinicalCourse}</span>
                     )}
                     {diag.note && (
-                      <span className="text-[9px] font-bold text-[#64748b] italic truncate max-w-[200px]" title={diag.note}>Note: {diag.note}</span>
+                      <span className="text-xs font-bold text-[#64748b] italic truncate max-w-[200px]" title={diag.note}>Note: {diag.note}</span>
                     )}
                   </div>
                 )}
@@ -706,11 +706,11 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
             onFocus={() => { setSearchOpen(true); setSearchHi(-1); }}
             onBlur={() => setTimeout(() => { setSearchOpen(false); setSearchHi(-1); }, 160)}
             onKeyDown={handleSearchKey}
-            className="w-full h-8.5 pl-8 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-medium transition-all"
+            className="w-full h-8.5 pl-8 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-sm bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-medium transition-all"
           />
           {searchVal.trim() && (
             <button type="button" onClick={() => addDiagnosis(searchVal)}
-              className="absolute right-2 text-blue-600 hover:text-blue-700 text-[10px] font-bold tracking-wide">+ Add</button>
+              className="absolute right-2 text-blue-600 hover:text-blue-700 text-xs font-bold tracking-wide">+ Add</button>
           )}
         </div>
 
@@ -739,15 +739,15 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
                   <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center text-[8px] font-extrabold text-purple-750 shrink-0 leading-none">
                     {initials(opt) || "Dx"}
                   </div>
-                  <span className="text-[11.5px] font-semibold text-[#1E293B]">{opt}</span>
+                  <span className="text-sm font-semibold text-[#1E293B]">{opt}</span>
                 </div>
               ))}
               {hasCustomVal && (
                 <div
                   onMouseDown={() => addDiagnosis(searchVal)}
-                  className="px-3 py-2.5 text-[11.5px] font-bold text-blue-600 hover:bg-blue-50 border-t border-[#F8FAFC] cursor-pointer flex items-center gap-2.5"
+                  className="px-3 py-2.5 text-sm font-bold text-blue-600 hover:bg-blue-50 border-t border-[#F8FAFC] cursor-pointer flex items-center gap-2.5"
                 >
-                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-extrabold text-blue-700 shrink-0 leading-none">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-extrabold text-blue-700 shrink-0 leading-none">
                     +
                   </div>
                   <span>Create "{searchVal.trim()}"</span>
@@ -766,13 +766,13 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
             {/* Header */}
             <div className="px-5 py-3.5 border-b border-[#F1F5F9] flex items-center justify-between shrink-0 bg-[#FAFBFC]">
               <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center text-[10px] font-extrabold text-purple-750 shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center text-xs font-extrabold text-purple-750 shrink-0">
                   {initials(activeDiag.name) || "Dx"}
                 </div>
                 <div>
-                  <p className="text-[13px] font-extrabold text-[#1E293B] leading-none">{activeDiag.name || "Diagnosis"}</p>
+                  <p className="text-sm font-extrabold text-[#1E293B] leading-none">{activeDiag.name || "Diagnosis"}</p>
                   {(activeDiag.since || activeDiag.status) && (
-                    <p className="text-[10px] text-[#94A3B8] font-medium mt-0.5">
+                    <p className="text-xs text-[#94A3B8] font-medium mt-0.5">
                       {[activeDiag.since, activeDiag.status].filter(Boolean).join(" · ")}
                     </p>
                   )}
@@ -911,16 +911,16 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
               {/* 9. Note */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-semibold text-[#64748B]">Note</label>
-                  <span className="text-[9px] text-[#CBD5E0]">ⓘ</span>
+                  <label className="block text-sm font-semibold text-[#64748B]">Note</label>
+                  <span className="text-xs text-[#CBD5E0]">ⓘ</span>
                 </div>
                 <div className="border border-[#E2E8F0] focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100 rounded-lg overflow-hidden bg-white transition-all">
                   <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-[#F1F5F9] bg-[#FAFBFC]">
-                    <button type="button" className="w-6 h-5 flex items-center justify-center text-[11px] font-extrabold text-[#94A3B8] hover:bg-[#E2E8F0] rounded">B</button>
-                    <button type="button" className="w-6 h-5 flex items-center justify-center text-[11px] italic font-bold text-[#94A3B8] hover:bg-[#E2E8F0] rounded">I</button>
-                    <button type="button" className="w-6 h-5 flex items-center justify-center text-[10px] text-[#94A3B8] hover:bg-[#E2E8F0] rounded">≡ ▾</button>
+                    <button type="button" className="w-6 h-5 flex items-center justify-center text-sm font-extrabold text-[#94A3B8] hover:bg-[#E2E8F0] rounded">B</button>
+                    <button type="button" className="w-6 h-5 flex items-center justify-center text-sm italic font-bold text-[#94A3B8] hover:bg-[#E2E8F0] rounded">I</button>
+                    <button type="button" className="w-6 h-5 flex items-center justify-center text-xs text-[#94A3B8] hover:bg-[#E2E8F0] rounded">≡ ▾</button>
                     <div className="flex-1" />
-                    <button type="button" className="text-[10px] text-[#CBD5E0] hover:text-[#94A3B8] px-1">⤢</button>
+                    <button type="button" className="text-xs text-[#CBD5E0] hover:text-[#94A3B8] px-1">⤢</button>
                   </div>
                   <textarea rows={3} value={mNote}
                     onChange={(e) => setMNote(e.target.value)}
@@ -932,7 +932,7 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
                       }
                     }}
                     placeholder="Add clinical notes, findings or observations…"
-                    className="w-full px-3 py-2 text-[11px] focus:outline-none bg-white font-medium text-[#475569] resize-none placeholder:text-[#CBD5E0]"
+                    className="w-full px-3 py-2 text-sm focus:outline-none bg-white font-medium text-[#475569] resize-none placeholder:text-[#CBD5E0]"
                   />
                 </div>
               </div>
@@ -941,10 +941,10 @@ export default function DiagnosisCard({ diagnoses, setDiagnoses }: DiagnosisCard
             {/* Footer */}
             <div className="px-5 py-3 border-t border-[#F1F5F9] bg-[#FAFBFC] flex items-center justify-end gap-2 shrink-0">
               <button type="button" onClick={() => setModalId(null)}
-                className="px-4 py-1.5 border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[11px] font-bold text-[#64748B] rounded-lg transition-all"
+                className="px-4 py-1.5 border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-sm font-bold text-[#64748B] rounded-lg transition-all"
               >Cancel</button>
               <button type="button" onClick={saveModal}
-                className="px-5 py-1.5 bg-blue-600 hover:bg-blue-700 text-[11px] font-extrabold text-white rounded-lg transition-all shadow-sm"
+                className="px-5 py-1.5 bg-blue-600 hover:bg-blue-700 text-sm font-extrabold text-white rounded-lg transition-all shadow-sm"
               >Save</button>
             </div>
 

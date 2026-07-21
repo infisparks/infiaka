@@ -50,7 +50,7 @@ export default function Sidebar({ active, onQueueClick, onBookClick }: SidebarPr
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
-            <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90">Queue</span>
+            <span className="text-sm font-semibold mt-0.5 tracking-tight">Queue</span>
           </button>
         ) : (
           <Link
@@ -63,7 +63,7 @@ export default function Sidebar({ active, onQueueClick, onBookClick }: SidebarPr
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
-            <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90">Queue</span>
+            <span className="text-sm font-semibold mt-0.5 tracking-tight">Queue</span>
           </Link>
         )}
 
@@ -79,7 +79,7 @@ export default function Sidebar({ active, onQueueClick, onBookClick }: SidebarPr
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90 leading-none text-center">
+            <span className="text-sm font-semibold mt-0.5 tracking-tight leading-none text-center">
               Book Appt
             </span>
           </button>
@@ -94,7 +94,7 @@ export default function Sidebar({ active, onQueueClick, onBookClick }: SidebarPr
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90 leading-none text-center">
+            <span className="text-sm font-semibold mt-0.5 tracking-tight leading-none text-center">
               Book Appt
             </span>
           </Link>
@@ -127,7 +127,7 @@ export default function Sidebar({ active, onQueueClick, onBookClick }: SidebarPr
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
           </svg>
-          <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90">Payments</span>
+          <span className="text-sm font-semibold mt-0.5 tracking-tight">Payments</span>
         </Link>
 
         {/* Inventory Tab */}
@@ -141,7 +141,7 @@ export default function Sidebar({ active, onQueueClick, onBookClick }: SidebarPr
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-20L4 7m8 4v10M4 7v10l8 4" />
           </svg>
-          <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90 leading-none text-center">Inv</span>
+          <span className="text-sm font-semibold mt-0.5 tracking-tight leading-none text-center">Inv</span>
         </Link>
 
         {/* More Tab */}
@@ -155,7 +155,7 @@ export default function Sidebar({ active, onQueueClick, onBookClick }: SidebarPr
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
           </svg>
-          <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90">More</span>
+          <span className="text-sm font-semibold mt-0.5 tracking-tight">More</span>
         </a>
 
         {/* Deleted Tab */}
@@ -169,7 +169,7 @@ export default function Sidebar({ active, onQueueClick, onBookClick }: SidebarPr
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
-          <span className="text-[9px] font-semibold mt-0.5 tracking-tight scale-90">Deleted</span>
+          <span className="text-sm font-semibold mt-0.5 tracking-tight">Deleted</span>
         </Link>
       </nav>
 

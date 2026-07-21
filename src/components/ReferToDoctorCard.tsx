@@ -170,7 +170,7 @@ export default function ReferToDoctorCard({ referrals, setReferrals }: ReferToDo
     <section className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-4 shadow-sm w-full select-none">
       {/* Header */}
       <div className="flex justify-between items-center border-b pb-2 select-none">
-        <span className="text-[11px] font-extrabold text-[#1E293B] uppercase flex items-center gap-1.5">
+        <span className="text-sm font-extrabold text-[#1E293B] uppercase flex items-center gap-1.5">
           <svg className="w-4 h-4 text-slate-500 fill-slate-500/10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <circle cx="12" cy="12" r="10" />
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v8M8 12h8" />
@@ -180,7 +180,7 @@ export default function ReferToDoctorCard({ referrals, setReferrals }: ReferToDo
         <button
           type="button"
           onClick={() => setReferrals([])}
-          className="flex items-center gap-1.5 px-3 py-1 border border-blue-500 hover:bg-blue-50 text-blue-600 rounded text-[10.5px] font-extrabold transition-colors leading-none"
+          className="flex items-center gap-1.5 px-3 py-1 border border-blue-500 hover:bg-blue-50 text-blue-600 rounded text-xs font-extrabold transition-colors leading-none"
         >
           Refresh
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
@@ -229,7 +229,7 @@ export default function ReferToDoctorCard({ referrals, setReferrals }: ReferToDo
 
               {/* Doctor Name / Specialty */}
               <div className="flex-1 border-r border-[#E2E8F0] flex items-center px-3">
-                <span className="text-[12.5px] font-extrabold text-[#090d16]">{item.doctorName}</span>
+                <span className="text-sm font-extrabold text-[#090d16]">{item.doctorName}</span>
               </div>
 
               {/* Notes for the doctor */}
@@ -239,7 +239,7 @@ export default function ReferToDoctorCard({ referrals, setReferrals }: ReferToDo
                   value={item.notes}
                   onChange={(e) => patch(item.id, { notes: e.target.value })}
                   placeholder="Notes for the doctor"
-                  className="w-full h-full border-0 focus:ring-0 px-3 text-[12.5px] font-extrabold text-[#090d16] bg-transparent outline-none placeholder:text-slate-400"
+                  className="w-full h-full border-0 focus:ring-0 px-3 text-sm font-extrabold text-[#090d16] bg-transparent outline-none placeholder:text-slate-400"
                 />
               </div>
 
@@ -277,13 +277,13 @@ export default function ReferToDoctorCard({ referrals, setReferrals }: ReferToDo
             }}
             onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
             onKeyDown={handleSearchKey}
-            className="w-full h-9 pl-9 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-semibold transition-all"
+            className="w-full h-9 pl-9 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-sm bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-semibold transition-all"
           />
           {searchVal.trim() && (
             <button
               type="button"
               onClick={() => addReferral(searchVal)}
-              className="absolute right-3.5 text-blue-600 hover:text-blue-700 text-[10.5px] font-bold"
+              className="absolute right-3.5 text-blue-600 hover:text-blue-700 text-xs font-bold"
             >
               + Add
             </button>
@@ -302,12 +302,12 @@ export default function ReferToDoctorCard({ referrals, setReferrals }: ReferToDo
                 <div
                   key={opt}
                   onMouseDown={() => addReferral(displayVal)}
-                  className={`px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 text-[11.5px] font-semibold transition-colors ${
+                  className={`px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 text-sm font-semibold transition-colors ${
                     i === searchHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F8FAFC] text-[#1E293B]"
                   }`}
                 >
                   {isCreate ? (
-                    <span className="text-[11.5px] font-bold text-blue-600">
+                    <span className="text-sm font-bold text-blue-600">
                       + Create <span className="italic font-semibold">"{displayVal}"</span>
                     </span>
                   ) : (

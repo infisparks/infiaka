@@ -260,7 +260,7 @@ export default function FoodAllergyDrawer({
                 setFocusField(null);
                 setRowHi(-1);
               }}
-              className={`px-3 py-[7px] text-[11px] font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
+              className={`px-3 py-[7px] text-sm font-semibold cursor-pointer border-b border-[#F8FAFC] last:border-b-0 transition-colors ${i === rowHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F1F5F9] text-[#334155]"}`}
             >
               {isCreate ? (
                 <span className="text-blue-600 font-bold">
@@ -324,7 +324,7 @@ export default function FoodAllergyDrawer({
         <div className="px-5 py-4 border-b border-[#F1F5F9] flex items-center justify-between shrink-0 bg-[#FAFBFC]">
           <div className="flex items-center gap-2.5">
             <div className="rounded-md bg-rose-100 flex items-center justify-center text-rose-700 text-xs px-1 shadow-sm">📕</div>
-            <span className="text-[13px] font-extrabold text-[#1E293B]">Food/Other Allergy</span>
+            <span className="text-sm font-extrabold text-[#1E293B]">Food/Other Allergy</span>
           </div>
           <button type="button" onClick={onClose} className="w-7 h-7 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] flex items-center justify-center text-[#94A3B8] hover:text-[#475569] transition-all">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -345,10 +345,10 @@ export default function FoodAllergyDrawer({
                 onFocus={() => { setSearchOpen(true); setSearchHi(-1); }}
                 onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
                 onKeyDown={handleSearchKey}
-                className="w-full h-9 pl-9 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-semibold transition-all"
+                className="w-full h-9 pl-9 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-sm bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-semibold transition-all"
               />
               {searchVal.trim() && (
-                <button type="button" onClick={() => addItem(searchVal)} className="absolute right-3 text-blue-600 hover:text-blue-700 text-[10px] font-bold">+ Add</button>
+                <button type="button" onClick={() => addItem(searchVal)} className="absolute right-3 text-blue-600 hover:text-blue-700 text-xs font-bold">+ Add</button>
               )}
             </div>
             {searchOpen && (() => {
@@ -358,7 +358,7 @@ export default function FoodAllergyDrawer({
                 <div className="absolute left-0 right-0 top-full mt-1.5 z-[60] bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
                   {list.map((opt, i) => (
                     <div key={opt} onMouseDown={() => addItem(opt)}
-                      className={`px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 text-[11.5px] font-semibold text-[#1E293B] transition-colors ${i === searchHi ? "bg-blue-50" : "hover:bg-[#F8FAFC]"}`}
+                      className={`px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 text-sm font-semibold text-[#1E293B] transition-colors ${i === searchHi ? "bg-blue-50" : "hover:bg-[#F8FAFC]"}`}
                     >{opt}</div>
                   ))}
                 </div>
@@ -368,7 +368,7 @@ export default function FoodAllergyDrawer({
 
           {/* Table */}
           <div className="flex-1 border border-[#E2E8F0] rounded-xl overflow-y-auto min-h-0 bg-[#FAFBFC]">
-            <div className="flex items-stretch border-b border-[#E2E8F0] bg-white text-[9px] font-extrabold text-[#718096] uppercase sticky top-0 z-30 h-9">
+            <div className="flex items-stretch border-b border-[#E2E8F0] bg-white text-sm font-extrabold text-[#718096] uppercase sticky top-0 z-30 h-10">
               <div className="w-8 shrink-0" />
               <div className="w-[30%] shrink-0 border-r border-[#E2E8F0] px-3 flex items-center">Name</div>
               <div className="w-[22%] shrink-0 border-r border-[#E2E8F0] px-3 flex items-center">Since</div>
@@ -380,7 +380,7 @@ export default function FoodAllergyDrawer({
             {items.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-[#CBD5E0]">
                 <span className="text-3xl mb-1.5">🍽️</span>
-                <span className="text-[11px] font-bold uppercase tracking-wider">No food allergies added yet</span>
+                <span className="text-sm font-bold uppercase tracking-wider">No food allergies added yet</span>
               </div>
             ) : (
               <div className="p-3.5 space-y-2">
@@ -411,7 +411,7 @@ export default function FoodAllergyDrawer({
                         onBlur={() => handleInputBlur(110, item.name)}
                         onKeyDown={(e) => handleRowKey(e, item.id, "name", suggestedNames, item.name)}
                         placeholder="Name"
-                        className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-300"
+                        className="w-full h-full border-0 focus:ring-0 px-3 text-sm font-bold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-300"
                       />
                       <InlineDD id={item.id} field="name" opts={suggestedNames} val={item.name} />
                     </div>
@@ -424,7 +424,7 @@ export default function FoodAllergyDrawer({
                         onBlur={handleSinceBlur}
                         onKeyDown={(e) => handleRowKey(e, item.id, "since", [], item.since)}
                         placeholder="Since"
-                        className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-[#CBD5E0]"
+                        className="w-full h-full border-0 focus:ring-0 px-3 text-sm font-semibold text-[#334155] bg-transparent outline-none placeholder:text-[#CBD5E0]"
                       />
                       <InlineDD id={item.id} field="since" opts={[]} val={item.since} />
                     </div>
@@ -437,7 +437,7 @@ export default function FoodAllergyDrawer({
                         onBlur={() => handleInputBlur(111, item.status)}
                         onKeyDown={(e) => handleRowKey(e, item.id, "status", suggestedStatuses, item.status)}
                         placeholder="Status"
-                        className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-emerald-600 bg-transparent outline-none placeholder:text-slate-305"
+                        className="w-full h-full border-0 focus:ring-0 px-3 text-sm font-bold text-emerald-600 bg-transparent outline-none placeholder:text-slate-305"
                       />
                       <InlineDD id={item.id} field="status" opts={suggestedStatuses} val={item.status} />
                     </div>
@@ -450,7 +450,7 @@ export default function FoodAllergyDrawer({
                         onBlur={() => handleInputBlur(112, item.notes)}
                         onKeyDown={(e) => handleRowKey(e, item.id, "notes", suggestedNotes, item.notes)}
                         placeholder="Add notes here"
-                        className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-[#CBD5E0]"
+                        className="w-full h-full border-0 focus:ring-0 px-3 text-sm font-semibold text-[#334155] bg-transparent outline-none placeholder:text-[#CBD5E0]"
                       />
                       <InlineDD id={item.id} field="notes" opts={suggestedNotes} val={item.notes} />
                     </div>
@@ -471,8 +471,8 @@ export default function FoodAllergyDrawer({
 
         {/* Footer */}
         <div className="px-5 py-3.5 border-t border-[#F1F5F9] bg-[#FAFBFC] flex items-center justify-end gap-2.5 shrink-0">
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[11.5px] font-bold text-[#64748B] rounded-lg transition-all">Cancel</button>
-          <button type="button" onClick={onClose} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-[11.5px] font-extrabold text-white rounded-lg transition-all shadow-md">Save & Close</button>
+          <button type="button" onClick={onClose} className="px-4 py-2 border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-sm font-bold text-[#64748B] rounded-lg transition-all">Cancel</button>
+          <button type="button" onClick={onClose} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-sm font-extrabold text-white rounded-lg transition-all shadow-md">Save & Close</button>
         </div>
       </div>
     </div>

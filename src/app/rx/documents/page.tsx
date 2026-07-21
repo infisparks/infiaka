@@ -408,7 +408,7 @@ function DocumentsPageContent() {
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
-        <div className="text-[12px] font-bold text-slate-500">Loading patient documents...</div>
+        <div className="text-sm font-bold text-slate-500">Loading patient documents...</div>
       </div>
     );
   }
@@ -452,15 +452,15 @@ function DocumentsPageContent() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
-          <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-[12px]">
+          <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
             {currentRxPatient.name.charAt(0).toUpperCase()}
           </div>
           <div className="text-left leading-tight">
             <div className="flex items-center gap-2">
-              <span className="text-[12px] font-bold text-foreground select-text">{currentRxPatient.name}</span>
-              <span className="text-[11px] font-medium text-[#718096]">{currentRxPatient.age}y | {currentRxPatient.gender}</span>
+              <span className="text-sm font-bold text-foreground select-text">{currentRxPatient.name}</span>
+              <span className="text-sm font-medium text-[#718096]">{currentRxPatient.age}y | {currentRxPatient.gender}</span>
             </div>
-            <span className="text-[9px] text-[#A0AEC0] font-semibold tracking-tight select-text">{currentRxPatient.phone}</span>
+            <span className="text-xs text-[#A0AEC0] font-semibold tracking-tight select-text">{currentRxPatient.phone}</span>
           </div>
         </div>
 
@@ -468,42 +468,42 @@ function DocumentsPageContent() {
         <div className="flex items-center h-full">
           <button 
             onClick={() => router.push(`/rx/overview?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Overview {pastVisitsCount > 0 ? `(${pastVisitsCount})` : `(0)`}
           </button>
           <button
             onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Pad
           </button>
           <button 
             onClick={() => router.push(`/rx/canvas?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Canvas
           </button>
           <button 
             onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
           </button>
           <button 
             onClick={() => router.push(`/rx/certificate?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Medical Certificate
           </button>
-          <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">
+          <button className="h-full px-3 text-sm font-bold text-primary border-b-2 border-primary">
             Documents
           </button>
         </div>
 
         {/* Right Session State */}
         <div className="flex items-center gap-2">
-          <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-[10px] font-extrabold rounded-md flex items-center gap-1 border border-emerald-100">
+          <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-xs font-extrabold rounded-md flex items-center gap-1 border border-emerald-100">
             🟢 Active Session
           </span>
         </div>
@@ -514,27 +514,27 @@ function DocumentsPageContent() {
         
         {/* Document Upload Card */}
         <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-sm text-left">
-          <h2 className="text-[12px] font-extrabold text-[#1E293B] uppercase tracking-wider mb-3">Upload Patient Document</h2>
+          <h2 className="text-sm font-extrabold text-[#1E293B] uppercase tracking-wider mb-3">Upload Patient Document</h2>
           <form onSubmit={handleUpload} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] font-bold text-[#718096] uppercase mb-1.5">Document Name *</label>
+                <label className="block text-xs font-bold text-[#718096] uppercase mb-1.5">Document Name *</label>
                 <input
                   type="text"
                   placeholder="e.g. Lab Report, X-Ray Summary, ECG Chart"
                   value={docName}
                   onChange={(e) => setDocName(e.target.value)}
-                  className="w-full h-9 px-3 border border-[#E2E8F0] rounded-lg text-[11px] bg-white focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 placeholder:text-slate-350 font-medium"
+                  className="w-full h-9 px-3 border border-[#E2E8F0] rounded-lg text-sm bg-white focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 placeholder:text-slate-350 font-medium"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-[#718096] uppercase mb-1.5">Select File (PDF or Image) *</label>
+                <label className="block text-xs font-bold text-[#718096] uppercase mb-1.5">Select File (PDF or Image) *</label>
                 <div className="flex items-center h-9 px-3 border border-[#E2E8F0] rounded-lg bg-white">
                   <input
                     type="file"
                     ref={fileInputRef}
                     accept="image/*,application/pdf"
-                    className="w-full text-[11px] text-slate-500 file:mr-3 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-extrabold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 file:cursor-pointer"
+                    className="w-full text-sm text-slate-500 file:mr-3 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:font-extrabold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 file:cursor-pointer"
                   />
                 </div>
               </div>
@@ -543,7 +543,7 @@ function DocumentsPageContent() {
               <button
                 type="submit"
                 disabled={uploading}
-                className="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg text-[11px] font-extrabold tracking-wide transition-colors flex items-center gap-2 shadow-sm"
+                className="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg text-sm font-extrabold tracking-wide transition-colors flex items-center gap-2 shadow-sm"
               >
                 {uploading ? (
                   <>
@@ -566,17 +566,17 @@ function DocumentsPageContent() {
 
         {/* Uploaded Documents List Card */}
         <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-sm flex-1 flex flex-col min-h-[300px] text-left">
-          <h2 className="text-[12px] font-extrabold text-[#1E293B] uppercase tracking-wider mb-4">Patient Document History</h2>
+          <h2 className="text-sm font-extrabold text-[#1E293B] uppercase tracking-wider mb-4">Patient Document History</h2>
           
           {docsLoading ? (
-            <div className="flex-1 flex items-center justify-center text-[12px] font-bold text-slate-400">
+            <div className="flex-1 flex items-center justify-center text-sm font-bold text-slate-400">
               Loading document list...
             </div>
           ) : documents.length === 0 ? (
             <div className="flex-1 border-2 border-dashed border-[#E2E8F0] rounded-xl flex flex-col items-center justify-center p-12 text-center text-slate-400">
               <span className="text-3xl mb-2.5">📂</span>
-              <span className="text-[12px] font-bold text-slate-500">No documents found.</span>
-              <span className="text-[10px] text-slate-350 mt-1 max-w-[280px]">Upload reports, prescriptions, or summary files for this patient using the form above.</span>
+              <span className="text-sm font-bold text-slate-500">No documents found.</span>
+              <span className="text-xs text-slate-350 mt-1 max-w-[280px]">Upload reports, prescriptions, or summary files for this patient using the form above.</span>
             </div>
           ) : (
             <div className="border border-[#E2E8F0] rounded-xl divide-y divide-[#E2E8F0] overflow-hidden bg-white">
@@ -602,19 +602,19 @@ function DocumentsPageContent() {
                             alt={doc.document_name}
                             className="w-16 h-16 rounded-lg object-cover border border-slate-200 shadow-xs hover:border-indigo-400 hover:shadow-sm transition-all"
                           />
-                          <div className="absolute inset-0 bg-black/40 text-white text-[9px] font-bold flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="absolute inset-0 bg-black/40 text-white text-xs font-bold flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
                             View 🔍
                           </div>
                         </div>
                       ) : (
-                        <div onClick={() => openViewModal(doc)} className="w-16 h-16 rounded-lg bg-rose-50 text-rose-600 flex flex-col items-center justify-center border border-rose-100 text-[9px] font-extrabold select-none leading-tight shrink-0 cursor-zoom-in" title="Click to view PDF">
+                        <div onClick={() => openViewModal(doc)} className="w-16 h-16 rounded-lg bg-rose-50 text-rose-600 flex flex-col items-center justify-center border border-rose-100 text-xs font-extrabold select-none leading-tight shrink-0 cursor-zoom-in" title="Click to view PDF">
                           <span className="text-xl">📄</span>
                           <span>PDF</span>
                         </div>
                       )}
                       <div>
-                        <p className="text-[12px] font-bold text-[#1E293B]">{doc.document_name}</p>
-                        <p className="text-[10px] font-medium text-slate-400 mt-0.5">Uploaded: {uploadDate}</p>
+                        <p className="text-sm font-bold text-[#1E293B]">{doc.document_name}</p>
+                        <p className="text-xs font-medium text-slate-400 mt-0.5">Uploaded: {uploadDate}</p>
                       </div>
                     </div>
 
@@ -623,7 +623,7 @@ function DocumentsPageContent() {
                       <button
                         type="button"
                         onClick={() => openViewModal(doc)}
-                        className="h-8 px-3.5 bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#475569] rounded-lg text-[10.5px] font-extrabold tracking-wide transition-colors flex items-center gap-1.5"
+                        className="h-8 px-3.5 bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#475569] rounded-lg text-xs font-extrabold tracking-wide transition-colors flex items-center gap-1.5"
                       >
                         <span>👁️</span>
                         <span>View</span>
@@ -654,13 +654,13 @@ function DocumentsPageContent() {
           <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-sm w-full p-5 text-left space-y-4 animate-in fade-in zoom-in duration-200">
             <div>
               <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide">Confirm Deletion</h3>
-              <p className="text-[11px] text-slate-500 mt-1">
+              <p className="text-sm text-slate-500 mt-1">
                 Are you sure you want to delete document <strong className="text-slate-700">"{deletingDoc.document_name}"</strong>?
               </p>
             </div>
             
             <div className="space-y-1.5 bg-slate-50 p-3 rounded-lg border border-slate-100">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase">
+              <label className="block text-xs font-bold text-slate-400 uppercase">
                 Type <strong className="text-indigo-600 font-extrabold">confirm</strong> to delete:
               </label>
               <input
@@ -668,21 +668,21 @@ function DocumentsPageContent() {
                 placeholder="Type 'confirm'"
                 value={deleteConfirmText}
                 onChange={(e) => setDeleteConfirmText(e.target.value)}
-                className="w-full h-8 px-2.5 border border-slate-200 focus:border-rose-400 focus:ring-1 focus:ring-rose-100 rounded-md text-[11px] bg-white focus:outline-none placeholder:text-slate-350 font-bold"
+                className="w-full h-8 px-2.5 border border-slate-200 focus:border-rose-400 focus:ring-1 focus:ring-rose-100 rounded-md text-sm bg-white focus:outline-none placeholder:text-slate-350 font-bold"
               />
             </div>
 
             <div className="flex gap-2 justify-end pt-1">
               <button
                 onClick={closeDeleteModal}
-                className="h-8 px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10.5px] font-bold transition-colors"
+                className="h-8 px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
                 disabled={deleteConfirmText.toLowerCase() !== "confirm"}
-                className="h-8 px-3.5 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300 text-white rounded-lg text-[10.5px] font-extrabold transition-colors"
+                className="h-8 px-3.5 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300 text-white rounded-lg text-xs font-extrabold transition-colors"
               >
                 Delete
               </button>
@@ -701,7 +701,7 @@ function DocumentsPageContent() {
               <span className="text-xl">📄</span>
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wide">{viewingDoc.document_name}</h3>
-                <p className="text-[10px] text-slate-400">Patient Document Preview</p>
+                <p className="text-xs text-slate-400">Patient Document Preview</p>
               </div>
             </div>
 
@@ -716,7 +716,7 @@ function DocumentsPageContent() {
                 >
                   ➖
                 </button>
-                <span className="text-[11px] font-bold text-slate-300 w-12 text-center">
+                <span className="text-sm font-bold text-slate-300 w-12 text-center">
                   {Math.round(zoomScale * 100)}%
                 </span>
                 <button 
@@ -730,7 +730,7 @@ function DocumentsPageContent() {
                 <button 
                   type="button"
                   onClick={handleZoomReset}
-                  className="text-[10px] bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-0.5 rounded font-bold transition-all ml-1.5"
+                  className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-0.5 rounded font-bold transition-all ml-1.5"
                 >
                   Reset
                 </button>
@@ -789,7 +789,7 @@ export default function DocumentsPage() {
   return (
     <Suspense fallback={
       <div className="flex h-screen items-center justify-center bg-slate-50">
-        <div className="text-[12px] font-bold text-slate-500">Loading documents component...</div>
+        <div className="text-sm font-bold text-slate-500">Loading documents component...</div>
       </div>
     }>
       <DocumentsPageContent />

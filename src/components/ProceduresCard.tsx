@@ -131,12 +131,12 @@ function InlineAutoComplete({
       const match = item.match(/\+ Create "(.*)"/);
       const custom = match ? match[1] : item;
       return (
-        <span className="text-blue-600 font-bold flex items-center gap-1 text-[11px]">
+        <span className="text-blue-600 font-bold flex items-center gap-1 text-sm">
           <span>+ Create</span><span className="italic">"{custom}"</span>
         </span>
       );
     }
-    return <span className="text-[11px] font-semibold text-[#334155]">{item}</span>;
+    return <span className="text-sm font-semibold text-[#334155]">{item}</span>;
   };
 
   return (
@@ -157,9 +157,9 @@ function InlineAutoComplete({
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
-        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-350"
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-sm font-semibold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-350"
         className="w-full h-full"
-        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+        panelClassName="custom-autocomplete-panel text-sm font-semibold"
       />
     </div>
   );
@@ -235,13 +235,13 @@ function InlineProcedureAutoComplete({
       const custom = match ? match[1] : item;
       return (
         <div className="p-1">
-          <span className="text-blue-600 font-bold text-[11px]">+ Create "{custom}"</span>
+          <span className="text-blue-600 font-bold text-sm">+ Create "{custom}"</span>
         </div>
       );
     }
     return (
       <div className="p-1">
-        <div className="text-[11px] font-bold text-[#1e293b]">{item}</div>
+        <div className="text-sm font-bold text-[#1e293b]">{item}</div>
       </div>
     );
   };
@@ -264,9 +264,9 @@ function InlineProcedureAutoComplete({
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
-        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none p-0 placeholder:text-slate-350"
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-sm font-bold text-[#1e293b] bg-transparent outline-none p-0 placeholder:text-slate-350"
         className="w-full h-full"
-        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+        panelClassName="custom-autocomplete-panel text-sm font-semibold"
       />
     </div>
   );
@@ -408,7 +408,7 @@ export default function ProceduresCard({ procedures, setProcedures }: Procedures
     <section className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-4 shadow-sm w-full select-none">
       {/* Header */}
       <div className="flex justify-between items-center border-b pb-2 select-none">
-        <span className="text-[11px] font-extrabold text-[#1E293B] uppercase flex items-center gap-1.5">
+        <span className="text-sm font-extrabold text-[#1E293B] uppercase flex items-center gap-1.5">
           <span className="text-sm">🩺</span>
           Procedures
         </span>
@@ -426,7 +426,7 @@ export default function ProceduresCard({ procedures, setProcedures }: Procedures
           {/* Templates */}
           <button
             type="button"
-            className="flex items-center gap-1 px-1.5 py-0.5 hover:bg-[#F1F5F9] rounded text-slate-500 hover:text-indigo-600 text-[10px] font-bold transition-colors"
+            className="flex items-center gap-1 px-1.5 py-0.5 hover:bg-[#F1F5F9] rounded text-slate-500 hover:text-indigo-600 text-xs font-bold transition-colors"
           >
             <span>T</span>
             <span className="text-[8px] font-bold lowercase">pr</span>
@@ -515,7 +515,7 @@ export default function ProceduresCard({ procedures, setProcedures }: Procedures
                   }}
                   onChange={(e) => patch(item.id, { note: e.target.value })}
                   placeholder="Note"
-                  className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none"
+                  className="w-full h-full border-0 focus:ring-0 px-3 text-sm font-semibold text-[#334155] bg-transparent outline-none"
                 />
               </div>
 
@@ -553,13 +553,13 @@ export default function ProceduresCard({ procedures, setProcedures }: Procedures
             }}
             onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
             onKeyDown={handleSearchKey}
-            className="w-full h-9 pl-9 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-semibold transition-all"
+            className="w-full h-9 pl-9 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-sm bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-semibold transition-all"
           />
           {searchVal.trim() && (
             <button
               type="button"
               onClick={() => addProcedure(searchVal)}
-              className="absolute right-3.5 text-blue-600 hover:text-blue-700 text-[10.5px] font-bold"
+              className="absolute right-3.5 text-blue-600 hover:text-blue-700 text-xs font-bold"
             >
               + Add
             </button>
@@ -578,12 +578,12 @@ export default function ProceduresCard({ procedures, setProcedures }: Procedures
                 <div
                   key={opt}
                   onMouseDown={() => addProcedure(displayVal)}
-                  className={`px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 text-[11.5px] font-semibold transition-colors ${
+                  className={`px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 text-sm font-semibold transition-colors ${
                     i === searchHi ? "bg-blue-50 text-blue-700" : "hover:bg-[#F8FAFC] text-[#1E293B]"
                   }`}
                 >
                   {isCreate ? (
-                    <span className="text-[11.5px] font-bold text-blue-600">
+                    <span className="text-sm font-bold text-blue-600">
                       + Create <span className="italic font-semibold">"{displayVal}"</span>
                     </span>
                   ) : (

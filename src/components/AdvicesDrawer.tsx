@@ -150,7 +150,7 @@ export default function AdvicesDrawer({
             <div className="w-7 h-7 rounded-md bg-indigo-50 flex items-center justify-center text-indigo-650 text-xs shadow-sm">
               💬
             </div>
-            <span className="text-[13px] font-extrabold text-[#1E293B]">Select Advices</span>
+            <span className="text-sm font-extrabold text-[#1E293B]">Select Advices</span>
           </div>
           <button
             type="button"
@@ -174,25 +174,25 @@ export default function AdvicesDrawer({
               placeholder="Search or add advice template..."
               value={searchVal}
               onChange={(e) => setSearchVal(e.target.value)}
-              className="w-full h-10 pl-9 pr-20 border border-[#E2E8F0] focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 rounded-lg text-[12px] bg-white focus:outline-none placeholder:text-[#C0CADC] font-semibold transition-all"
+              className="w-full h-10 pl-9 pr-20 border border-[#E2E8F0] focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 rounded-lg text-sm bg-white focus:outline-none placeholder:text-[#C0CADC] font-semibold transition-all"
             />
             {searchVal.trim() && !isExactMatch && (
               <button
                 type="button"
                 onClick={() => handleCreateAdvice(searchVal)}
-                className="absolute right-3 text-indigo-600 hover:text-indigo-700 text-[11px] font-bold tracking-wide transition-all"
+                className="absolute right-3 text-indigo-600 hover:text-indigo-700 text-sm font-bold tracking-wide transition-all"
               >
                 + Create
               </button>
             )}
           </div>
-          <div className="flex justify-between items-center text-[10px] text-slate-500 font-bold px-1">
+          <div className="flex justify-between items-center text-xs text-slate-500 font-bold px-1">
             <span>Selected: {selectedAdvices.length} template(s)</span>
             {selectedAdvices.length > 0 && (
               <button
                 type="button"
                 onClick={() => setSelectedAdvices([])}
-                className="text-red-500 hover:text-red-650 transition-colors uppercase tracking-wider text-[9px]"
+                className="text-red-500 hover:text-red-650 transition-colors uppercase tracking-wider text-xs"
               >
                 Clear All
               </button>
@@ -208,12 +208,12 @@ export default function AdvicesDrawer({
           {filteredList.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-[#CBD5E0] bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-xs">
               <span className="text-3xl mb-1.5 font-bold">💬</span>
-              <span className="text-[11px] font-bold uppercase tracking-wider mb-2">No templates found</span>
+              <span className="text-sm font-bold uppercase tracking-wider mb-2">No templates found</span>
               {searchVal.trim() && (
                 <button
                   type="button"
                   onClick={() => handleCreateAdvice(searchVal)}
-                  className="px-3.5 py-1.5 bg-primary text-white text-[11px] font-extrabold rounded-lg hover:bg-primary-hover shadow-sm transition-all"
+                  className="px-3.5 py-1.5 bg-primary text-white text-sm font-extrabold rounded-lg hover:bg-primary-hover shadow-sm transition-all"
                 >
                   Create "{searchVal.trim()}"
                 </button>
@@ -239,7 +239,7 @@ export default function AdvicesDrawer({
                     onChange={() => {}} // Controlled click via parent row
                     className="rounded text-primary border-gray-300 w-4 h-4 cursor-pointer focus:ring-0 shrink-0 accent-indigo-600"
                   />
-                  <span className={`text-[12px] font-semibold leading-relaxed transition-all
+                  <span className={`text-sm font-semibold leading-relaxed transition-all
                     ${isChecked ? "text-indigo-900 font-bold" : "text-[#334155]"}`}
                   >
                     {advice}
@@ -255,14 +255,14 @@ export default function AdvicesDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[12px] font-bold text-[#64748B] rounded-lg transition-all"
+            className="px-4 py-2 border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-sm font-bold text-[#64748B] rounded-lg transition-all"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSave}
-            className="px-5 py-2 bg-primary hover:bg-primary-hover text-[12px] font-extrabold text-white rounded-lg transition-all shadow-md"
+            className="px-5 py-2 bg-primary hover:bg-primary-hover text-sm font-extrabold text-white rounded-lg transition-all shadow-md"
           >
             Save & Close
           </button>

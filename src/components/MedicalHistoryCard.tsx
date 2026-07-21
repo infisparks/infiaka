@@ -151,13 +151,13 @@ export default function MedicalHistoryCard({
       
       {/* Title block */}
       <div className="flex justify-between items-center border-b pb-2 select-none">
-        <span className="text-[11px] font-extrabold text-[#1E293B] uppercase flex items-center gap-1.5">
+        <span className="text-sm font-extrabold text-[#1E293B] uppercase flex items-center gap-1.5">
           <svg className="w-4 h-4 text-amber-500 fill-amber-500/10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>
           Patient Medical History
         </span>
-        <div className="flex items-center gap-3 text-[10.5px] font-bold text-[#4A5568]">
+        <div className="flex items-center gap-3 text-xs font-bold text-[#4A5568]">
           <label className="flex items-center gap-1.5 cursor-pointer">
             <input
               type="checkbox"
@@ -167,7 +167,7 @@ export default function MedicalHistoryCard({
             />
             No known medical history
           </label>
-          <button type="button" className="px-2.5 py-0.5 bg-slate-50 border border-slate-200 text-[9.5px] font-bold rounded hover:bg-slate-100 flex items-center gap-1">
+          <button type="button" className="px-2.5 py-0.5 bg-slate-50 border border-slate-200 text-xs font-bold rounded hover:bg-slate-100 flex items-center gap-1">
             <span>⚙ Configure</span>
           </button>
         </div>
@@ -178,7 +178,7 @@ export default function MedicalHistoryCard({
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
           <div
             onClick={onOpenFamily}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-xs font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
           >
             FAMILY HISTORY
           </div>
@@ -205,7 +205,7 @@ export default function MedicalHistoryCard({
                 <div key={item.id} className="flex items-center gap-2">
                   <div
                     onClick={() => toggleFamilyStatus(item.id, item.status)}
-                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-[10px] select-none transition-colors cursor-pointer ${badgeClass}`}
+                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-xs select-none transition-colors cursor-pointer ${badgeClass}`}
                   >
                     <div className="flex items-center gap-0.5">
                       <span>{badgeText}</span>
@@ -215,8 +215,8 @@ export default function MedicalHistoryCard({
                     </div>
                   </div>
                   <div onClick={onOpenFamily} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{item.name}</p>
-                    {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
+                    <p className="text-sm font-bold text-[#090d16] leading-tight">{item.name}</p>
+                    {details && <p className="text-sm text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
                   </div>
                 </div>
               );
@@ -226,7 +226,7 @@ export default function MedicalHistoryCard({
           <button
             type="button"
             onClick={onOpenFamily}
-            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-[10px] font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
+            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-xs font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
           >
             + Add
           </button>
@@ -238,7 +238,7 @@ export default function MedicalHistoryCard({
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
           <div
             onClick={onOpenConditions}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-xs font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
           >
             EXISTING CONDITIONS
           </div>
@@ -266,7 +266,7 @@ export default function MedicalHistoryCard({
                 <div key={cond.id} className="flex items-center gap-2">
                   <div
                     onClick={() => toggleConditionStatus(cond.id, cond.status)}
-                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-[10px] select-none transition-colors cursor-pointer ${badgeClass}`}
+                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-xs select-none transition-colors cursor-pointer ${badgeClass}`}
                   >
                     <div className="flex items-center gap-0.5">
                       <span>{badgeText}</span>
@@ -276,8 +276,8 @@ export default function MedicalHistoryCard({
                     </div>
                   </div>
                   <div onClick={onOpenConditions} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{cond.name}</p>
-                    {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
+                    <p className="text-sm font-bold text-[#090d16] leading-tight">{cond.name}</p>
+                    {details && <p className="text-sm text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
                   </div>
                 </div>
               );
@@ -287,7 +287,7 @@ export default function MedicalHistoryCard({
           <button
             type="button"
             onClick={onOpenConditions}
-            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-[10px] font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
+            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-xs font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
           >
             + Add
           </button>
@@ -297,7 +297,7 @@ export default function MedicalHistoryCard({
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
           <div
             onClick={onOpenAllergies}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-xs font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
           >
             DRUG ALLERGY
           </div>
@@ -325,7 +325,7 @@ export default function MedicalHistoryCard({
                 <div key={item.id} className="flex items-center gap-2">
                   <div
                     onClick={() => toggleAllergyStatus(item.id, item.status)}
-                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-[10px] select-none transition-colors cursor-pointer ${badgeClass}`}
+                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-xs select-none transition-colors cursor-pointer ${badgeClass}`}
                   >
                     <div className="flex items-center gap-0.5">
                       <span>{badgeText}</span>
@@ -335,8 +335,8 @@ export default function MedicalHistoryCard({
                     </div>
                   </div>
                   <div onClick={onOpenAllergies} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{item.name}</p>
-                    {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
+                    <p className="text-sm font-bold text-[#090d16] leading-tight">{item.name}</p>
+                    {details && <p className="text-sm text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
                   </div>
                 </div>
               );
@@ -346,7 +346,7 @@ export default function MedicalHistoryCard({
           <button
             type="button"
             onClick={onOpenAllergies}
-            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-[10px] font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
+            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-xs font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
           >
             + Add
           </button>
@@ -358,7 +358,7 @@ export default function MedicalHistoryCard({
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
           <div
             onClick={onOpenProcedures}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-xs font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
           >
             PAST SURGICAL PROCEDURES
           </div>
@@ -386,7 +386,7 @@ export default function MedicalHistoryCard({
                 <div key={proc.id} className="flex items-center gap-2">
                   <div
                     onClick={() => toggleProcedureStatus(proc.id, proc.status)}
-                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-[10px] select-none transition-colors cursor-pointer ${badgeClass}`}
+                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-xs select-none transition-colors cursor-pointer ${badgeClass}`}
                   >
                     <div className="flex items-center gap-0.5">
                       <span>{badgeText}</span>
@@ -396,8 +396,8 @@ export default function MedicalHistoryCard({
                     </div>
                   </div>
                   <div onClick={onOpenProcedures} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{proc.name}</p>
-                    {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
+                    <p className="text-sm font-bold text-[#090d16] leading-tight">{proc.name}</p>
+                    {details && <p className="text-sm text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
                   </div>
                 </div>
               );
@@ -407,7 +407,7 @@ export default function MedicalHistoryCard({
           <button
             type="button"
             onClick={onOpenProcedures}
-            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-[10px] font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
+            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-xs font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
           >
             + Add
           </button>
@@ -419,7 +419,7 @@ export default function MedicalHistoryCard({
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
           <div
             onClick={onOpenCurrentMeds}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-xs font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
           >
             CURRENT MEDICATIONS
           </div>
@@ -450,7 +450,7 @@ export default function MedicalHistoryCard({
                 <div key={med.id} className="flex items-center gap-2">
                   <div
                     onClick={() => toggleMedStatus(med.id, med.status)}
-                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-[10px] select-none transition-colors cursor-pointer ${badgeClass}`}
+                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-xs select-none transition-colors cursor-pointer ${badgeClass}`}
                   >
                     <div className="flex items-center gap-0.5">
                       <span>{badgeText}</span>
@@ -460,8 +460,8 @@ export default function MedicalHistoryCard({
                     </div>
                   </div>
                   <div onClick={onOpenCurrentMeds} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{med.name}</p>
-                    {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
+                    <p className="text-sm font-bold text-[#090d16] leading-tight">{med.name}</p>
+                    {details && <p className="text-sm text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
                   </div>
                 </div>
               );
@@ -471,7 +471,7 @@ export default function MedicalHistoryCard({
           <button
             type="button"
             onClick={onOpenCurrentMeds}
-            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-[10px] font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
+            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-xs font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
           >
             + Add
           </button>
@@ -483,7 +483,7 @@ export default function MedicalHistoryCard({
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
           <div
             onClick={onOpenHabits}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-xs font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none cursor-pointer transition-colors"
           >
             LIFESTYLE HABITS
           </div>
@@ -504,7 +504,7 @@ export default function MedicalHistoryCard({
                 <div key={h.id} className="flex items-center gap-2">
                   <div
                     onClick={() => toggleHabitStatus(h.id, h.status)}
-                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-[10px] select-none transition-colors cursor-pointer ${badgeClass}`}
+                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-xs select-none transition-colors cursor-pointer ${badgeClass}`}
                   >
                     <div className="flex items-center gap-0.5">
                       <span>{badgeText}</span>
@@ -514,8 +514,8 @@ export default function MedicalHistoryCard({
                     </div>
                   </div>
                   <div onClick={onOpenHabits} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{h.name}</p>
-                    {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
+                    <p className="text-sm font-bold text-[#090d16] leading-tight">{h.name}</p>
+                    {details && <p className="text-sm text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
                   </div>
                 </div>
               );
@@ -524,7 +524,7 @@ export default function MedicalHistoryCard({
           <button
             type="button"
             onClick={onOpenHabits}
-            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-[10px] font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
+            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-xs font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
           >+ Add</button>
         </div>
       )}
@@ -534,7 +534,7 @@ export default function MedicalHistoryCard({
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
           <div
             onClick={onOpenFoodAllergies}
-            className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none border border-rose-100 cursor-pointer transition-colors"
+            className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-2.5 py-1 rounded text-xs font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none border border-rose-100 cursor-pointer transition-colors"
           >
             FOOD/OTHER ALLERGY
           </div>
@@ -552,22 +552,22 @@ export default function MedicalHistoryCard({
               return (
                 <div key={f.id} className="flex items-center gap-2">
                   <div onClick={() => toggleFoodAllergyStatus(f.id, f.status)}
-                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-[10px] select-none transition-colors cursor-pointer ${badgeClass}`}>
+                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-xs select-none transition-colors cursor-pointer ${badgeClass}`}>
                     <div className="flex items-center gap-0.5">
                       <span>{badgeText}</span>
                       <svg className="w-1.5 h-2 fill-current" viewBox="0 0 320 512"><path d="M27.66 224h264.7c24.6 0 36.89-29.78 19.54-47.12l-132.3-136.8c-5.406-5.406-12.47-8.107-19.53-8.107c-7.055 0-14.09 2.701-19.45 8.107L8.119 176.9C-9.229 194.2 3.055 224 27.66 224zM292.3 288H27.66c-24.6 0-36.89 29.77-19.54 47.12l132.5 136.8C145.9 477.3 152.1 480 160 480c7.053 0 14.12-2.703 19.53-8.109l132.3-136.8C329.2 317.8 316.9 288 292.3 288z"/></svg>
                     </div>
                   </div>
                   <div onClick={onOpenFoodAllergies} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{f.name}</p>
-                    {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
+                    <p className="text-sm font-bold text-[#090d16] leading-tight">{f.name}</p>
+                    {details && <p className="text-sm text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
                   </div>
                 </div>
               );
             })}
           </div>
           <button type="button" onClick={onOpenFoodAllergies}
-            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-[10px] font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none">+ Add</button>
+            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-xs font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none">+ Add</button>
         </div>
       )}
 
@@ -576,7 +576,7 @@ export default function MedicalHistoryCard({
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
           <div
             onClick={onOpenOtherHistory}
-            className="bg-violet-50 hover:bg-violet-100 text-violet-700 px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none border border-violet-100 cursor-pointer transition-colors"
+            className="bg-violet-50 hover:bg-violet-100 text-violet-700 px-2.5 py-1 rounded text-xs font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none border border-violet-100 cursor-pointer transition-colors"
           >
             {otherHistoryTitle || "OTHER MED. HISTORY"}
           </div>
@@ -589,15 +589,15 @@ export default function MedicalHistoryCard({
                 <div key={o.id} className="flex flex-col">
                   <div className="flex items-center gap-1.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />
-                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{o.name}</p>
+                    <p className="text-sm font-bold text-[#090d16] leading-tight">{o.name}</p>
                   </div>
-                  {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none pl-3">{details}</p>}
+                  {details && <p className="text-sm text-[#090d16] font-bold mt-0.5 leading-none pl-3">{details}</p>}
                 </div>
               );
             })}
           </div>
           <button type="button" onClick={onOpenOtherHistory}
-            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-[10px] font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none">+ Add</button>
+            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-xs font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none">+ Add</button>
         </div>
       )}
 
@@ -606,7 +606,7 @@ export default function MedicalHistoryCard({
         <div className="flex items-start gap-4 py-3 border-t border-[#F1F5F9] w-full text-left">
           <div
             onClick={onOpenTravelHistory}
-            className="bg-[#E0F2FE] hover:bg-[#D0E7FC] text-[#0369A1] px-2.5 py-1 rounded text-[9px] font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none border border-[#BAE6FD] cursor-pointer transition-colors"
+            className="bg-[#E0F2FE] hover:bg-[#D0E7FC] text-[#0369A1] px-2.5 py-1 rounded text-xs font-extrabold tracking-wide uppercase shrink-0 min-w-[140px] text-center select-none border border-[#BAE6FD] cursor-pointer transition-colors"
           >
             TRAVEL HISTORY
           </div>
@@ -627,7 +627,7 @@ export default function MedicalHistoryCard({
                 <div key={t.id} className="flex items-center gap-2">
                   <div
                     onClick={() => toggleTravelStatus(t.id, t.status)}
-                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-[10px] select-none transition-colors cursor-pointer ${badgeClass}`}
+                    className={`w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center border font-bold text-xs select-none transition-colors cursor-pointer ${badgeClass}`}
                   >
                     <div className="flex items-center gap-0.5">
                       <span>{badgeText}</span>
@@ -637,9 +637,9 @@ export default function MedicalHistoryCard({
                     </div>
                   </div>
                   <div onClick={onOpenTravelHistory} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{t.destination}</p>
+                    <p className="text-sm font-bold text-[#090d16] leading-tight">{t.destination}</p>
                     {(t.travelDate || t.notes) && (
-                      <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">
+                      <p className="text-sm text-[#090d16] font-bold mt-0.5 leading-none">
                         {[
                           t.travelDate ? `Date: ${t.travelDate}` : "",
                           t.notes ? `Notes: ${t.notes}` : ""
@@ -656,7 +656,7 @@ export default function MedicalHistoryCard({
           <button
             type="button"
             onClick={onOpenTravelHistory}
-            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-[10px] font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
+            className="px-3.5 py-1 border border-blue-400 hover:bg-blue-50 text-xs font-extrabold text-blue-500 rounded-full shrink-0 transition-all select-none leading-none"
           >
             + Add
           </button>
@@ -664,7 +664,7 @@ export default function MedicalHistoryCard({
       )}
 
       {/* History Action pills row */}
-      <div className="flex items-center gap-2 flex-wrap pt-3 border-t text-[10.5px]">
+      <div className="flex items-center gap-2 flex-wrap pt-3 border-t text-xs">
         {conditions.length === 0 && (
           <button type="button" onClick={onOpenConditions} className="px-3 py-1 border border-primary/20 hover:bg-primary/5 rounded-full font-bold text-primary">+ Existing Conditions</button>
         )}

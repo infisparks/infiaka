@@ -935,7 +935,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
   const compileHistoryText = (items: any[], title: string) => {
     if (!items || items.length === 0) return null;
     return (
-      <div className="text-[11px] leading-relaxed">
+      <div className="text-sm leading-relaxed">
         <span className="font-bold text-primary mr-1">{title}:</span>
         <span className="text-[#334155]">
           {items.map((item) => {
@@ -1031,11 +1031,11 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
             <div className="text-[20px] font-black text-[#4f46e5] uppercase tracking-tight">
               {patient?.opdRegistration?.clinic_name || "OPD CLINIC"}
             </div>
-            <p className="m-0 text-[#64748b] text-[11px] font-semibold mt-0.5">
+            <p className="m-0 text-[#64748b] text-sm font-semibold mt-0.5">
               Comprehensive & Advanced Healthcare Clinic
             </p>
           </div>
-          <div className="text-right text-[11.5px] leading-normal font-semibold">
+          <div className="text-right text-sm leading-normal font-semibold">
             <strong className="text-[#4f46e5] text-[13.5px] block mb-0.5">
               {patient?.opdRegistration?.treating_doctor || "DR. TREATING DOCTOR"}
             </strong>
@@ -1048,7 +1048,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
       )}
 
       {/* ─── PATIENT INFORMATION GRID ─── */}
-      <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-[#e2e8f0] p-4 rounded-lg text-[11.5px] font-semibold mb-5">
+      <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-[#e2e8f0] p-4 rounded-lg text-sm font-semibold mb-5">
         <div className="space-y-1">
           <div>
             <span className="text-[#64748b]">Patient Name:</span>{" "}
@@ -1092,11 +1092,11 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
       </div>
       {weight && (
         <div className="mb-5 w-fit">
-          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1.5 border-b pb-0.5">Vitals</div>
+          <div className="text-xs font-bold text-primary uppercase tracking-wider mb-1.5 border-b pb-0.5">Vitals</div>
           <div className="bg-[#f8fafc] border border-[#e2e8f0] px-4 py-2 rounded-lg text-center select-text">
             <div>
-              <div className="text-[9px] font-bold text-[#64748b] uppercase">Weight</div>
-              <div className="text-[12px] font-extrabold text-[#334155]">{weight} <span className="text-[9px] font-semibold text-slate-400">kg</span></div>
+              <div className="text-xs font-bold text-[#64748b] uppercase">Weight</div>
+              <div className="text-sm font-extrabold text-[#334155]">{weight} <span className="text-xs font-semibold text-slate-400">kg</span></div>
             </div>
           </div>
         </div>
@@ -1105,10 +1105,10 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
       {/* ─── 2. SYMPTOMS ─── */}
       {symptoms && symptoms.length > 0 && (
         <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg avoid-break">
-          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-0.5">
+          <div className="text-xs font-bold text-primary uppercase tracking-wider mb-2 border-b pb-0.5">
             Symptoms / Complaints
           </div>
-          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+          <ul className="list-disc pl-4 space-y-1 text-sm font-semibold text-slate-700">
             {symptoms.map((s, idx) => (
               <li key={idx}>
                 {s.name}{" "}
@@ -1116,7 +1116,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
                   <span className="text-slate-400 font-medium">({s.duration})</span>
                 )}{" "}
                 {s.severity && (
-                  <span className="text-[9px] uppercase font-bold text-[#64748b] bg-slate-100 px-1 py-0.2 rounded ml-1">
+                  <span className="text-xs uppercase font-bold text-[#64748b] bg-slate-100 px-1 py-0.2 rounded ml-1">
                     {s.severity}
                   </span>
                 )}
@@ -1129,7 +1129,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
       {/* ─── 3. PATIENT MEDICAL HISTORY ─── */}
       {(!histNoKnown || familyItems.length > 0 || conditions.length > 0 || allergies.length > 0 || procedures.length > 0 || currentMeds.length > 0 || habits.length > 0 || foodAllergies.length > 0 || travelHistory.length > 0 || otherHistory.length > 0) && (
         <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg bg-slate-50/50 space-y-1.5 avoid-break">
-          <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1">
+          <div className="text-xs font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1">
             Patient Medical History
           </div>
           {conditions.length > 0 && compileHistoryText(conditions, "Patient Medical History")}
@@ -1147,10 +1147,10 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
       {/* ─── 4. EXAMINATION FINDING ─── */}
       {examinationFindings && (
         <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg bg-slate-50/50 avoid-break">
-          <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1">
+          <div className="text-xs font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1">
             Examination Findings
           </div>
-          <div className="text-[11px] font-medium text-slate-750 whitespace-pre-line leading-relaxed">
+          <div className="text-sm font-medium text-slate-750 whitespace-pre-line leading-relaxed">
             {examinationFindings}
           </div>
         </div>
@@ -1159,14 +1159,14 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
       {/* ─── 5. LAB RESULTS ─── */}
       {labResults && labResults.length > 0 && (
         <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg avoid-break">
-          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-0.5">
+          <div className="text-xs font-bold text-primary uppercase tracking-wider mb-2 border-b pb-0.5">
             Lab Results
           </div>
-          <div className="grid grid-cols-2 gap-4 text-[10.5px] font-semibold text-slate-700">
+          <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-700">
             {labResults.map((r, idx) => (
               <div key={idx} className="border-b pb-1 last:border-0">
                 <div className="font-bold text-[#0f172a]">{r.name}</div>
-                <div className="flex gap-2 text-[9.5px] text-slate-500 mt-0.5">
+                <div className="flex gap-2 text-xs text-slate-500 mt-0.5">
                   <span>Reading: <strong className="text-slate-700">{r.reading} {r.unit}</strong></span>
                   {r.date && (
                     <span>| Date: <strong className="text-slate-700">{r.date}</strong></span>
@@ -1180,7 +1180,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
                     </span>
                   )}
                 </div>
-                {r.notes && <div className="text-[9px] text-slate-400 mt-0.5 italic">Note: {r.notes}</div>}
+                {r.notes && <div className="text-xs text-slate-400 mt-0.5 italic">Note: {r.notes}</div>}
               </div>
             ))}
           </div>
@@ -1190,10 +1190,10 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
       {/* ─── 6. DIAGNOSIS ─── */}
       {diagnoses && diagnoses.length > 0 && (
         <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg avoid-break">
-          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2 border-b pb-0.5">
+          <div className="text-xs font-bold text-primary uppercase tracking-wider mb-2 border-b pb-0.5">
             Diagnoses
           </div>
-          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+          <ul className="list-disc pl-4 space-y-1 text-sm font-semibold text-slate-700">
             {diagnoses.map((d, idx) => (
               <li key={idx}>
                 {d.name}{" "}
@@ -1209,10 +1209,10 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
       {/* ─── 7. SURGERY ─── */}
       {surgeryPerformed && (
         <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg bg-slate-50/50 avoid-break">
-          <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1.5">
+          <div className="text-xs font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1.5">
             Surgery
           </div>
-          <div className="text-[11px] font-semibold text-slate-700 space-y-1">
+          <div className="text-sm font-semibold text-slate-700 space-y-1">
             <div><span className="text-slate-400 font-medium">Surgery Performed:</span> {surgeryPerformed}</div>
             {surgeryDate && <div><span className="text-slate-400 font-medium">Date of Surgery:</span> {surgeryDate}</div>}
             {surgeryNotes && <div><span className="text-slate-400 font-medium">Post Operative Periods:</span> {surgeryNotes}</div>}
@@ -1224,7 +1224,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
       <div className="mb-5 avoid-break">
         <div className="text-[32px] font-bold text-primary font-serif -mt-2 leading-none mb-2">Rₓ</div>
         {medications.length > 0 ? (
-          <table className="w-full border-collapse border border-[#cbd5e1] text-[11px] text-[#0f172a]">
+          <table className="w-full border-collapse border border-[#cbd5e1] text-sm text-[#0f172a]">
             <thead>
               <tr className="bg-slate-100/80">
                 <th className="border border-[#cbd5e1] px-2 py-1.5 text-center w-7">S.No</th>
@@ -1240,13 +1240,13 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
                 <tr key={idx} className="hover:bg-slate-50/50">
                   <td className="border border-[#cbd5e1] px-2 py-2 text-center font-bold">{idx + 1}</td>
                   <td className="border border-[#cbd5e1] px-3 py-2 font-semibold">
-                    <div className="font-bold text-[12px]">{m.name}</div>
-                    {m.generic && <div className="text-[9px] text-[#64748b] uppercase font-semibold mt-0.5">{m.generic}</div>}
+                    <div className="font-bold text-sm">{m.name}</div>
+                    {m.generic && <div className="text-xs text-[#64748b] uppercase font-semibold mt-0.5">{m.generic}</div>}
                   </td>
                   <td className="border border-[#cbd5e1] px-2.5 py-2 text-center font-semibold">{m.dose}</td>
                   <td className="border border-[#cbd5e1] px-2.5 py-2 text-center font-semibold">
                     <div>{m.freq}</div>
-                    {m.timing && <div className="text-[9.5px] text-slate-500 font-medium mt-0.5">{m.timing}</div>}
+                    {m.timing && <div className="text-xs text-slate-500 font-medium mt-0.5">{m.timing}</div>}
                   </td>
                   <td className="border border-[#cbd5e1] px-2.5 py-2 text-center font-semibold">{formatDuration(m.duration)}</td>
                   <td className="border border-[#cbd5e1] px-3 py-2 text-slate-600 font-medium italic">{m.instr || ""}</td>
@@ -1255,7 +1255,7 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
             </tbody>
           </table>
         ) : (
-          <div className="text-[11px] text-slate-400 italic p-3 border border-dashed rounded-lg text-center">
+          <div className="text-sm text-slate-400 italic p-3 border border-dashed rounded-lg text-center">
             No medications prescribed.
           </div>
         )}
@@ -1264,10 +1264,10 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
       {/* ─── 9. ADVISED INVESTIGATIONS ─── */}
       {labs && labs.length > 0 && (
         <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg avoid-break">
-          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1.5 border-b pb-0.5">
+          <div className="text-xs font-bold text-primary uppercase tracking-wider mb-1.5 border-b pb-0.5">
             Advised Investigations (Lab/Radiology)
           </div>
-          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+          <ul className="list-disc pl-4 space-y-1 text-sm font-semibold text-slate-700">
             {labs.map((l, idx) => (
               <li key={idx}>
                 {l.name}{" "}
@@ -1283,10 +1283,10 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
       {/* ─── 10. PLAN/SURGERY ADVISED ─── */}
       {planSurgeryAdvised && (
         <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg bg-slate-50/50 avoid-break">
-          <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1">
+          <div className="text-xs font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1">
             Plan / Surgery Advised
           </div>
-          <div className="text-[11px] font-medium text-slate-750 whitespace-pre-line leading-relaxed">
+          <div className="text-sm font-medium text-slate-750 whitespace-pre-line leading-relaxed">
             {planSurgeryAdvised}
           </div>
         </div>
@@ -1298,8 +1298,8 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
         <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg avoid-break space-y-3">
           {followUpVal && (
             <div>
-              <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5 border-b pb-0.5">Follow Up</strong>
-              <div className="text-[11px] font-semibold text-slate-700 mt-1">
+              <strong className="text-primary text-xs uppercase block tracking-wider mb-0.5 border-b pb-0.5">Follow Up</strong>
+              <div className="text-sm font-semibold text-slate-700 mt-1">
                 {followUpVal}{" "}
                 {followUpNotes && <span className="text-slate-400 font-medium">({followUpNotes})</span>}
               </div>
@@ -1308,8 +1308,8 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
 
           {(advicesInput || advRest || advWater) && (
             <div>
-              <strong className="text-primary text-[10px] uppercase block tracking-wider mb-0.5 border-b pb-0.5">General Advice</strong>
-              <ul className="list-disc pl-4 space-y-0.5 text-[11px] font-semibold text-slate-700 mt-1">
+              <strong className="text-primary text-xs uppercase block tracking-wider mb-0.5 border-b pb-0.5">General Advice</strong>
+              <ul className="list-disc pl-4 space-y-0.5 text-sm font-semibold text-slate-700 mt-1">
                 {advicesInput && advicesInput.split('\n').filter(line => line.trim() !== '').map((line, idx) => (
                   <li key={idx}>{line.trim()}</li>
                 ))}
@@ -1324,10 +1324,10 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
       {/* ─── 12. NOTES / REMARKS ─── */}
       {notesForPatient && (
         <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg bg-slate-50/50 avoid-break">
-          <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1">
+          <div className="text-xs font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1">
             Doctor Notes for Patient
           </div>
-          <div className="text-[11px] font-medium text-slate-750 whitespace-pre-line leading-relaxed">
+          <div className="text-sm font-medium text-slate-750 whitespace-pre-line leading-relaxed">
             {notesForPatient}
           </div>
         </div>
@@ -1336,10 +1336,10 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
       {/* ─── 13. PROCEDURE DONE ─── */}
       {procedureDone && (
         <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg bg-slate-50/50 avoid-break">
-          <div className="text-[10px] font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1">
+          <div className="text-xs font-bold text-primary uppercase tracking-wider border-b pb-0.5 mb-1">
             Procedure Done
           </div>
-          <div className="text-[11px] font-medium text-slate-750 whitespace-pre-line leading-relaxed">
+          <div className="text-sm font-medium text-slate-750 whitespace-pre-line leading-relaxed">
             {procedureDone}
           </div>
         </div>
@@ -1348,10 +1348,10 @@ const PrintPrescription = forwardRef<any, PrintPrescriptionProps>(function Print
       {/* ─── 14. REFER TO SPECIALIST ─── */}
       {referrals && referrals.length > 0 && (
         <div className="mb-5 border border-[#e2e8f0] p-3 rounded-lg avoid-break">
-          <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1.5 border-b pb-0.5">
+          <div className="text-xs font-bold text-primary uppercase tracking-wider mb-1.5 border-b pb-0.5">
             Refer To Specialist
           </div>
-          <ul className="list-disc pl-4 space-y-1 text-[11px] font-semibold text-slate-700">
+          <ul className="list-disc pl-4 space-y-1 text-sm font-semibold text-slate-700">
             {referrals.map((ref, idx) => (
               <li key={idx}>
                 {ref.doctorName}{" "}

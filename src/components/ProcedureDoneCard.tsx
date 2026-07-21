@@ -13,7 +13,7 @@ export default function ProcedureDoneCard({
 }: ProcedureDoneCardProps) {
   return (
     <section className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-4 shadow-sm w-full">
-      <span className="text-[10px] font-bold text-[#4A5568] uppercase flex items-center gap-1.5 select-none border-b pb-1.5">
+      <span className="text-xs font-bold text-[#4A5568] uppercase flex items-center gap-1.5 select-none border-b pb-1.5">
         Procedure Done (If any)
       </span>
       <div className="space-y-1">
@@ -22,7 +22,7 @@ export default function ProcedureDoneCard({
           value={procedureDone}
           onChange={(e) => setProcedureDone(e.target.value)}
           placeholder="Enter surgical or clinical procedures performed..."
-          className="w-full p-2 border border-[#CBD5E0] rounded-md text-[11px] focus:outline-none"
+          className="w-full p-2 border border-[#CBD5E0] rounded-md text-sm focus:outline-none"
         />
       </div>
     </section>

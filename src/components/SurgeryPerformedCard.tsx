@@ -254,7 +254,7 @@ export default function SurgeryPerformedCard({
   return (
     <section className="bg-white border border-slate-200 rounded-xl p-4 md:p-5 space-y-4 shadow-sm w-full transition-all">
       <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-        <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5 select-none">
+        <span className="text-sm font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5 select-none">
           <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 0L5 5m4.121 4.121L5 19" />
           </svg>
@@ -265,7 +265,7 @@ export default function SurgeryPerformedCard({
       <div className="space-y-4">
         {/* Row 1: Full width - Surgery Performed */}
         <div className="w-full relative" ref={nameContainerRef}>
-          <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1 select-none">
+          <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1 select-none">
             Surgery Performed
           </label>
           <input
@@ -322,7 +322,7 @@ export default function SurgeryPerformedCard({
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           {/* Input 2: Date of Surgery (md:col-span-4) */}
           <div className="md:col-span-4 relative" ref={dateContainerRef}>
-            <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1 select-none">
+            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1 select-none">
               Date of Surgery
             </label>
             <div className="relative flex items-center">
@@ -396,7 +396,7 @@ export default function SurgeryPerformedCard({
                         ${isHighlighted ? "bg-indigo-50 text-indigo-700 font-semibold" : "hover:bg-slate-50 text-slate-700"}`}
                     >
                       <span className="font-medium">{opt}</span>
-                      <span className="text-[10px] text-slate-400 font-normal">({dateVal})</span>
+                      <span className="text-xs text-slate-400 font-normal">({dateVal})</span>
                     </div>
                   );
                 })}
@@ -406,7 +406,7 @@ export default function SurgeryPerformedCard({
 
           {/* Input 3: Post Operative Periods (md:col-span-8) */}
           <div className="md:col-span-8">
-            <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1 select-none">
+            <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1 select-none">
               Post Operative Periods
             </label>
             <input

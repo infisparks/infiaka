@@ -56,7 +56,7 @@ export default function AdvicesCard({
     <section className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-4 shadow-sm w-full select-none text-left">
       {/* Header */}
       <div className="flex justify-between items-center border-b pb-2 select-none">
-        <span className="text-[11px] font-extrabold text-[#1E293B] uppercase flex items-center gap-1.5">
+        <span className="text-sm font-extrabold text-[#1E293B] uppercase flex items-center gap-1.5">
           <svg className="w-4 h-4 text-slate-500 fill-slate-500/10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
@@ -78,7 +78,7 @@ export default function AdvicesCard({
           <button
             type="button"
             onClick={onOpenDrawer}
-            className="flex items-center gap-1 px-1.5 py-0.5 hover:bg-[#F1F5F9] rounded text-slate-500 hover:text-indigo-600 text-[10px] font-bold transition-colors"
+            className="flex items-center gap-1 px-1.5 py-0.5 hover:bg-[#F1F5F9] rounded text-slate-500 hover:text-indigo-600 text-xs font-bold transition-colors"
             title="Advices Templates Quick-List"
           >
             <span>T</span>
@@ -118,11 +118,11 @@ export default function AdvicesCard({
           value={advicesInput}
           onChange={(e) => setAdvicesInput(e.target.value)}
           placeholder="Enter medical advice here..."
-          className="w-full p-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[12.5px] font-extrabold text-[#090d16] placeholder:text-slate-400 focus:bg-white focus:outline-none transition-all resize-none"
+          className="w-full p-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-sm font-extrabold text-[#090d16] placeholder:text-slate-400 focus:bg-white focus:outline-none transition-all resize-none"
         />
 
         {/* Checkbox Templates Section */}
-        <div className="flex flex-col gap-2 select-none text-[12px] font-bold text-[#090d16] pt-1">
+        <div className="flex flex-col gap-2 select-none text-sm font-bold text-[#090d16] pt-1">
 
           {/* Dynamically created templates (Masters) */}
           {customTemplates.map((text, idx) => (

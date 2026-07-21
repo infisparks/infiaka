@@ -65,7 +65,7 @@ const CustomToast = ({ message, type, onClose }: { message: string; type: "succe
     <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg transition-all">
       <div className={`flex items-center gap-2.5 ${bgColors[type]} px-4 py-2.5 rounded-xl border-2 shadow-sm`}>
         {icons[type]}
-        <span className="text-[13px] font-bold tracking-tight">{message}</span>
+        <span className="text-sm font-bold tracking-tight">{message}</span>
       </div>
     </div>
   );
@@ -314,15 +314,15 @@ function EkaCarePageContent() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
-          <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-[12px]">
+          <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
             {currentRxPatient.name.charAt(0).toUpperCase()}
           </div>
           <div className="text-left leading-tight">
             <div className="flex items-center gap-2">
-              <span className="text-[12px] font-bold text-foreground select-text">{currentRxPatient.name}</span>
-              <span className="text-[11px] font-medium text-[#718096]">{currentRxPatient.age}y | {currentRxPatient.gender}</span>
+              <span className="text-sm font-bold text-foreground select-text">{currentRxPatient.name}</span>
+              <span className="text-sm font-medium text-[#718096]">{currentRxPatient.age}y | {currentRxPatient.gender}</span>
             </div>
-            <span className="text-[9px] text-[#A0AEC0] font-semibold tracking-tight select-text">{currentRxPatient.phone}</span>
+            <span className="text-xs text-[#A0AEC0] font-semibold tracking-tight select-text">{currentRxPatient.phone}</span>
           </div>
         </div>
 
@@ -330,34 +330,34 @@ function EkaCarePageContent() {
         <div className="flex items-center h-full">
           <button 
             onClick={() => router.push(`/rx/overview?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Overview {pastVisitsCount > 0 ? `(${pastVisitsCount})` : `(0)`}
           </button>
           <button
             onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Pad
           </button>
           <button 
             onClick={() => router.push(`/rx/canvas?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Canvas
           </button>
-          <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">
+          <button className="h-full px-3 text-sm font-bold text-primary border-b-2 border-primary">
             EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
           </button>
           <button 
             onClick={() => router.push(`/rx/certificate?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Medical Certificate
           </button>
           <button 
             onClick={() => router.push(`/rx/documents?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Documents
           </button>
@@ -365,7 +365,7 @@ function EkaCarePageContent() {
 
         {/* Right Header Controls */}
         <div className="flex items-center gap-2">
-          <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-[10px] font-extrabold rounded-md flex items-center gap-1 border border-emerald-100">
+          <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-xs font-extrabold rounded-md flex items-center gap-1 border border-emerald-100">
             🟢 Active Session
           </span>
         </div>
@@ -377,8 +377,8 @@ function EkaCarePageContent() {
         <div className="w-[300px] border-r border-[#E2E8F0] bg-white flex flex-col h-full overflow-hidden shrink-0">
           <div className="p-4 border-b border-[#E2E8F0] bg-slate-50 flex items-center justify-between">
             <div>
-              <h2 className="text-[12px] font-bold text-slate-800 uppercase tracking-wide">Legacy Visits</h2>
-              <p className="text-[10px] text-slate-500 mt-0.5">{legacyVisits.length} Records Found</p>
+              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Legacy Visits</h2>
+              <p className="text-xs text-slate-500 mt-0.5">{legacyVisits.length} Records Found</p>
             </div>
             {loadingLegacy && (
               <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -391,8 +391,8 @@ function EkaCarePageContent() {
                 <svg className="w-8 h-8 text-slate-300 mb-2" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
-                <p className="text-[10.5px] font-bold text-slate-700">No records found</p>
-                <p className="text-[9px] text-slate-400 mt-1 max-w-[180px]">No EkaCare prescriptions match this patient's name or number.</p>
+                <p className="text-xs font-bold text-slate-700">No records found</p>
+                <p className="text-xs text-slate-400 mt-1 max-w-[180px]">No EkaCare prescriptions match this patient's name or number.</p>
               </div>
             ) : (
               legacyVisits.map((visit) => {
@@ -414,8 +414,8 @@ function EkaCarePageContent() {
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <p className="text-[11px] font-bold text-foreground">{formattedDate}</p>
-                        <p className="text-[9.5px] text-slate-500 mt-0.5 font-medium">{visit.clinic_name || "DLPC"}</p>
+                        <p className="text-sm font-bold text-foreground">{formattedDate}</p>
+                        <p className="text-xs text-slate-500 mt-0.5 font-medium">{visit.clinic_name || "DLPC"}</p>
                       </div>
                       <span className="text-[8px] bg-red-105 text-red-700 font-extrabold px-1.5 py-0.5 rounded uppercase">
                         PDF
@@ -438,10 +438,10 @@ function EkaCarePageContent() {
             <div className="w-full h-full flex flex-col min-h-0">
               <div className="p-3 bg-white border-b border-[#E2E8F0] flex items-center justify-between shadow-sm shrink-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11.5px] font-bold text-foreground">
+                  <span className="text-sm font-bold text-foreground">
                     Prescription Preview - {selectedLegacyVisit.name}
                   </span>
-                  <span className="text-[9px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                  <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
                     Visit Date: {new Date(selectedLegacyVisit.visit_date).toLocaleDateString()}
                   </span>
                 </div>
@@ -450,7 +450,7 @@ function EkaCarePageContent() {
                     href={selectedLegacyVisit.prescription_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3 py-1 bg-primary hover:bg-primary-hover text-white rounded text-[10px] font-bold transition-all flex items-center gap-1 shadow-sm"
+                    className="px-3 py-1 bg-primary hover:bg-primary-hover text-white rounded text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
@@ -473,8 +473,8 @@ function EkaCarePageContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              <p className="text-[12px] font-bold text-slate-600">Select a visit from the left menu</p>
-              <p className="text-[10px] text-slate-400 mt-1 max-w-[240px]">Preview the legacy PDF prescription documents directly in the workspace.</p>
+              <p className="text-sm font-bold text-slate-600">Select a visit from the left menu</p>
+              <p className="text-xs text-slate-400 mt-1 max-w-[240px]">Preview the legacy PDF prescription documents directly in the workspace.</p>
             </div>
           )}
         </div>

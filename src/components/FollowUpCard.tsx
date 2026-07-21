@@ -144,7 +144,7 @@ export default function FollowUpCard({
     <section className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-4 shadow-sm w-full relative">
       {/* Header */}
       <div className="flex justify-between items-center border-b pb-2 select-none">
-        <span className="text-[11px] font-extrabold text-[#1E293B] uppercase flex items-center gap-1.5">
+        <span className="text-sm font-extrabold text-[#1E293B] uppercase flex items-center gap-1.5">
           <svg className="w-4 h-4 text-slate-500 fill-slate-500/10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
@@ -174,7 +174,7 @@ export default function FollowUpCard({
               }, 200)}
               onKeyDown={handleKeyDown}
               placeholder="e.g. 10 Days"
-              className="w-full h-10 px-3.5 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[12px] font-semibold text-[#1E293B] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] transition-all"
+              className="w-full h-10 px-3.5 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-sm font-semibold text-[#1E293B] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] transition-all"
             />
             {followUpVal && (
               <button
@@ -197,7 +197,7 @@ export default function FollowUpCard({
                       setShowDD(false);
                       setFocusedIdx(-1);
                     }}
-                    className={`px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 text-[11.5px] font-semibold text-left transition-colors ${
+                    className={`px-3.5 py-2.5 cursor-pointer border-b border-[#F8FAFC] last:border-b-0 text-sm font-semibold text-left transition-colors ${
                       index === focusedIdx
                         ? "bg-[#EFF6FF] text-[#1D4ED8]"
                         : "text-[#1E293B] hover:bg-[#F8FAFC]"
@@ -234,7 +234,7 @@ export default function FollowUpCard({
           </div>
 
           {/* Auto fill check right aligned */}
-          <label className="flex items-center gap-1.5 text-[10.5px] font-extrabold text-[#64748B] cursor-pointer shrink-0">
+          <label className="flex items-center gap-1.5 text-sm font-extrabold text-[#64748B] cursor-pointer shrink-0">
             <input type="checkbox" className="rounded text-primary border-gray-300 w-4 h-4 cursor-pointer focus:ring-0" />
             Auto Fill from Rx
           </label>
@@ -242,7 +242,7 @@ export default function FollowUpCard({
 
         {/* Calculated date displays below input */}
         {calcDate && (
-          <div className="text-[12px] font-extrabold text-[#090d16] bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-left inline-block w-fit select-none">
+          <div className="text-sm font-extrabold text-[#090d16] bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-left inline-block w-fit select-none">
             📅 {calcDate}
           </div>
         )}
@@ -254,7 +254,7 @@ export default function FollowUpCard({
             value={followUpNotes}
             onChange={(e) => setFollowUpNotes(e.target.value)}
             placeholder="Notes added here will be available in the follow-up visit for reference"
-            className="w-full p-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[12.5px] font-extrabold text-[#090d16] placeholder:text-slate-400 focus:bg-white focus:outline-none transition-all resize-none"
+            className="w-full p-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-sm font-extrabold text-[#090d16] placeholder:text-slate-400 focus:bg-white focus:outline-none transition-all resize-none"
           />
         </div>
       </div>

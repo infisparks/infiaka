@@ -198,12 +198,12 @@ function InlineAutoComplete({
       const match = item.match(/\+ Create "(.*)"/);
       const custom = match ? match[1] : item;
       return (
-        <span className="text-blue-600 font-bold flex items-center gap-1 text-[11px]">
+        <span className="text-blue-600 font-bold flex items-center gap-1 text-sm">
           <span>+ Create</span><span className="italic">"{custom}"</span>
         </span>
       );
     }
-    return <span className="text-[11px] font-semibold text-[#334155]">{item}</span>;
+    return <span className="text-sm font-semibold text-[#334155]">{item}</span>;
   };
 
   return (
@@ -223,9 +223,9 @@ function InlineAutoComplete({
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
-        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-350"
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-sm font-semibold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-350"
         className="w-full h-full"
-        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+        panelClassName="custom-autocomplete-panel text-sm font-semibold"
       />
     </div>
   );
@@ -297,13 +297,13 @@ function InlineParameterAutoComplete({
       const custom = match ? match[1] : item;
       return (
         <div className="p-1">
-          <span className="text-blue-600 font-bold text-[11px]">+ Create "{custom}"</span>
+          <span className="text-blue-600 font-bold text-sm">+ Create "{custom}"</span>
         </div>
       );
     }
     return (
       <div className="p-1">
-        <div className="text-[11px] font-bold text-[#1e293b]">{item}</div>
+        <div className="text-sm font-bold text-[#1e293b]">{item}</div>
       </div>
     );
   };
@@ -325,9 +325,9 @@ function InlineParameterAutoComplete({
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
-        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none p-0 placeholder:text-slate-350"
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-sm font-bold text-[#1e293b] bg-transparent outline-none p-0 placeholder:text-slate-350"
         className="w-full h-full"
-        panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
+        panelClassName="custom-autocomplete-panel text-sm font-semibold"
       />
     </div>
   );
@@ -475,14 +475,14 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
           <div className="w-6 h-6 rounded-md bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-white text-xs shadow-sm">
             💧
           </div>
-          <span className="text-[12px] font-bold text-[#1E293B] tracking-tight">Lab Results</span>
+          <span className="text-sm font-bold text-[#1E293B] tracking-tight">Lab Results</span>
         </div>
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-[10.5px] font-bold text-[#718096] cursor-pointer">
+          <label className="flex items-center gap-1.5 text-xs font-bold text-[#718096] cursor-pointer">
             <input type="checkbox" className="rounded text-primary border-gray-300 w-3.5 h-3.5 focus:ring-primary" />
             <span>Print only Out of range in Rx</span>
           </label>
-          <button className="h-7 px-3 border border-blue-500 hover:bg-blue-50 rounded-lg text-blue-500 text-[10px] font-bold tracking-wide transition-all flex items-center gap-1.5">
+          <button className="h-7 px-3 border border-blue-500 hover:bg-blue-50 rounded-lg text-blue-500 text-xs font-bold tracking-wide transition-all flex items-center gap-1.5">
             Browse Panels
             <svg viewBox="0 0 512 512" className="w-2.5 h-2.5 fill-current">
               <path d="M40 48C26.7 48 16 58.7 16 72v48c0 13.3 10.7 24 24 24H88c13.3 0 24-10.7 24-24V72c0-13.3-10.7-24-24-24H40zM192 64c-17.7 0-32 14.3-32 32s14.3 32 32 32H480c17.7 0 32-14.3 32-32s-14.3-32-32-32H192zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32H480c17.7 0 32-14.3 32-32s-14.3-32-32-32H192zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32H480c17.7 0 32-14.3 32-32s-14.3-32-32-32H192zM16 232v48c0 13.3 10.7 24 24 24H88c13.3 0 24-10.7 24-24V232c0-13.3-10.7-24-24-24H40c-13.3 0-24 10.7-24 24zm24 136c-13.3 0-24 10.7-24 24v48c0 13.3 10.7 24 24 24H88c13.3 0 24-10.7 24-24V392c0-13.3-10.7-24-24-24H40z"/>
@@ -494,13 +494,13 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
             </svg>
           </button>
           <button className="w-7 h-7 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200 flex flex-col items-center justify-center text-amber-700 transition-colors">
-            <span className="text-[9.5px] font-extrabold">TInv</span>
+            <span className="text-xs font-extrabold">TInv</span>
           </button>
         </div>
       </div>
 
       {/* Grid Headers Row */}
-      <div className="flex items-stretch border-b border-[#E2E8F0] bg-slate-50/50 text-[9px] font-bold text-[#718096] uppercase select-none">
+      <div className="flex items-stretch border-b border-[#E2E8F0] bg-slate-50/50 text-xs font-bold text-[#718096] uppercase select-none">
         <div className="w-7 shrink-0 border-r border-[#E2E8F0]" />
         <div className="w-[28%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">Parameter Name</div>
         <div className="w-[8%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">Unit</div>
@@ -580,7 +580,7 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
                       }
                     }}
                     placeholder="Reading"
-                    className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
+                    className="w-full h-full border-0 focus:ring-0 px-3 text-sm font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                   />
                 </div>
 
@@ -604,7 +604,7 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
                     value={row.date}
                     onChange={(e) => patch(row.id, { date: e.target.value })}
                     placeholder="Date"
-                    className="w-full h-full border-0 focus:ring-0 pl-3 pr-7 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
+                    className="w-full h-full border-0 focus:ring-0 pl-3 pr-7 text-sm font-semibold text-[#334155] bg-transparent outline-none placeholder:text-slate-350"
                   />
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center cursor-pointer text-slate-350 hover:text-slate-500 transition-colors">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
@@ -666,18 +666,18 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
             onFocus={() => { setSearchOpen(true); setSearchHi(-1); }}
             onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
             onKeyDown={handleSearchKey}
-            className="w-full h-8.5 pl-8 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[11px] bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-medium transition-all"
+            className="w-full h-8.5 pl-8 pr-14 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-sm bg-[#FAFBFC] focus:bg-white focus:outline-none placeholder:text-[#C0CADC] font-medium transition-all"
           />
           {searchVal.trim() && (
             <button type="button" onClick={() => addLabResult(searchVal)}
-              className="absolute right-2 text-blue-600 hover:text-blue-700 text-[10px] font-bold tracking-wide">+ Add</button>
+              className="absolute right-2 text-blue-600 hover:text-blue-700 text-xs font-bold tracking-wide">+ Add</button>
           )}
         </div>
 
         {/* Dropdown suggestions */}
         {searchOpen && (searchSuggestions.length > 0 || searchVal.trim()) && (
           <div className="absolute left-3 right-3 top-full mt-0.5 z-40 bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
-            <div className="px-3 pt-2 pb-1 text-[9px] font-bold text-[#94A3B8] uppercase tracking-wide">
+            <div className="px-3 pt-2 pb-1 text-xs font-bold text-[#94A3B8] uppercase tracking-wide">
               {searchVal.trim() ? "Matching Parameters" : "Sample Parameters"}
             </div>
             {searchSuggestions.map((opt, i) => {
@@ -697,11 +697,11 @@ export default function ResultsCard({ labResults, setLabResults }: ResultsCardPr
                     {isCreate ? "+" : (initials(opt) || "Lr")}
                   </div>
                   {isCreate ? (
-                    <span className="text-[11.5px] font-bold text-blue-600">
+                    <span className="text-sm font-bold text-blue-600">
                       + Create <span className="italic font-semibold">"{displayVal}"</span>
                     </span>
                   ) : (
-                    <span className="text-[11.5px] font-semibold text-[#1E293B]">{opt}</span>
+                    <span className="text-sm font-semibold text-[#1E293B]">{opt}</span>
                   )}
                 </div>
               );

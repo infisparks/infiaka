@@ -80,7 +80,7 @@ const CustomToast = ({ message, type, onClose }: { message: string; type: "succe
     <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg transition-all">
       <div className={`flex items-center gap-2.5 ${bgColors[type]} px-4 py-2.5 rounded-xl border-2 shadow-sm`}>
         {icons[type]}
-        <span className="text-[13px] font-bold tracking-tight">{message}</span>
+        <span className="text-sm font-bold tracking-tight">{message}</span>
       </div>
     </div>
   );
@@ -354,7 +354,7 @@ function CertificatePageContent() {
       y += 6;
       doc.text(`UHID: ${currentRxPatient.id}`, 22, y + 4);
       const docName = currentRxPatient.opdRegistration?.treating_doctor || "Doctor";
-      doc.text(`Treating Doctor: Dr. ${docName}`, 125, y + 4);
+      doc.text(`Consultant : ${docName}`, 125, y + 4);
 
       // Date issued
       y += 18;
@@ -478,7 +478,7 @@ function CertificatePageContent() {
 
       y += 6;
       doc.text(`UHID: ${currentRxPatient.id}`, 22, y + 4);
-      doc.text(`Treating Doctor: Dr. ${docName}`, 125, y + 4);
+      doc.text(`Consultant : ${docName}`, 125, y + 4);
 
       // Date
       y += 18;
@@ -555,7 +555,7 @@ function CertificatePageContent() {
 
     y += 6;
     doc.text(`UHID: ${currentRxPatient.id}`, 22, y + 4);
-    doc.text(`Treating Doctor: Dr. ${docName}`, 125, y + 4);
+    doc.text(`Consultant : ${docName}`, 125, y + 4);
 
     // Date
     y += 18;
@@ -592,7 +592,7 @@ function CertificatePageContent() {
             <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
             <path fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" className="opacity-75" />
           </svg>
-          <span className="text-[12px] font-bold text-slate-500">Loading certificate configuration...</span>
+          <span className="text-sm font-bold text-slate-500">Loading certificate configuration...</span>
         </div>
       </div>
     );
@@ -601,7 +601,7 @@ function CertificatePageContent() {
   if (!currentRxPatient) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
-        <div className="text-[12px] font-bold text-slate-500">No active patient session found.</div>
+        <div className="text-sm font-bold text-slate-500">No active patient session found.</div>
       </div>
     );
   }
@@ -622,49 +622,49 @@ function CertificatePageContent() {
             </svg>
           </button>
           <span className="text-[14px] font-extrabold text-[#111827]">{currentRxPatient.name}</span>
-          <span className="px-2 py-0.5 bg-[#F1F5F9] text-[9.5px] font-extrabold rounded-md text-[#475569]">{currentRxPatient.gender} / {currentRxPatient.age} {currentRxPatient.ageUnit}</span>
-          <span className="text-[10px] text-slate-400 font-bold">UHID: {currentRxPatient.id}</span>
+          <span className="px-2 py-0.5 bg-[#F1F5F9] text-xs font-extrabold rounded-md text-[#475569]">{currentRxPatient.gender} / {currentRxPatient.age} {currentRxPatient.ageUnit}</span>
+          <span className="text-xs text-slate-400 font-bold">UHID: {currentRxPatient.id}</span>
         </div>
 
         {/* Navigation tab bar in the center */}
         <div className="flex items-center h-full">
           <button 
             onClick={() => router.push(`/rx/overview?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Overview {pastVisitsCount > 0 ? `(${pastVisitsCount})` : `(0)`}
           </button>
           <button
             onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Pad
           </button>
           <button 
             onClick={() => router.push(`/rx/canvas?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Canvas
           </button>
           <button 
             onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
           </button>
-          <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">
+          <button className="h-full px-3 text-sm font-bold text-primary border-b-2 border-primary">
             Medical Certificate
           </button>
           <button 
             onClick={() => router.push(`/rx/documents?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Documents
           </button>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-[10px] font-extrabold rounded-md flex items-center gap-1 border border-emerald-100">
+          <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-xs font-extrabold rounded-md flex items-center gap-1 border border-emerald-100">
             🟢 Active Session
           </span>
         </div>
@@ -677,11 +677,11 @@ function CertificatePageContent() {
         <aside className="w-[280px] bg-white border-r border-[#E2E8F0] p-4 flex flex-col justify-between shrink-0 overflow-y-auto">
           <div className="space-y-5">
             <div>
-              <h2 className="text-[12px] font-bold text-[#111827] uppercase tracking-wider mb-3">Layout Margins</h2>
+              <h2 className="text-sm font-bold text-[#111827] uppercase tracking-wider mb-3">Layout Margins</h2>
               <div className="space-y-4">
                 {/* Header Height */}
                 <div>
-                  <div className="flex justify-between text-[11px] font-bold text-slate-600 mb-1">
+                  <div className="flex justify-between text-sm font-bold text-slate-600 mb-1">
                     <span>Header Margin (mm)</span>
                     <span className="text-primary">{printHeaderHeight}mm</span>
                   </div>
@@ -697,7 +697,7 @@ function CertificatePageContent() {
 
                 {/* Footer Height */}
                 <div>
-                  <div className="flex justify-between text-[11px] font-bold text-slate-600 mb-1">
+                  <div className="flex justify-between text-sm font-bold text-slate-600 mb-1">
                     <span>Footer Margin (mm)</span>
                     <span className="text-primary">{printFooterHeight}mm</span>
                   </div>
@@ -717,10 +717,10 @@ function CertificatePageContent() {
 
             {/* Print settings switches */}
             <div>
-              <h2 className="text-[12px] font-bold text-[#111827] uppercase tracking-wider mb-3">Print Configuration</h2>
+              <h2 className="text-sm font-bold text-[#111827] uppercase tracking-wider mb-3">Print Configuration</h2>
               <div className="space-y-3">
                 <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-[11.5px] font-bold text-slate-700">With Letterhead Background</span>
+                  <span className="text-sm font-bold text-slate-700">With Letterhead Background</span>
                   <input
                     type="checkbox"
                     checked={printShowLetterhead}
@@ -729,7 +729,7 @@ function CertificatePageContent() {
                   />
                 </label>
                 <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-[11.5px] font-bold text-slate-700">Show Header Block</span>
+                  <span className="text-sm font-bold text-slate-700">Show Header Block</span>
                   <input
                     type="checkbox"
                     checked={printShowHeader}
@@ -738,7 +738,7 @@ function CertificatePageContent() {
                   />
                 </label>
                 <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-[11.5px] font-bold text-slate-700">Show Footer Block</span>
+                  <span className="text-sm font-bold text-slate-700">Show Footer Block</span>
                   <input
                     type="checkbox"
                     checked={printShowFooter}
@@ -753,7 +753,7 @@ function CertificatePageContent() {
           <button
             onClick={handleSaveSettings}
             disabled={savingSettings}
-            className="w-full py-2 bg-[#F1F5F9] border border-[#CBD5E1] hover:bg-slate-100 text-slate-700 text-[11px] font-extrabold rounded-lg flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors mt-6 shadow-2xs"
+            className="w-full py-2 bg-[#F1F5F9] border border-[#CBD5E1] hover:bg-slate-100 text-slate-700 text-sm font-extrabold rounded-lg flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors mt-6 shadow-2xs"
           >
             {savingSettings ? "Saving Settings..." : "💾 Save Layout Configuration"}
           </button>
@@ -763,29 +763,29 @@ function CertificatePageContent() {
         <section className="flex-1 p-5 flex flex-col gap-5 overflow-y-auto">
           {/* Certificate Creator Form */}
           <div className="bg-white rounded-xl border border-[#E5E7EB] p-5 shadow-2xs space-y-4">
-            <h2 className="text-[13px] font-extrabold text-[#111827] uppercase tracking-wider">Issue Certificate</h2>
+            <h2 className="text-sm font-extrabold text-[#111827] uppercase tracking-wider">Issue Certificate</h2>
 
             <div className="space-y-3">
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 mb-1">Certificate Header Title*</label>
+                <label className="block text-sm font-bold text-slate-500 mb-1">Certificate Header Title*</label>
                 <input
                   type="text"
                   value={certificateTitle}
                   onChange={(e) => setCertificateTitle(e.target.value)}
                   placeholder="e.g. MEDICAL CERTIFICATE"
-                  className="w-full px-3 py-2 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[12px] font-semibold text-[#1E293B] placeholder:text-[#A0AEC0] focus:outline-none transition-all"
+                  className="w-full px-3 py-2 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-sm font-semibold text-[#1E293B] placeholder:text-[#A0AEC0] focus:outline-none transition-all"
                 />
               </div>
 
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 mb-1">Certificate Body Content*</label>
+                <label className="block text-sm font-bold text-slate-500 mb-1">Certificate Body Content*</label>
                 <textarea
                   rows={8}
                   value={certificateBody}
                   onChange={(e) => setCertificateBody(e.target.value)}
                   placeholder="Type the certificate details..."
-                  className="w-full p-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[12px] font-semibold text-[#1E293B] placeholder:text-[#A0AEC0] focus:outline-none transition-all resize-none"
+                  className="w-full p-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-sm font-semibold text-[#1E293B] placeholder:text-[#A0AEC0] focus:outline-none transition-all resize-none"
                 />
               </div>
             </div>
@@ -793,7 +793,7 @@ function CertificatePageContent() {
             <button
               onClick={handleIssueCertificate}
               disabled={issuing}
-              className="w-full py-2.5 bg-primary hover:bg-primary-hover text-white text-[11px] font-bold rounded-lg flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg disabled:opacity-50 cursor-pointer transition-all"
+              className="w-full py-2.5 bg-primary hover:bg-primary-hover text-white text-sm font-bold rounded-lg flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg disabled:opacity-50 cursor-pointer transition-all"
             >
               {issuing ? "Issuing..." : "📜 Issue & Record Certificate"}
             </button>
@@ -801,10 +801,10 @@ function CertificatePageContent() {
 
           {/* Certificate History */}
           <div className="bg-white rounded-xl border border-[#E5E7EB] p-5 shadow-2xs flex-1 flex flex-col min-h-[300px]">
-            <h2 className="text-[13px] font-extrabold text-[#111827] uppercase tracking-wider mb-3">Issued Certificate History</h2>
+            <h2 className="text-sm font-extrabold text-[#111827] uppercase tracking-wider mb-3">Issued Certificate History</h2>
             
             {issuedCertificates.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-[11.5px] text-slate-400 italic">
+              <div className="flex-1 flex items-center justify-center text-sm text-slate-400 italic">
                 No certificate history recorded for this patient.
               </div>
             ) : (
@@ -812,11 +812,11 @@ function CertificatePageContent() {
                 {issuedCertificates.map((cert) => (
                   <div key={cert.certificate_id} className="p-3 border border-[#F1F5F9] bg-[#FAFAFC] rounded-lg flex items-center justify-between gap-3 shadow-2xs hover:border-slate-200 transition-all">
                     <div className="min-w-0">
-                      <div className="text-[12px] font-bold text-slate-800 truncate">{cert.title || "Untitled Certificate"}</div>
-                      <div className="text-[10px] text-slate-400 font-bold">
+                      <div className="text-sm font-bold text-slate-800 truncate">{cert.title || "Untitled Certificate"}</div>
+                      <div className="text-xs text-slate-400 font-bold">
                         Issued: {new Date(cert.created_at).toLocaleString("en-IN", { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </div>
-                      <div className="text-[10.5px] text-slate-500 font-medium line-clamp-1 mt-1">
+                      <div className="text-xs text-slate-500 font-medium line-clamp-1 mt-1">
                         {(() => {
                           try {
                             const parsed = JSON.parse(cert.content);
@@ -831,14 +831,14 @@ function CertificatePageContent() {
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         onClick={() => handlePrintPastCertificate(cert)}
-                        className="p-1.5 bg-white border border-[#CBD5E1] hover:bg-indigo-50 hover:text-indigo-650 rounded-lg text-[10px] font-bold text-slate-600 cursor-pointer shadow-2xs transition-colors"
+                        className="p-1.5 bg-white border border-[#CBD5E1] hover:bg-indigo-50 hover:text-indigo-650 rounded-lg text-xs font-bold text-slate-600 cursor-pointer shadow-2xs transition-colors"
                         title="Print Certificate"
                       >
                         🖨️ Print
                       </button>
                       <button
                         onClick={() => handleDeleteCertificate(cert.certificate_id)}
-                        className="p-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-[10px] font-bold cursor-pointer shadow-2xs transition-colors"
+                        className="p-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-bold cursor-pointer shadow-2xs transition-colors"
                         title="Delete Record"
                       >
                         🗑️
@@ -854,8 +854,8 @@ function CertificatePageContent() {
         {/* COLUMN 3: Live PDF Preview Frame */}
         <section className="w-[45%] bg-white border-l border-[#E2E8F0] p-4 flex flex-col">
           <div className="flex items-center justify-between mb-3 shrink-0">
-            <h2 className="text-[12px] font-bold text-[#111827] uppercase tracking-wider">Live Certificate Preview</h2>
-            <span className="text-[9.5px] font-extrabold text-slate-400">Standard A4 Layout</span>
+            <h2 className="text-sm font-bold text-[#111827] uppercase tracking-wider">Live Certificate Preview</h2>
+            <span className="text-xs font-extrabold text-slate-400">Standard A4 Layout</span>
           </div>
 
           <div className="flex-1 bg-slate-100 rounded-xl overflow-hidden border border-[#E5E7EB] relative">
@@ -866,7 +866,7 @@ function CertificatePageContent() {
                 title="Medical Certificate Preview"
               />
             ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-[12px] text-slate-400 italic">
+              <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-400 italic">
                 Generating preview document...
               </div>
             )}
@@ -883,7 +883,7 @@ export default function CertificatePage() {
   return (
     <Suspense fallback={
       <div className="flex h-screen items-center justify-center bg-slate-50">
-        <div className="text-[12px] font-bold text-slate-500">Loading certificate components...</div>
+        <div className="text-sm font-bold text-slate-500">Loading certificate components...</div>
       </div>
     }>
       <CertificatePageContent />

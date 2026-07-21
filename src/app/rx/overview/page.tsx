@@ -93,7 +93,7 @@ const CustomToast = ({ message, type, onClose }: { message: string; type: "succe
     <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg transition-all">
       <div className={`flex items-center gap-2.5 ${bgColors[type]} px-4 py-2.5 rounded-xl border-2 shadow-sm`}>
         {icons[type]}
-        <span className="text-[13px] font-bold tracking-tight">{message}</span>
+        <span className="text-sm font-bold tracking-tight">{message}</span>
       </div>
     </div>
   );
@@ -384,8 +384,8 @@ function OverviewContent() {
           age: pData.age || 25,
           ageUnit: pData.age_unit || "Year",
           dob: pData.dob || "",
-          permanentAddress: pData.address || "",
-          localAddress: pData.local_address || "",
+          permanentAddress: pData.address || pData.permanent_address || "",
+          localAddress: pData.local_address || pData.address || pData.permanent_address || "",
           country: pData.country || "India",
           state: pData.state || "Maharashtra",
           statusTags: ["Ongoing"],
@@ -1025,50 +1025,60 @@ function OverviewContent() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
-          <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-[12px]">
+          <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
             {currentRxPatient.name.charAt(0).toUpperCase()}
           </div>
           <div className="text-left leading-tight">
             <div className="flex items-center gap-2">
-              <span className="text-[12px] font-bold text-foreground select-text">{currentRxPatient.name}</span>
-              <span className="text-[11px] font-medium text-[#718096]">{currentRxPatient.age}y | {currentRxPatient.gender}</span>
+              <span className="text-sm font-bold text-foreground select-text">{currentRxPatient.name}</span>
+              <span className="text-sm font-medium text-[#718096]">{currentRxPatient.age}y | {currentRxPatient.gender}</span>
             </div>
-            <span className="text-[9px] text-[#A0AEC0] font-semibold tracking-tight select-text">{currentRxPatient.phone}</span>
+            <div className="flex items-center gap-1.5 text-xs text-[#A0AEC0] font-semibold tracking-tight">
+              <span className="select-text">{currentRxPatient.phone}</span>
+              {(currentRxPatient.localAddress || currentRxPatient.permanentAddress) && (
+                <>
+                  <span className="text-slate-400 font-normal">•</span>
+                  <span className="select-text text-slate-600 font-medium truncate max-w-[280px]" title={currentRxPatient.localAddress || currentRxPatient.permanentAddress}>
+                    {currentRxPatient.localAddress || currentRxPatient.permanentAddress}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Navigation tab bar in the center */}
         <div className="flex items-center h-full">
-          <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">
+          <button className="h-full px-3 text-sm font-bold text-primary border-b-2 border-primary">
             Overview {pastRegistrations.length > 0 ? `(${pastRegistrations.length})` : `(0)`}
           </button>
           <button
             onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Pad
           </button>
           <button 
             onClick={() => router.push(`/rx/canvas?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Canvas
           </button>
           <button 
             onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
           </button>
           <button 
             onClick={() => router.push(`/rx/certificate?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Medical Certificate
           </button>
           <button 
             onClick={() => router.push(`/rx/documents?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-sm font-bold text-[#718096] hover:text-foreground transition-all"
           >
             Documents
           </button>
@@ -1076,7 +1086,7 @@ function OverviewContent() {
 
         {/* Right Header Controls */}
         <div className="flex items-center gap-2">
-          <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-[10px] font-extrabold rounded-md flex items-center gap-1 border border-emerald-100">
+          <span className="px-2.5 py-1 text-emerald-600 bg-emerald-50 text-xs font-extrabold rounded-md flex items-center gap-1 border border-emerald-100">
             🟢 Active Session
           </span>
         </div>
@@ -1091,10 +1101,10 @@ function OverviewContent() {
         {/* PAST VISITS CONTAINER: SCROLLABLE HORIZONTALLY, LATEST ONE ON THE LEFT */}
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-4.5 flex flex-col shadow-2xs text-left shrink-0">
           <div className="flex items-center justify-between pb-3 border-b border-[#F1F5F9] mb-4 shrink-0">
-            <span className="text-[12px] font-extrabold text-[#1E293B] uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-sm font-extrabold text-[#1E293B] uppercase tracking-wider flex items-center gap-1.5">
               📅 Past Visits
             </span>
-            <span className="text-[9.5px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+            <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
               {pastRegistrations.length} visit(s) found
             </span>
           </div>
@@ -1131,7 +1141,7 @@ function OverviewContent() {
             {pastRegistrations.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 w-full text-slate-350 bg-[#FAFBFC] rounded-xl border border-dashed border-[#E2E8F0] p-4">
                 <span className="text-3xl mb-1.5">📋</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">No Past Visits</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">No Past Visits</span>
               </div>
             ) : (
               // Latest visits are already sorted descending (first in list = latest, shown on the left)
@@ -1165,15 +1175,15 @@ function OverviewContent() {
                     {/* Card Header */}
                     <div className="px-3.5 py-2.5 border-b border-[#E5E7EB] bg-slate-50/50 flex items-center justify-between shrink-0">
                       <div className="flex items-center gap-2">
-                        <div className="w-6.5 h-6.5 rounded-md bg-indigo-50 text-indigo-650 flex items-center justify-center font-black text-[9px] border border-indigo-100 uppercase shrink-0">
+                        <div className="w-6.5 h-6.5 rounded-md bg-indigo-50 text-indigo-650 flex items-center justify-center font-black text-xs border border-indigo-100 uppercase shrink-0">
                           {getInitials(reg.treating_doctor)}
                         </div>
                         <div className="text-left leading-tight">
-                          <span className="text-[11.5px] font-bold text-slate-800 flex items-center gap-1.5">
+                          <span className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                             {visitDateStr}
                           </span>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[9px] text-[#718096] font-bold uppercase">
+                            <span className="text-xs text-[#718096] font-bold uppercase">
                               {reg.treating_doctor || "Physician"}
                             </span>
                             <span className="text-slate-350 text-[8px]">•</span>
@@ -1188,7 +1198,7 @@ function OverviewContent() {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handlePrintPastVisit(reg)}
-                          className="px-2 py-0.5 bg-white border border-[#E2E8F0] text-[9.5px] font-bold rounded hover:bg-slate-50 transition-colors shadow-2xs"
+                          className="px-2 py-0.5 bg-white border border-[#E2E8F0] text-xs font-bold rounded hover:bg-slate-50 transition-colors shadow-2xs"
                         >
                           PDF
                         </button>
@@ -1205,17 +1215,17 @@ function OverviewContent() {
                     </div>
 
                     {/* Card Content - scrollable vertically internally if too long */}
-                    <div className="flex-1 overflow-y-auto p-1.5 divide-y divide-[#F1F5F9] text-[11.5px]">
+                    <div className="flex-1 overflow-y-auto p-1.5 divide-y divide-[#F1F5F9] text-sm">
                       
                       {/* 1. Vitals row */}
                       {(reg.bp || reg.pulse || reg.weight || reg.spo2 || reg.sugar) && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-rose-500 shadow-sm">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-xs font-black text-white bg-rose-500 shadow-sm">
                             Vt
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Vitals</div>
-                            <div className="text-[10px] font-bold text-slate-600 flex flex-wrap gap-x-3 gap-y-1 select-text">
+                            <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Vitals</div>
+                            <div className="text-xs font-bold text-slate-600 flex flex-wrap gap-x-3 gap-y-1 select-text">
                               {reg.bp && <span>BP: {reg.bp}</span>}
                               {reg.pulse && <span>Pulse: {reg.pulse}</span>}
                               {reg.weight && <span>Weight: {reg.weight} kg</span>}
@@ -1229,12 +1239,12 @@ function OverviewContent() {
                       {/* 2. Symptoms row */}
                       {regSyms.length > 0 && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-sky-500 shadow-sm uppercase">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-xs font-black text-white bg-sky-500 shadow-sm uppercase">
                             Sx
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Symptoms</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text">
+                            <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Symptoms</div>
+                            <div className="text-sm font-bold text-slate-800 leading-normal select-text">
                               {regSyms.map((s, idx) => (
                                 <span key={s.symptom_id}>
                                   {s.name}{s.duration ? ` (${s.duration})` : ""}{idx < regSyms.length - 1 ? " | " : ""}
@@ -1259,12 +1269,12 @@ function OverviewContent() {
                       {/* 3. Examination Findings row */}
                       {reg.examination_findings && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-cyan-600 shadow-sm uppercase">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-xs font-black text-white bg-cyan-600 shadow-sm uppercase">
                             Ef
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Examination Findings</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text whitespace-pre-wrap">
+                            <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Examination Findings</div>
+                            <div className="text-sm font-bold text-slate-800 leading-normal select-text whitespace-pre-wrap">
                               {reg.examination_findings}
                             </div>
                           </div>
@@ -1283,12 +1293,12 @@ function OverviewContent() {
                       {/* 4. Lab Results row */}
                       {regResults.length > 0 && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-emerald-600 shadow-sm uppercase">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-xs font-black text-white bg-emerald-600 shadow-sm uppercase">
                             Lr
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Lab Results</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text">
+                            <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Lab Results</div>
+                            <div className="text-sm font-bold text-slate-800 leading-normal select-text">
                               {regResults.map((r, idx) => (
                                 <span key={r.lab_result_id || idx} className="block">
                                   {r.name}: <span className="font-extrabold text-indigo-650">{r.reading}</span> {r.unit || ""} {r.interpretation ? `(${r.interpretation})` : ""}
@@ -1302,12 +1312,12 @@ function OverviewContent() {
                       {/* 5. Diagnosis row */}
                       {regDiags.length > 0 && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-violet-500 shadow-sm uppercase">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-xs font-black text-white bg-violet-500 shadow-sm uppercase">
                             Dx
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Diagnosis</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text">
+                            <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Diagnosis</div>
+                            <div className="text-sm font-bold text-slate-800 leading-normal select-text">
                               {regDiags.map((d) => (
                                 <div key={d.diagnosis_id} className="block">
                                   {d.name} {d.icd10_code ? `[${d.icd10_code}]` : ""}
@@ -1332,15 +1342,15 @@ function OverviewContent() {
                       {/* 6. Surgery Performed row */}
                       {(reg.surgery_performed || reg.surgery_notes) && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-rose-600 shadow-sm uppercase">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-xs font-black text-white bg-rose-600 shadow-sm uppercase">
                             Sp
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Surgery</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-tight select-text">
+                            <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Surgery</div>
+                            <div className="text-sm font-bold text-slate-800 leading-tight select-text">
                               {reg.surgery_performed}
-                              {reg.surgery_date && <span className="block text-[10px] text-slate-500 font-semibold mt-0.5">Date: {reg.surgery_date}</span>}
-                              {reg.surgery_notes && <span className="block text-[10px] text-slate-600 font-normal mt-0.5 whitespace-pre-wrap">{reg.surgery_notes}</span>}
+                              {reg.surgery_date && <span className="block text-xs text-slate-500 font-semibold mt-0.5">Date: {reg.surgery_date}</span>}
+                              {reg.surgery_notes && <span className="block text-xs text-slate-600 font-normal mt-0.5 whitespace-pre-wrap">{reg.surgery_notes}</span>}
                             </div>
                           </div>
                           <button
@@ -1358,11 +1368,11 @@ function OverviewContent() {
                       {/* 7. Medications row */}
                       {regMeds.length > 0 && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-pink-500 shadow-sm uppercase">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-xs font-black text-white bg-pink-500 shadow-sm uppercase">
                             Rx
                           </div>
                           <div className="flex-1 text-left space-y-2">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none flex items-center justify-between">
+                            <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wide leading-none flex items-center justify-between">
                               <span>Medications</span>
                               <button
                                 type="button"
@@ -1389,7 +1399,7 @@ function OverviewContent() {
                               ].filter(Boolean);
 
                               return (
-                                <div key={med.patient_medication_id} className="text-[11.5px] leading-tight border-b border-[#F8FAFC] pb-1.5 last:border-0 last:pb-0">
+                                <div key={med.patient_medication_id} className="text-sm leading-tight border-b border-[#F8FAFC] pb-1.5 last:border-0 last:pb-0">
                                   <div className="font-extrabold text-slate-800 flex justify-between items-center">
                                     <span className="uppercase tracking-tight select-text">{medName}</span>
                                     <button
@@ -1402,9 +1412,9 @@ function OverviewContent() {
                                       </svg>
                                     </button>
                                   </div>
-                                  {medGeneric && <p className="text-[9px] text-slate-450 font-bold uppercase leading-none mt-0.5 select-text">{medGeneric}</p>}
+                                  {medGeneric && <p className="text-xs text-slate-450 font-bold uppercase leading-none mt-0.5 select-text">{medGeneric}</p>}
                                   {detailsList.length > 0 && (
-                                    <span className="text-[9.5px] text-slate-500 font-bold block mt-1 leading-normal select-text">
+                                    <span className="text-xs text-slate-500 font-bold block mt-1 leading-normal select-text">
                                       {detailsList.join(" | ")}
                                     </span>
                                   )}
@@ -1418,12 +1428,12 @@ function OverviewContent() {
                       {/* 8. Investigations / Labs row */}
                       {regLabs.length > 0 && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-amber-500 shadow-sm uppercase">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-xs font-black text-white bg-amber-500 shadow-sm uppercase">
                             Lab
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Investigations</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text">
+                            <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Investigations</div>
+                            <div className="text-sm font-bold text-slate-800 leading-normal select-text">
                               {regLabs.map((l, idx) => (
                                 <span key={l.patient_lab_id}>
                                   {l.name}{idx < regLabs.length - 1 ? " | " : ""}
@@ -1448,12 +1458,12 @@ function OverviewContent() {
                       {/* 9. Plan / Surgery Advised row */}
                       {reg.plan_surgery_advised && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-purple-700 shadow-sm uppercase">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-xs font-black text-white bg-purple-700 shadow-sm uppercase">
                             Sa
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Plan / Surgery Advised</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text whitespace-pre-wrap">
+                            <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Plan / Surgery Advised</div>
+                            <div className="text-sm font-bold text-slate-800 leading-normal select-text whitespace-pre-wrap">
                               {reg.plan_surgery_advised}
                             </div>
                           </div>
@@ -1472,14 +1482,14 @@ function OverviewContent() {
                       {/* 10. Follow Up row */}
                       {(reg.follow_up || reg.follow_up_notes) && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-blue-600 shadow-sm uppercase">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-xs font-black text-white bg-blue-600 shadow-sm uppercase">
                             Fu
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Follow Up</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-tight select-text">
+                            <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Follow Up</div>
+                            <div className="text-sm font-bold text-slate-800 leading-tight select-text">
                               {reg.follow_up && <span>Follow-up: {reg.follow_up}</span>}
-                              {reg.follow_up_notes && <span className="block text-[10px] text-slate-600 font-normal mt-0.5 whitespace-pre-wrap">{reg.follow_up_notes}</span>}
+                              {reg.follow_up_notes && <span className="block text-xs text-slate-600 font-normal mt-0.5 whitespace-pre-wrap">{reg.follow_up_notes}</span>}
                             </div>
                           </div>
                           <button
@@ -1497,15 +1507,15 @@ function OverviewContent() {
                       {/* 11. Advice row */}
                       {hasAdvice && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-purple-600 shadow-sm uppercase">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-xs font-black text-white bg-purple-600 shadow-sm uppercase">
                             Ad
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Advice</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal whitespace-pre-wrap select-text">
+                            <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Advice</div>
+                            <div className="text-sm font-bold text-slate-800 leading-normal whitespace-pre-wrap select-text">
                               {regAdviceStr}
-                              {reg.advice_rest && <span className="block text-[10px] text-slate-500 font-semibold mt-0.5">• Take some rest</span>}
-                              {reg.advice_water && <span className="block text-[10px] text-slate-500 font-semibold mt-0.5">• Drink water</span>}
+                              {reg.advice_rest && <span className="block text-xs text-slate-500 font-semibold mt-0.5">• Take some rest</span>}
+                              {reg.advice_water && <span className="block text-xs text-slate-500 font-semibold mt-0.5">• Drink water</span>}
                             </div>
                           </div>
                           <button
@@ -1523,12 +1533,12 @@ function OverviewContent() {
                       {/* 12. Notes for Patient row */}
                       {reg.notes_for_patient && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-amber-600 shadow-sm uppercase">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-xs font-black text-white bg-amber-600 shadow-sm uppercase">
                             Nt
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Notes for Patient</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text whitespace-pre-wrap">
+                            <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Notes for Patient</div>
+                            <div className="text-sm font-bold text-slate-800 leading-normal select-text whitespace-pre-wrap">
                               {reg.notes_for_patient}
                             </div>
                           </div>
@@ -1547,12 +1557,12 @@ function OverviewContent() {
                       {/* 13. Private Notes row */}
                       {reg.private_notes && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-slate-600 shadow-sm uppercase">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-xs font-black text-white bg-slate-600 shadow-sm uppercase">
                             Pn
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Private / Doctor Notes</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text whitespace-pre-wrap">
+                            <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Private / Doctor Notes</div>
+                            <div className="text-sm font-bold text-slate-800 leading-normal select-text whitespace-pre-wrap">
                               {reg.private_notes}
                             </div>
                           </div>
@@ -1562,12 +1572,12 @@ function OverviewContent() {
                       {/* 14. Procedure Done row */}
                       {reg.procedure_done && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-emerald-600 shadow-sm uppercase">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-xs font-black text-white bg-emerald-600 shadow-sm uppercase">
                             Pd
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Procedure Done</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text whitespace-pre-wrap">
+                            <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Procedure Done</div>
+                            <div className="text-sm font-bold text-slate-800 leading-normal select-text whitespace-pre-wrap">
                               {reg.procedure_done}
                             </div>
                           </div>
@@ -1586,12 +1596,12 @@ function OverviewContent() {
                       {/* 15. Referrals row */}
                       {regRefs.length > 0 && (
                         <div className="flex items-start gap-3 py-2.5 px-2 hover:bg-slate-50/50 rounded-lg transition-colors group">
-                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-black text-white bg-pink-650 shadow-sm uppercase">
+                          <div className="w-6.5 h-6.5 rounded-full shrink-0 flex items-center justify-center text-xs font-black text-white bg-pink-650 shadow-sm uppercase">
                             Rf
                           </div>
                           <div className="flex-1 text-left">
-                            <div className="text-[9.5px] font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Referrals</div>
-                            <div className="text-[11.5px] font-bold text-slate-800 leading-normal select-text">
+                            <div className="text-xs font-extrabold text-slate-400 uppercase tracking-wide leading-none mb-1">Referrals</div>
+                            <div className="text-sm font-bold text-slate-800 leading-normal select-text">
                               {regRefs.map((r, idx) => (
                                 <span key={r.refer_id}>
                                   Dr. {r.doctor_name}{idx < regRefs.length - 1 ? " | " : ""}
@@ -1629,12 +1639,12 @@ function OverviewContent() {
           {/* LAB RESULTS CARD */}
           <div className="bg-white rounded-xl border border-[#E5E7EB] flex flex-col overflow-hidden shadow-2xs text-left h-[500px]">
             <div className="px-4 py-3.5 border-b border-[#E5E7EB] bg-[#FAFBFC] flex items-center justify-between shrink-0">
-              <span className="text-[12px] font-extrabold text-[#1E293B] uppercase tracking-wider flex items-center gap-1.5">
+              <span className="text-sm font-extrabold text-[#1E293B] uppercase tracking-wider flex items-center gap-1.5">
                 🧪 Lab Results
               </span>
               <button 
                 type="button"
-                className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-[#E2E8F0] text-[9.5px] font-bold rounded-lg text-[#4F46E5] shadow-2xs transition-all"
+                className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-[#E2E8F0] text-xs font-bold rounded-lg text-[#4F46E5] shadow-2xs transition-all"
               >
                 See Historical Data
               </button>
@@ -1647,7 +1657,7 @@ function OverviewContent() {
                 placeholder="Search lab test results..."
                 value={labSearchQuery}
                 onChange={(e) => setLabSearchQuery(e.target.value)}
-                className="w-full h-8.5 px-3 border border-[#E2E8F0] focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 rounded-lg text-[11px] bg-white focus:outline-none placeholder:text-[#C0CADC] font-semibold transition-all"
+                className="w-full h-8.5 px-3 border border-[#E2E8F0] focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 rounded-lg text-sm bg-white focus:outline-none placeholder:text-[#C0CADC] font-semibold transition-all"
               />
             </div>
 
@@ -1656,12 +1666,12 @@ function OverviewContent() {
               {uniqueLabReadings.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-24 text-slate-350 bg-white">
                   <span className="text-3xl mb-1.5">🔬</span>
-                  <span className="text-[10.5px] font-bold uppercase tracking-wider">No Lab Readings Recorded</span>
+                  <span className="text-xs font-bold uppercase tracking-wider">No Lab Readings Recorded</span>
                 </div>
               ) : (
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-[#E2E8F0] bg-slate-50 text-[9px] font-extrabold text-[#718096] uppercase select-none">
+                    <tr className="border-b border-[#E2E8F0] bg-slate-50 text-xs font-extrabold text-[#718096] uppercase select-none">
                       <th className="px-4 py-2 w-[55%]">Test Name</th>
                       <th className="px-4 py-2 w-[35%]">Latest Reading</th>
                       <th className="px-4 py-2 w-[10%] text-center">Trend</th>
@@ -1676,13 +1686,13 @@ function OverviewContent() {
                       });
                       
                       return (
-                        <tr key={res.lab_result_id} className="border-b border-[#F1F5F9] hover:bg-slate-50/50 transition-colors text-[11.5px] font-semibold text-slate-800">
+                        <tr key={res.lab_result_id} className="border-b border-[#F1F5F9] hover:bg-slate-50/50 transition-colors text-sm font-semibold text-slate-800">
                           <td className="px-4 py-2.5 leading-tight">{res.name}</td>
                           <td className="px-4 py-2.5 leading-tight text-slate-600">
                             <span className="font-extrabold text-[#1E293B] block">
                               {res.reading} {res.unit}
                             </span>
-                            <span className="text-[9px] font-bold text-slate-400">{readingDateStr}</span>
+                            <span className="text-xs font-bold text-slate-400">{readingDateStr}</span>
                           </td>
                           <td className="px-4 py-2.5 text-center">
                             <button className="p-1 hover:bg-indigo-50 border border-transparent rounded transition-all">
@@ -1703,7 +1713,7 @@ function OverviewContent() {
           {/* VITALS CARD */}
           <div className="bg-white rounded-xl border border-[#E5E7EB] flex flex-col overflow-hidden shadow-2xs text-left h-[500px]">
             <div className="px-4 py-3.5 border-b border-[#E5E7EB] bg-[#FAFBFC] flex items-center shrink-0">
-              <span className="text-[12px] font-extrabold text-[#1E293B] uppercase tracking-wider flex items-center gap-1.5">
+              <span className="text-sm font-extrabold text-[#1E293B] uppercase tracking-wider flex items-center gap-1.5">
                 🩺 Today's Vitals
               </span>
             </div>
@@ -1724,32 +1734,32 @@ function OverviewContent() {
                       <circle cx="40" cy="28" r="2.5" fill="currentColor" />
                     </svg>
                   </div>
-                  <p className="text-[10px] font-extrabold text-slate-455 uppercase tracking-wider">No Vitals Added for Today!</p>
+                  <p className="text-xs font-extrabold text-slate-455 uppercase tracking-wider">No Vitals Added for Today!</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-4 w-full">
                   {currentRxPatient.vitals.bp && (
                     <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                      <div className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wide">Blood Pressure</div>
-                      <div className="text-[15px] font-extrabold text-slate-800 mt-1">{currentRxPatient.vitals.bp} <span className="text-[10.5px] text-slate-500 font-semibold">mmHg</span></div>
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Blood Pressure</div>
+                      <div className="text-[15px] font-extrabold text-slate-800 mt-1">{currentRxPatient.vitals.bp} <span className="text-xs text-slate-500 font-semibold">mmHg</span></div>
                     </div>
                   )}
                   {currentRxPatient.vitals.pulse && (
                     <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                      <div className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wide">Pulse Rate</div>
-                      <div className="text-[15px] font-extrabold text-slate-800 mt-1">{currentRxPatient.vitals.pulse} <span className="text-[10.5px] text-slate-500 font-semibold">bpm</span></div>
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Pulse Rate</div>
+                      <div className="text-[15px] font-extrabold text-slate-800 mt-1">{currentRxPatient.vitals.pulse} <span className="text-xs text-slate-500 font-semibold">bpm</span></div>
                     </div>
                   )}
                   {currentRxPatient.vitals.spo2 && (
                     <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                      <div className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wide">Oxygen (SpO2)</div>
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Oxygen (SpO2)</div>
                       <div className="text-[15px] font-extrabold text-slate-800 mt-1">{currentRxPatient.vitals.spo2}%</div>
                     </div>
                   )}
                   {currentRxPatient.vitals.weight && (
                     <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-                      <div className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wide">Weight</div>
-                      <div className="text-[15px] font-extrabold text-slate-800 mt-1">{currentRxPatient.vitals.weight} <span className="text-[10.5px] text-slate-500 font-semibold">kg</span></div>
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Weight</div>
+                      <div className="text-[15px] font-extrabold text-slate-800 mt-1">{currentRxPatient.vitals.weight} <span className="text-xs text-slate-500 font-semibold">kg</span></div>
                     </div>
                   )}
                 </div>
@@ -1766,11 +1776,11 @@ function OverviewContent() {
           
           {/* Preview Header / Controls */}
           <div className="bg-white border-b border-[#E2E8F0] px-4 py-2.5 flex items-center justify-between shrink-0 shadow-2xs">
-            <span className="text-[11px] font-extrabold text-[#1E293B] uppercase tracking-wider flex items-center gap-1.5 select-none">
+            <span className="text-sm font-extrabold text-[#1E293B] uppercase tracking-wider flex items-center gap-1.5 select-none">
               📄 Prescription Preview
             </span>
             <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 cursor-pointer select-none text-[#4A5568] font-bold text-[10.5px]">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-[#4A5568] font-bold text-xs">
                 <input
                   type="checkbox"
                   checked={printShowLetterhead}
@@ -1796,7 +1806,7 @@ function OverviewContent() {
                   <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
                   <path fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" className="opacity-75" />
                 </svg>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 select-none">Generating PDF Preview...</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 select-none">Generating PDF Preview...</span>
               </div>
             )}
           </div>
@@ -1810,7 +1820,7 @@ function OverviewContent() {
                   onClick={() => {
                     showToast("Prescription saved as template successfully!", "success");
                   }}
-                  className="px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10px] font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  className="px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-xs font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                 >
                   📂 Save as Template
                 </button>
@@ -1821,7 +1831,7 @@ function OverviewContent() {
                       reassignFullVisit(activePrintData.registration_id);
                     }
                   }}
-                  className="px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10px] font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  className="px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-xs font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                 >
                   📋 Use as Template
                 </button>
@@ -1833,7 +1843,7 @@ function OverviewContent() {
                   onClick={() => {
                     router.push(`/rx?rx=${rxPatientId}`);
                   }}
-                  className="px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10px] font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  className="px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-xs font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                 >
                   ✏️ Edit
                 </button>
@@ -1845,7 +1855,7 @@ function OverviewContent() {
                     window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(text)}`, "_blank");
                     showToast("Redirecting to WhatsApp to send prescription...", "success");
                   }}
-                  className="px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10px] font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  className="px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-xs font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                 >
                   💬 Send SMS/WhatsApp
                 </button>
@@ -1859,7 +1869,7 @@ function OverviewContent() {
                       }
                     }
                   }}
-                  className="px-4 py-1.5 bg-indigo-650 hover:bg-indigo-750 text-[10.5px] font-extrabold text-white rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+                  className="px-4 py-1.5 bg-indigo-650 hover:bg-indigo-750 text-xs font-extrabold text-white rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
                 >
                   🖨️ Print
                 </button>
@@ -1874,20 +1884,20 @@ function OverviewContent() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push("/")}
-            className="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-650 text-white rounded-lg text-[10px] font-bold border border-slate-700 transition-colors"
+            className="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-650 text-white rounded-lg text-xs font-bold border border-slate-700 transition-colors"
           >
             Dashboard
           </button>
         </div>
 
-        <div className="text-[10.5px] text-slate-400 font-bold tracking-wide">
+        <div className="text-xs text-slate-400 font-bold tracking-wide">
           Overview mode
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => router.push(`/rx?rx=${rxPatientId}`)}
-            className="px-5 py-1.5 bg-primary hover:bg-primary-hover text-white rounded-lg text-[11px] font-extrabold shadow-md transition-colors flex items-center gap-1.5"
+            className="px-5 py-1.5 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-extrabold shadow-md transition-colors flex items-center gap-1.5"
           >
             Continue to Prescription
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5">
