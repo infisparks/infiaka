@@ -953,7 +953,7 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                       </button>
                     </div>
                   ) : med.generic ? (
-                    <div className="text-[8px] text-[#A0AEC0] font-semibold uppercase leading-none truncate max-w-full">
+                    <div className="text-[8.5px] text-slate-800 font-extrabold uppercase leading-none truncate max-w-full">
                       {med.generic}
                     </div>
                   ) : null}

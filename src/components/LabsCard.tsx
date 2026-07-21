@@ -327,10 +327,12 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
   const [packages, setPackages] = useState(fallbackPackages);
   const [showPkgDropdown, setShowPkgDropdown] = useState(false);
   const pkgDropdownRef = useRef<HTMLDivElement>(null);
-  // Create Package state
+  // Create / Delete Package state
   const [showCreatePkgModal, setShowCreatePkgModal] = useState(false);
   const [newPkgName, setNewPkgName]                 = useState("");
   const [isCreatingPkg, setIsCreatingPkg]             = useState(false);
+  const [pkgToDelete, setPkgToDelete]                 = useState<{ id: number | string; name: string } | null>(null);
+  const [isDeletingPkg, setIsDeletingPkg]             = useState(false);
   const [toast, setToast]                             = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
@@ -363,14 +365,36 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
           .delete()
           .eq("package_id", packageId);
       } else {
+        // Query maximum numeric ID to guarantee unique primary key insertion without 409 sequence collision
+        const { data: maxRows } = await supabase
+          .from("aka_lab_packages")
+          .select("id")
+          .order("id", { ascending: false })
+          .limit(1);
+
+        const nextId = (maxRows && maxRows.length > 0 && typeof maxRows[0].id === "number" && !isNaN(maxRows[0].id))
+          ? maxRows[0].id + 1
+          : 1;
+
         const { data: newPkg, error: pkgErr } = await supabase
           .from("aka_lab_packages")
-          .insert({ name })
+          .insert({ id: nextId, name })
           .select("id")
           .single();
 
-        if (pkgErr) throw pkgErr;
-        packageId = newPkg.id;
+        if (pkgErr) {
+          // Fallback retry without explicit ID
+          const { data: fallbackPkg, error: fallbackErr } = await supabase
+            .from("aka_lab_packages")
+            .insert({ name })
+            .select("id")
+            .single();
+
+          if (fallbackErr) throw fallbackErr;
+          packageId = fallbackPkg.id;
+        } else {
+          packageId = newPkg.id;
+        }
       }
 
       const itemsToInsert = labs.map((l) => ({
@@ -407,11 +431,38 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
 
       setNewPkgName("");
       setShowCreatePkgModal(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error creating lab package:", err);
-      showToast("Failed to save lab package.", "error");
+      showToast(err?.message || "Failed to save lab package.", "error");
     } finally {
       setIsCreatingPkg(false);
+    }
+  };
+
+  const handleDeletePackage = async () => {
+    if (!pkgToDelete) return;
+    setIsDeletingPkg(true);
+    try {
+      await supabase
+        .from("aka_lab_package_items")
+        .delete()
+        .eq("package_id", pkgToDelete.id);
+
+      const { error } = await supabase
+        .from("aka_lab_packages")
+        .delete()
+        .eq("id", pkgToDelete.id);
+
+      if (error) throw error;
+
+      showToast(`Package "${pkgToDelete.name}" deleted successfully.`, "success");
+      setPackages((prev) => prev.filter((p) => p.id !== pkgToDelete.id));
+      setPkgToDelete(null);
+    } catch (err: any) {
+      console.error("Error deleting lab package:", err);
+      showToast(err?.message || "Failed to delete lab package.", "error");
+    } finally {
+      setIsDeletingPkg(false);
     }
   };
 
@@ -608,36 +659,54 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
                   Select Lab Package
                 </div>
                 {packages.map((pkg) => (
-                  <button
+                  <div
                     key={pkg.id}
-                    type="button"
-                    onClick={() => {
-                      const newLabs = [...labs];
-                      pkg.items.forEach((testName) => {
-                        const exists = newLabs.some(l => l.name.toLowerCase() === testName.toLowerCase());
-                        if (!exists) {
-                          newLabs.push({
-                            id: "temp_" + (Date.now() + Math.floor(Math.random() * 100000)),
-                            name: testName,
-                            testOn: "",
-                            repeatOn: "",
-                            remarks: ""
-                          });
-                        }
-                      });
-                      setLabs(newLabs);
-                      setShowPkgDropdown(false);
-                    }}
-                    className="w-full text-left px-3.5 py-2.5 text-[11px] font-bold text-slate-700 hover:bg-yellow-50/40 hover:text-yellow-800 transition-colors block border-b border-[#F8FAFC] last:border-0 cursor-pointer"
+                    className="w-full text-left px-3 py-2 text-[11px] font-bold text-slate-700 hover:bg-yellow-50/50 hover:text-yellow-800 transition-colors border-b border-[#F8FAFC] last:border-0 flex items-center justify-between group cursor-pointer"
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-slate-800">{pkg.name}</span>
-                      <span className="text-[7.5px] bg-yellow-100 text-yellow-800 px-1 py-0.2 rounded font-extrabold uppercase">{pkg.items.length} tests</span>
+                    <div
+                      className="flex-1 min-w-0 pr-2"
+                      onClick={() => {
+                        const newLabs = [...labs];
+                        pkg.items.forEach((testName) => {
+                          const exists = newLabs.some(l => l.name.toLowerCase() === testName.toLowerCase());
+                          if (!exists) {
+                            newLabs.push({
+                              id: "temp_" + (Date.now() + Math.floor(Math.random() * 100000)),
+                              name: testName,
+                              testOn: "",
+                              repeatOn: "",
+                              remarks: ""
+                            });
+                          }
+                        });
+                        setLabs(newLabs);
+                        setShowPkgDropdown(false);
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-extrabold text-slate-800 truncate">{pkg.name}</span>
+                        <span className="text-[7.5px] bg-yellow-100 text-yellow-800 px-1 py-0.2 rounded font-extrabold uppercase shrink-0">{pkg.items.length} tests</span>
+                      </div>
+                      <div className="text-[8.5px] text-slate-400 font-bold lowercase truncate mt-0.5">
+                        {pkg.items.join(", ")}
+                      </div>
                     </div>
-                    <div className="text-[8.5px] text-slate-400 font-bold lowercase truncate mt-1">
-                      {pkg.items.join(", ")}
-                    </div>
-                  </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowPkgDropdown(false);
+                        setPkgToDelete({ id: pkg.id, name: pkg.name });
+                      }}
+                      className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0 cursor-pointer"
+                      title="Delete Package"
+                    >
+                      <svg className="w-3.5 h-3.5 stroke-current fill-none" viewBox="0 0 24 24" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                      </svg>
+                    </button>
+                  </div>
                 ))}
                 <div className="border-t border-slate-100 mt-1 pt-1.5 px-2">
                   <button
@@ -898,6 +967,48 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
                   className="px-3.5 py-1.5 text-[10px] font-extrabold text-white bg-yellow-600 hover:bg-yellow-750 disabled:bg-slate-200 disabled:text-slate-400 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
                 >
                   {isCreatingPkg ? "Saving..." : "Save Package"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Package Confirmation Modal Popup */}
+      {pkgToDelete && (
+        <div className="fixed inset-0 z-[1000] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 select-none">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-150">
+            <div className="p-4 bg-red-50 border-b border-red-100 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold text-sm shrink-0">
+                ⚠️
+              </div>
+              <div>
+                <h3 className="text-[13px] font-extrabold text-red-900 leading-tight">Delete Lab Package?</h3>
+                <p className="text-[10px] font-semibold text-red-600">This action cannot be undone.</p>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-3">
+              <p className="text-[11.5px] font-medium text-slate-700 leading-relaxed">
+                Are you sure you want to delete the package <span className="font-bold text-slate-900">"{pkgToDelete.name}"</span>?
+              </p>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setPkgToDelete(null)}
+                  disabled={isDeletingPkg}
+                  className="px-3.5 py-1.5 text-[10.5px] font-bold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeletePackage}
+                  disabled={isDeletingPkg}
+                  className="px-4 py-1.5 text-[10.5px] font-extrabold text-white bg-red-600 hover:bg-red-700 disabled:bg-slate-300 rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                >
+                  {isDeletingPkg ? "Deleting..." : "Confirm Delete"}
                 </button>
               </div>
             </div>

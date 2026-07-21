@@ -2169,10 +2169,10 @@ function RxPageContent() {
           </div>
           <div className="text-left leading-tight">
             <div className="flex items-center gap-2">
-              <span className="text-[12px] font-bold text-foreground select-text">{currentRxPatient.name}</span>
-              <span className="text-[11px] font-medium text-[#718096]">{currentRxPatient.age}y | {currentRxPatient.gender}</span>
+              <span className="text-[12px] font-bold text-slate-900 select-text">{currentRxPatient.name}</span>
+              <span className="text-[11px] font-bold text-slate-900">{currentRxPatient.age}y | {currentRxPatient.gender}</span>
             </div>
-            <span className="text-[9px] text-[#A0AEC0] font-semibold tracking-tight select-text">{currentRxPatient.phone}</span>
+            <span className="text-[9.5px] text-slate-800 font-bold tracking-tight select-text">{currentRxPatient.phone}</span>
           </div>
         </div>
 
@@ -2180,32 +2180,32 @@ function RxPageContent() {
         <div className="flex items-center h-full">
           <button 
             onClick={() => router.push(`/rx/overview?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-[11px] font-extrabold text-slate-800 hover:text-black transition-all"
           >
             Overview {pastVisitsCount > 0 ? `(${pastVisitsCount})` : `(0)`}
           </button>
-          <button className="h-full px-3 text-[11px] font-bold text-primary border-b-2 border-primary">Pad</button>
+          <button className="h-full px-3 text-[11px] font-extrabold text-primary border-b-2 border-primary">Pad</button>
           <button 
             onClick={() => router.push(`/rx/canvas?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-[11px] font-extrabold text-slate-800 hover:text-black transition-all"
           >
             Canvas
           </button>
           <button 
             onClick={() => router.push(`/rx/ekacare?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-[11px] font-extrabold text-slate-800 hover:text-black transition-all"
           >
             EkaCare Old Data{legacyVisitsCount > 0 ? ` (${legacyVisitsCount} found)` : ""}
           </button>
           <button 
             onClick={() => router.push(`/rx/certificate?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-[11px] font-extrabold text-slate-800 hover:text-black transition-all"
           >
             Medical Certificate
           </button>
           <button 
             onClick={() => router.push(`/rx/documents?rx=${rxPatientId}`)}
-            className="h-full px-3 text-[11px] font-bold text-[#718096] hover:text-foreground transition-all"
+            className="h-full px-3 text-[11px] font-extrabold text-slate-800 hover:text-black transition-all"
           >
             Documents
           </button>
