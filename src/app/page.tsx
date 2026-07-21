@@ -1256,11 +1256,14 @@ function DashboardContent() {
         return [...prev, { name: finalVal.trim(), price: Number(rowFee) || 0, type }];
       });
 
-      updateServiceRow(rowId, finalVal, rowFee, type);
+      const nextFee = type === "product" ? "" : rowFee;
+      updateServiceRow(rowId, finalVal, nextFee, type);
     } else {
       const matched = serviceCache.find((s) => s.name.toLowerCase() === val.toLowerCase());
       if (matched) {
-        updateServiceRow(rowId, matched.name, matched.price, matched.type);
+        const type = matched.type || "service";
+        const fee = type === "product" ? "" : matched.price;
+        updateServiceRow(rowId, matched.name, fee, type);
       } else {
         updateServiceRow(rowId, val, rowFee);
       }
@@ -3393,7 +3396,8 @@ function DashboardContent() {
                             value={row.type || "service"}
                             onChange={(e) => {
                               const newType = e.target.value as "service" | "product";
-                              updateServiceRow(row.id, row.name, row.fee, newType, newType === "service" ? 1 : (row.qty || 1));
+                              const nextFee = newType === "product" ? "" : row.fee;
+                              updateServiceRow(row.id, row.name, nextFee, newType, newType === "service" ? 1 : (row.qty || 1));
                             }}
                             className="w-full h-7 px-1.5 border border-[#CBD5E0] rounded text-[11px] bg-white focus:outline-none cursor-pointer"
                           >

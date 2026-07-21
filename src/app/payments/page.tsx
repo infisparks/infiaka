@@ -6,6 +6,7 @@ import { supabase, getUserRole } from "@/lib/supabase";
 import Sidebar from "@/components/Sidebar";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import QRCode from "qrcode";
 
 interface Patient {
   uhid: string;
@@ -74,6 +75,293 @@ function getRegistrationPaymentDetails(reg: Registration) {
 
   return { netPaid, cashPaid, onlinePaid };
 }
+
+const downloadSingleReceiptPDF = async (reg: Registration) => {
+  try {
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+      compress: true
+    });
+
+    const PAGE_W = 210;
+    const PAGE_H = 297;
+    const MARGIN = 15;
+    const CONTENT_W = PAGE_W - MARGIN * 2;
+
+    // Load Poppins font
+    let fontName = "helvetica";
+    try {
+      const [regRes, boldRes] = await Promise.all([
+        fetch("https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Regular.ttf").then(res => res.arrayBuffer()),
+        fetch("https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf").then(res => res.arrayBuffer())
+      ]);
+
+      const toBase64 = (buffer: ArrayBuffer) => {
+        let binary = "";
+        const bytes = new Uint8Array(buffer);
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return window.btoa(binary);
+      };
+
+      doc.addFileToVFS("Poppins-Regular.ttf", toBase64(regRes));
+      doc.addFont("Poppins-Regular.ttf", "Poppins", "normal");
+      doc.addFileToVFS("Poppins-Bold.ttf", toBase64(boldRes));
+      doc.addFont("Poppins-Bold.ttf", "Poppins", "bold");
+      fontName = "Poppins";
+    } catch (e) {
+      console.error("Failed to load Poppins web fonts, falling back to Helvetica:", e);
+    }
+
+    doc.setFont(fontName);
+
+    // Color system
+    const primaryColor: [number, number, number] = [107, 33, 168];   // Deep Purple
+    const primaryLight: [number, number, number] = [243, 232, 255];  // Purple-100
+    const textDark: [number, number, number] = [15, 23, 42];          // slate-900
+    const textGray: [number, number, number] = [100, 116, 139];       // slate-500
+    const borderColor: [number, number, number] = [226, 232, 240];    // slate-200
+    const redColor: [number, number, number] = [220, 38, 38];
+    const greenColor: [number, number, number] = [22, 163, 74];
+
+    // QR Code
+    const qrData = await QRCode.toDataURL(`BILL_${reg.registration_id}_${reg.patient_uhid}`, {
+      margin: 1,
+      width: 100,
+      errorCorrectionLevel: 'L'
+    });
+
+    // ── HEADER ───────────────────────────────────────────────────────
+    let currentY = 15;
+
+    // Clinic Info (Left)
+    doc.setFont("Poppins", "bold").setFontSize(18).setTextColor(...primaryColor);
+    doc.text((reg.clinic_name || "OPD CLINIC").toUpperCase(), MARGIN, currentY);
+    
+    doc.setFont("Poppins", "normal").setFontSize(8.5).setTextColor(...textGray);
+    doc.text("Comprehensive & Advanced Healthcare Clinic", MARGIN, currentY + 5.5);
+    
+    // Doctor Details (Right)
+    doc.setFont("Poppins", "bold").setFontSize(10).setTextColor(...textDark);
+    doc.text((reg.treating_doctor || "DR. LAXMAN SALVE").toUpperCase(), PAGE_W - MARGIN, currentY, { align: "right" });
+    
+    doc.setFont("Poppins", "normal").setFontSize(8).setTextColor(...textGray);
+    doc.text("Consulting Physician / Specialist", PAGE_W - MARGIN, currentY + 4.5, { align: "right" });
+    doc.text("Reg. No: FMC-98745-A", PAGE_W - MARGIN, currentY + 8.5, { align: "right" });
+
+    // Divider Line
+    currentY += 12;
+    doc.setDrawColor(...borderColor).setLineWidth(0.3).line(MARGIN, currentY, PAGE_W - MARGIN, currentY);
+
+    // Title
+    currentY += 8;
+    doc.setFont("Poppins", "bold").setFontSize(12).setTextColor(...primaryColor);
+    doc.text("TAX INVOICE / RECEIPT", PAGE_W / 2, currentY, { align: "center" });
+
+    // ── PATIENT & INVOICE CARD ───────────────────────────────────────
+    currentY += 4;
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(...borderColor);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(MARGIN, currentY, CONTENT_W, 25, 1, 1, "FD");
+
+    // Left Side - Patient Details
+    const detailsCardY = currentY;
+    doc.setFont("Poppins", "bold").setFontSize(7).setTextColor(...textGray);
+    doc.text("PATIENT DETAILS", MARGIN + 5, detailsCardY + 5.5);
+    
+    doc.setFont("Poppins", "bold").setFontSize(11).setTextColor(...textDark);
+    doc.text(reg.patient?.name || "Unknown Patient", MARGIN + 5, detailsCardY + 11.5);
+    
+    doc.setFont("Poppins", "normal").setFontSize(8.5).setTextColor(...textDark);
+    const ageGender = reg.patient ? `${reg.patient.age} Y / ${reg.patient.gender}` : "N/A";
+    doc.text(`${ageGender}   •   UHID: ${reg.patient_uhid}`, MARGIN + 5, detailsCardY + 16.5);
+    if (reg.patient?.phone) {
+      doc.text(`Phone: ${reg.patient.phone}`, MARGIN + 5, detailsCardY + 21.5);
+    }
+
+    // Right Side - Invoice Details
+    doc.setFont("Poppins", "bold").setFontSize(7).setTextColor(...textGray);
+    doc.text("INVOICE DETAILS", PAGE_W - MARGIN - 30, detailsCardY + 5.5, { align: "right" });
+    
+    doc.setFont("Poppins", "bold").setFontSize(10).setTextColor(...textDark);
+    doc.text(`Invoice ID: #${reg.registration_id}`, PAGE_W - MARGIN - 30, detailsCardY + 10.5, { align: "right" });
+    
+    doc.setFont("Poppins", "normal").setFontSize(8.5).setTextColor(...textDark);
+    const formattedDate = new Date(reg.created_at).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    doc.text(`Date: ${formattedDate}`, PAGE_W - MARGIN - 30, detailsCardY + 15.5, { align: "right" });
+    doc.text(`Payment: ${reg.payment_method || "Cash"}`, PAGE_W - MARGIN - 30, detailsCardY + 20.5, { align: "right" });
+
+    // QR Code
+    doc.addImage(qrData, 'PNG', PAGE_W - MARGIN - 23, detailsCardY + 2.5, 20, 20, undefined, 'FAST');
+
+    currentY += 29;
+
+    // ── BILL ITEMS TABLE ─────────────────────────────────────────────
+    const servicesList = reg.services || [];
+    let tableBody = [];
+    if (servicesList.length > 0) {
+      tableBody = servicesList.map((s: any, idx: number) => {
+        const qty = s.type === "product" ? (Number(s.qty) || 1) : 1;
+        const rate = Number(s.fee) || 0;
+        const lineTotal = rate * qty;
+        return [
+          (idx + 1).toString(),
+          s.name || "Consultation / Visit",
+          s.type === "product" ? "Product" : "Service",
+          qty.toString(),
+          `₹${rate.toFixed(2)}`,
+          `₹${lineTotal.toFixed(2)}`
+        ];
+      });
+    } else {
+      tableBody = [[
+        "1",
+        reg.visit_category || "Outpatient Consultation",
+        "Service",
+        "1",
+        `₹${reg.bill_amount.toFixed(2)}`,
+        `₹${reg.bill_amount.toFixed(2)}`
+      ]];
+    }
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [['#', 'ITEM DESCRIPTION', 'TYPE', 'QTY', 'RATE', 'AMOUNT']],
+      body: tableBody,
+      theme: 'plain',
+      headStyles: {
+        fillColor: primaryLight,
+        textColor: primaryColor,
+        fontSize: 8.5,
+        font: 'Poppins',
+        fontStyle: 'bold',
+        lineWidth: { bottom: 0.3 },
+        lineColor: [216, 180, 254],
+        cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 }
+      },
+      bodyStyles: {
+        fontSize: 8.5,
+        font: 'Poppins',
+        cellPadding: 3,
+        textColor: textDark,
+        lineWidth: 0.05,
+        lineColor: [241, 245, 249]
+      },
+      columnStyles: {
+        0: { cellWidth: 10, halign: 'center' },
+        2: { halign: 'center', cellWidth: 20 },
+        3: { halign: 'center', cellWidth: 15 },
+        4: { halign: 'right', cellWidth: 25 },
+        5: { halign: 'right', fontStyle: 'bold', cellWidth: 25 }
+      },
+      margin: { left: MARGIN, right: MARGIN }
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 4;
+    const totalsStartY = currentY;
+
+    // ── TOTALS SECTION ─────────────────────────────────────────────
+    const { netPaid, cashPaid, onlinePaid } = getRegistrationPaymentDetails(reg);
+    const paymentsList = Array.isArray(reg.payments) ? reg.payments : [];
+    const amountPaid = paymentsList.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
+    const actualPaid = paymentsList.length > 0 ? amountPaid : netPaid;
+    const balance = Math.max(0, netPaid - actualPaid);
+
+    const totalsLabelX = PAGE_W - MARGIN - 50;
+    const totalsValueX = PAGE_W - MARGIN;
+
+    const drawRow = (label: string, value: number, color: [number, number, number] = textDark, isBold = false, size = 9) => {
+      doc.setFont("Poppins", isBold ? "bold" : "normal")
+         .setFontSize(size)
+         .setTextColor(color[0], color[1], color[2]);
+      doc.text(label, totalsLabelX, currentY);
+      doc.text(`₹${value.toFixed(2)}`, totalsValueX, currentY, { align: "right" });
+      currentY += 4.5;
+    };
+
+    drawRow("Sub Total (Gross):", reg.bill_amount, textGray);
+    if (reg.discount_amount > 0) {
+      drawRow("Discount:", reg.discount_amount, greenColor);
+    }
+    
+    currentY += 1;
+    doc.setDrawColor(...borderColor).setLineWidth(0.2).line(PAGE_W - MARGIN - 60, currentY, PAGE_W - MARGIN, currentY);
+    currentY += 4.5;
+
+    drawRow("Net Amount Payable:", netPaid, textDark, true, 9.5);
+    drawRow("Amount Paid:", actualPaid, textGray, false, 9);
+
+    // Balance Due Callout Box
+    const isDue = balance > 0;
+    const balanceBg = isDue ? [254, 242, 242] : [240, 253, 244];
+    const balanceText = isDue ? redColor : greenColor;
+    const balanceBorderColor = isDue ? [254, 202, 202] : [187, 247, 208];
+
+    doc.setFillColor(balanceBg[0], balanceBg[1], balanceBg[2]);
+    doc.setDrawColor(balanceBorderColor[0], balanceBorderColor[1], balanceBorderColor[2]);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(PAGE_W - MARGIN - 60, currentY - 2.5, 60, 7.5, 0.5, 0.5, "FD");
+    
+    doc.setFont("Poppins", "bold").setFontSize(9.5).setTextColor(balanceText[0], balanceText[1], balanceText[2]);
+    doc.text("BALANCE DUE:", PAGE_W - MARGIN - 56, currentY + 2.5);
+    doc.text(`₹${balance.toFixed(2)}`, totalsValueX - 2, currentY + 2.5, { align: "right" });
+    
+    currentY += 10;
+
+    // Payment Entries Table (if any)
+    if (paymentsList.length > 0) {
+      doc.setFont("Poppins", "bold").setFontSize(8.5).setTextColor(...textGray);
+      doc.text("PAYMENT METHOD DISTRIBUTION", MARGIN, totalsStartY);
+      autoTable(doc, {
+        startY: totalsStartY + 2,
+        head: [['Transaction Date', 'Mode', 'Amount']],
+        body: paymentsList.map((e: any) => [
+          e.time ? new Date(e.time).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : formattedDate,
+          (e.mode || 'CASH').toUpperCase(),
+          `₹${(Number(e.amount) || 0).toFixed(2)}`
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: primaryLight, textColor: primaryColor, fontSize: 7.5, font: 'Poppins', fontStyle: 'bold', cellPadding: 1.5 },
+        bodyStyles: { fontSize: 7.5, font: 'Poppins', cellPadding: 1.5 },
+        margin: { left: MARGIN, right: PAGE_W - (PAGE_W - MARGIN - 60) + 5 }
+      });
+    }
+
+    // ── FOOTER ───────────────────────────────────────────────────────
+    const contentEndY = Math.max(currentY, (paymentsList.length > 0 && (doc as any).lastAutoTable) ? (doc as any).lastAutoTable.finalY : 0);
+    const footerY = Math.max(PAGE_H - 30, contentEndY + 10);
+
+    doc.setDrawColor(...borderColor).setLineWidth(0.25).line(MARGIN, footerY, PAGE_W - MARGIN, footerY);
+
+    doc.setFont("Poppins", "bold").setFontSize(7).setTextColor(...textGray);
+    doc.text("Scan QR on invoice to verify authenticity", MARGIN, footerY + 5);
+    doc.setFont("Poppins", "normal").setFontSize(6.5).setTextColor(...textGray);
+    doc.text("System generated invoice — No physical signature required.", MARGIN, footerY + 9);
+
+    // Signature
+    doc.setDrawColor(...borderColor).setLineWidth(0.25).line(PAGE_W - MARGIN - 50, footerY + 8, PAGE_W - MARGIN, footerY + 8);
+    doc.setFont("Poppins", "bold").setFontSize(7.5).setTextColor(...textGray);
+    doc.text("AUTHORIZED SIGNATURE", PAGE_W - MARGIN, footerY + 12, { align: "right" });
+
+    // Open PDF
+    const pdfBlob = doc.output("blob");
+    const blobUrl = URL.createObjectURL(pdfBlob);
+    window.open(blobUrl, "_blank");
+
+  } catch (err) {
+    console.error("Error generating invoice PDF:", err);
+  }
+};
 
 function PaymentsContent() {
   const router = useRouter();
@@ -548,6 +836,7 @@ function PaymentsContent() {
                       <th className="py-2.5 px-4 text-right">Discount</th>
                       <th className="py-2.5 px-4 text-right">Gross Total</th>
                       <th className="py-2.5 px-4 text-right">Net Paid</th>
+                      <th className="py-2.5 px-4 text-center select-none">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E2E8F0] text-[12px] font-medium text-slate-650">
@@ -609,6 +898,18 @@ function PaymentsContent() {
                           </td>
                           <td className="py-2.5 px-4 text-right font-black text-slate-800 select-all">
                             ₹{netPaid}
+                          </td>
+                          <td className="py-2.5 px-4 text-center select-none">
+                            <button
+                              onClick={() => downloadSingleReceiptPDF(reg)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-extrabold text-indigo-700 bg-indigo-50 hover:bg-indigo-100/80 rounded-lg border border-indigo-200 transition-colors shadow-2xs"
+                              title="Download professional PDF receipt"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                              </svg>
+                              PDF Receipt
+                            </button>
                           </td>
                         </tr>
                       );
