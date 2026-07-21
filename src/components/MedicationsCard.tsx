@@ -427,7 +427,7 @@ function InlineAutoComplete({
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
-        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#1e293b] bg-transparent outline-none placeholder:text-slate-350"
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[12.5px] font-bold text-[#090d16] bg-transparent outline-none placeholder:text-slate-400"
         className="w-full h-full"
         panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
       />
@@ -538,7 +538,7 @@ function InlineMedicineAutoComplete({
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
-        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none p-0 placeholder:text-slate-350"
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[12.5px] font-extrabold text-[#090d16] bg-transparent outline-none p-0 placeholder:text-slate-400"
         className="w-full h-full"
         panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
       />
@@ -752,50 +752,50 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
       </div>
 
       {/* Columns Header Grid */}
-      <div className="flex items-stretch border-b border-[#E2E8F0] bg-slate-50/50 text-[9px] font-bold text-[#718096] uppercase select-none">
+      <div className="flex items-stretch border-b border-[#E2E8F0] bg-slate-50/50 text-[10.5px] font-extrabold text-[#090d16] uppercase select-none">
         {/* drag grip blank */}
         <div className="w-7 shrink-0 border-r border-[#E2E8F0]" />
         
         {/* Col 1: Medicine */}
         <div className="w-[27%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Medicine</div>
-          <div className="text-[8px] text-[#A0AEC0] lowercase font-normal">Generic</div>
+          <div className="text-[9.5px] text-slate-700 lowercase font-semibold">Generic</div>
         </div>
         
         {/* Col 2: Dose */}
         <div className="w-[10%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Dose</div>
-          <div className="text-[8px] text-[#A0AEC0] lowercase font-normal">eg. 1 tablet</div>
+          <div className="text-[9.5px] text-slate-700 lowercase font-semibold">eg. 1 tablet</div>
         </div>
 
         {/* Col 3: Frequency */}
         <div className="w-[10%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Frequency</div>
-          <div className="text-[8px] text-[#A0AEC0] lowercase font-normal">eg. 1-0-1 etc</div>
+          <div className="text-[9.5px] text-slate-700 lowercase font-semibold">eg. 1-0-1 etc</div>
         </div>
 
         {/* Col 4: Timing */}
         <div className="w-[10%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Timing</div>
-          <div className="text-[8px] text-[#A0AEC0] lowercase font-normal">eg. After meal</div>
+          <div className="text-[9.5px] text-slate-700 lowercase font-semibold">eg. After meal</div>
         </div>
 
         {/* Col 5: Duration */}
         <div className="w-[10%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Duration</div>
-          <div className="text-[8px] text-[#A0AEC0] lowercase font-normal">eg. 3 days</div>
+          <div className="text-[9.5px] text-slate-700 lowercase font-semibold">eg. 3 days</div>
         </div>
 
         {/* Col 6: Start From */}
         <div className="w-[10%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Start From</div>
-          <div className="text-[8px] text-[#A0AEC0] lowercase font-normal">eg. 1, 3, 5 etc</div>
+          <div className="text-[9.5px] text-slate-700 lowercase font-semibold">eg. 1, 3, 5 etc</div>
         </div>
 
         {/* Col 7: Instructions */}
         <div className="w-[18%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Instructions</div>
-          <div className="text-[8px] text-[#A0AEC0] lowercase font-normal">if any..</div>
+          <div className="text-[9.5px] text-slate-700 lowercase font-semibold">if any..</div>
         </div>
 
         {/* Action blank */}

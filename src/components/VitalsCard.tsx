@@ -43,7 +43,7 @@ export default function VitalsCard({
         <div className="flex flex-col justify-between border border-[#E5E7EB] rounded-lg p-2.5 bg-white shadow-2xs w-full space-y-1">
           <div className="flex items-center gap-1.5">
             <span className="text-xs">💧</span>
-            <span className="font-extrabold text-[11px] text-[#0f172a]">bp</span>
+            <span className="font-extrabold text-[12px] text-[#090d16]">bp</span>
           </div>
           <div className="flex items-center justify-between gap-1.5 w-full">
             <input
@@ -51,9 +51,9 @@ export default function VitalsCard({
               value={bp}
               onChange={(e) => setBp(e.target.value)}
               placeholder="0"
-              className="w-full h-7 font-extrabold text-[11px] text-[#0f172a] border border-[#CBD5E0] focus:border-primary rounded focus:outline-none bg-white placeholder-slate-400 px-2"
+              className="w-full h-7 font-extrabold text-[12.5px] text-[#090d16] border border-[#CBD5E0] focus:border-primary rounded focus:outline-none bg-white placeholder-slate-400 px-2"
             />
-            <span className="text-[9.5px] text-[#1e293b] font-extrabold shrink-0">mmHg</span>
+            <span className="text-[10.5px] text-[#090d16] font-black shrink-0">mmHg</span>
           </div>
         </div>
 
@@ -61,7 +61,7 @@ export default function VitalsCard({
         <div className="flex flex-col justify-between border border-[#E5E7EB] rounded-lg p-2.5 bg-white shadow-2xs w-full space-y-1">
           <div className="flex items-center gap-1.5">
             <span className="text-xs">💓</span>
-            <span className="font-extrabold text-[11px] text-[#0f172a]">pulse</span>
+            <span className="font-extrabold text-[12px] text-[#090d16]">pulse</span>
           </div>
           <div className="flex items-center justify-between gap-1.5 w-full">
             <input
@@ -69,9 +69,9 @@ export default function VitalsCard({
               value={pulse}
               onChange={(e) => setPulse(e.target.value)}
               placeholder="0"
-              className="w-full h-7 font-extrabold text-[11px] text-[#0f172a] border border-[#CBD5E0] focus:border-primary rounded focus:outline-none bg-white placeholder-slate-400 px-2"
+              className="w-full h-7 font-extrabold text-[12.5px] text-[#090d16] border border-[#CBD5E0] focus:border-primary rounded focus:outline-none bg-white placeholder-slate-400 px-2"
             />
-            <span className="text-[9.5px] text-[#1e293b] font-extrabold shrink-0">/min</span>
+            <span className="text-[10.5px] text-[#090d16] font-black shrink-0">/min</span>
           </div>
         </div>
 
@@ -79,7 +79,7 @@ export default function VitalsCard({
         <div className="flex flex-col justify-between border border-[#E5E7EB] rounded-lg p-2.5 bg-white shadow-2xs w-full space-y-1">
           <div className="flex items-center gap-1.5">
             <span className="text-xs">⚖️</span>
-            <span className="font-extrabold text-[11px] text-[#0f172a]">weight</span>
+            <span className="font-extrabold text-[12px] text-[#090d16]">weight</span>
           </div>
           <div className="flex items-center justify-between gap-1.5 w-full">
             <input
@@ -87,9 +87,9 @@ export default function VitalsCard({
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
               placeholder="0"
-              className="w-full h-7 font-extrabold text-[11px] text-[#0f172a] border border-[#CBD5E0] focus:border-primary rounded focus:outline-none bg-white placeholder-slate-400 px-2"
+              className="w-full h-7 font-extrabold text-[12.5px] text-[#090d16] border border-[#CBD5E0] focus:border-primary rounded focus:outline-none bg-white placeholder-slate-400 px-2"
             />
-            <span className="text-[9.5px] text-[#1e293b] font-extrabold shrink-0">kg</span>
+            <span className="text-[10.5px] text-[#090d16] font-black shrink-0">kg</span>
           </div>
         </div>
 
@@ -97,7 +97,7 @@ export default function VitalsCard({
         <div className="flex flex-col justify-between border border-[#E5E7EB] rounded-lg p-2.5 bg-white shadow-2xs w-full space-y-1">
           <div className="flex items-center gap-1.5">
             <span className="text-xs">🫁</span>
-            <span className="font-extrabold text-[11px] text-[#0f172a]">spo2</span>
+            <span className="font-extrabold text-[12px] text-[#090d16]">spo2</span>
           </div>
           <div className="flex items-center justify-between gap-1.5 w-full">
             <input
@@ -105,9 +105,9 @@ export default function VitalsCard({
               value={spo2}
               onChange={(e) => setSpo2(e.target.value)}
               placeholder="0"
-              className="w-full h-7 font-extrabold text-[11px] text-[#0f172a] border border-[#CBD5E0] focus:border-primary rounded focus:outline-none bg-white placeholder-slate-400 px-2"
+              className="w-full h-7 font-extrabold text-[12.5px] text-[#090d16] border border-[#CBD5E0] focus:border-primary rounded focus:outline-none bg-white placeholder-slate-400 px-2"
             />
-            <span className="text-[9.5px] text-[#1e293b] font-extrabold shrink-0">%</span>
+            <span className="text-[10.5px] text-[#090d16] font-black shrink-0">%</span>
           </div>
         </div>
 
@@ -115,7 +115,7 @@ export default function VitalsCard({
         <div className="flex flex-col justify-between border border-[#E5E7EB] rounded-lg p-2.5 bg-white shadow-2xs w-full space-y-1">
           <div className="flex items-center gap-1.5">
             <span className="text-xs">🩸</span>
-            <span className="font-extrabold text-[11px] text-[#0f172a]">sugar</span>
+            <span className="font-extrabold text-[12px] text-[#090d16]">sugar</span>
           </div>
           <div className="flex items-center justify-between gap-1.5 w-full">
             <input
@@ -123,9 +123,9 @@ export default function VitalsCard({
               value={sugar}
               onChange={(e) => setSugar(e.target.value)}
               placeholder="0"
-              className="w-full h-7 font-extrabold text-[11px] text-[#0f172a] border border-[#CBD5E0] focus:border-primary rounded focus:outline-none bg-white placeholder-slate-400 px-2"
+              className="w-full h-7 font-extrabold text-[12.5px] text-[#090d16] border border-[#CBD5E0] focus:border-primary rounded focus:outline-none bg-white placeholder-slate-400 px-2"
             />
-            <span className="text-[9.5px] text-[#1e293b] font-extrabold shrink-0">mg/dL</span>
+            <span className="text-[10.5px] text-[#090d16] font-black shrink-0">mg/dL</span>
           </div>
         </div>
       </div>

@@ -215,8 +215,8 @@ export default function MedicalHistoryCard({
                     </div>
                   </div>
                   <div onClick={onOpenFamily} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{item.name}</p>
-                    {details && <p className="text-[9.5px] text-slate-900 font-bold mt-0.5 leading-none">{details}</p>}
+                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{item.name}</p>
+                    {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
                   </div>
                 </div>
               );
@@ -276,8 +276,8 @@ export default function MedicalHistoryCard({
                     </div>
                   </div>
                   <div onClick={onOpenConditions} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{cond.name}</p>
-                    {details && <p className="text-[9.5px] text-slate-900 font-bold mt-0.5 leading-none">{details}</p>}
+                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{cond.name}</p>
+                    {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
                   </div>
                 </div>
               );
@@ -335,8 +335,8 @@ export default function MedicalHistoryCard({
                     </div>
                   </div>
                   <div onClick={onOpenAllergies} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{item.name}</p>
-                    {details && <p className="text-[9.5px] text-slate-900 font-bold mt-0.5 leading-none">{details}</p>}
+                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{item.name}</p>
+                    {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
                   </div>
                 </div>
               );
@@ -396,8 +396,8 @@ export default function MedicalHistoryCard({
                     </div>
                   </div>
                   <div onClick={onOpenProcedures} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{proc.name}</p>
-                    {details && <p className="text-[9.5px] text-slate-900 font-bold mt-0.5 leading-none">{details}</p>}
+                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{proc.name}</p>
+                    {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
                   </div>
                 </div>
               );
@@ -460,8 +460,8 @@ export default function MedicalHistoryCard({
                     </div>
                   </div>
                   <div onClick={onOpenCurrentMeds} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{med.name}</p>
-                    {details && <p className="text-[9.5px] text-slate-900 font-bold mt-0.5 leading-none">{details}</p>}
+                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{med.name}</p>
+                    {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
                   </div>
                 </div>
               );
@@ -514,8 +514,8 @@ export default function MedicalHistoryCard({
                     </div>
                   </div>
                   <div onClick={onOpenHabits} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{h.name}</p>
-                    {details && <p className="text-[9.5px] text-slate-900 font-bold mt-0.5 leading-none">{details}</p>}
+                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{h.name}</p>
+                    {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
                   </div>
                 </div>
               );
@@ -559,8 +559,8 @@ export default function MedicalHistoryCard({
                     </div>
                   </div>
                   <div onClick={onOpenFoodAllergies} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{f.name}</p>
-                    {details && <p className="text-[9.5px] text-slate-900 font-bold mt-0.5 leading-none">{details}</p>}
+                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{f.name}</p>
+                    {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">{details}</p>}
                   </div>
                 </div>
               );
@@ -589,9 +589,9 @@ export default function MedicalHistoryCard({
                 <div key={o.id} className="flex flex-col">
                   <div className="flex items-center gap-1.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />
-                    <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{o.name}</p>
+                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{o.name}</p>
                   </div>
-                  {details && <p className="text-[9.5px] text-slate-900 font-bold mt-0.5 leading-none pl-3">{details}</p>}
+                  {details && <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none pl-3">{details}</p>}
                 </div>
               );
             })}
@@ -637,9 +637,9 @@ export default function MedicalHistoryCard({
                     </div>
                   </div>
                   <div onClick={onOpenTravelHistory} className="cursor-pointer hover:opacity-85">
-                    <p className="text-[11px] font-bold text-[#1E293B] leading-tight">{t.destination}</p>
+                    <p className="text-[12.5px] font-bold text-[#090d16] leading-tight">{t.destination}</p>
                     {(t.travelDate || t.notes) && (
-                      <p className="text-[9.5px] text-slate-900 font-bold mt-0.5 leading-none">
+                      <p className="text-[11px] text-[#090d16] font-bold mt-0.5 leading-none">
                         {[
                           t.travelDate ? `Date: ${t.travelDate}` : "",
                           t.notes ? `Notes: ${t.notes}` : ""

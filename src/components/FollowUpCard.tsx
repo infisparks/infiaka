@@ -242,7 +242,7 @@ export default function FollowUpCard({
 
         {/* Calculated date displays below input */}
         {calcDate && (
-          <div className="text-[11px] font-bold text-slate-600 bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5 text-left inline-block w-fit select-none">
+          <div className="text-[12px] font-extrabold text-[#090d16] bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-left inline-block w-fit select-none">
             📅 {calcDate}
           </div>
         )}
@@ -254,7 +254,7 @@ export default function FollowUpCard({
             value={followUpNotes}
             onChange={(e) => setFollowUpNotes(e.target.value)}
             placeholder="Notes added here will be available in the follow-up visit for reference"
-            className="w-full p-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[12px] font-semibold text-[#1E293B] placeholder:text-[#A0AEC0] focus:bg-white focus:outline-none transition-all resize-none"
+            className="w-full p-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[12.5px] font-extrabold text-[#090d16] placeholder:text-slate-400 focus:bg-white focus:outline-none transition-all resize-none"
           />
         </div>
       </div>

@@ -118,11 +118,11 @@ export default function AdvicesCard({
           value={advicesInput}
           onChange={(e) => setAdvicesInput(e.target.value)}
           placeholder="Enter medical advice here..."
-          className="w-full p-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[12px] font-semibold text-[#1E293B] placeholder:text-[#A0AEC0] focus:bg-white focus:outline-none transition-all resize-none"
+          className="w-full p-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-lg text-[12.5px] font-extrabold text-[#090d16] placeholder:text-slate-400 focus:bg-white focus:outline-none transition-all resize-none"
         />
 
         {/* Checkbox Templates Section */}
-        <div className="flex flex-col gap-2 select-none text-[11px] font-bold text-[#4A5568] pt-1">
+        <div className="flex flex-col gap-2 select-none text-[12px] font-bold text-[#090d16] pt-1">
 
           {/* Dynamically created templates (Masters) */}
           {customTemplates.map((text, idx) => (

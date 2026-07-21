@@ -257,7 +257,7 @@ function InlineLabAutoComplete({
         itemTemplate={itemTemplate}
         placeholder={placeholder}
         inputRef={onInputRef ? (el: any) => onInputRef(el as HTMLInputElement | null) : undefined}
-        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-bold text-[#1e293b] bg-transparent outline-none p-0 placeholder:text-slate-350"
+        inputClassName="w-full h-full border-0 focus:ring-0 px-3 text-[12.5px] font-extrabold text-[#090d16] bg-transparent outline-none p-0 placeholder:text-slate-400"
         className="w-full h-full"
         panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
       />
@@ -731,7 +731,7 @@ export default function LabsCard({ labs, setLabs }: LabsCardProps) {
       </div>
 
       {/* Grid Column Headers */}
-      <div className="flex items-stretch border-b border-[#E2E8F0] bg-slate-50/50 text-[9px] font-bold text-[#718096] uppercase select-none">
+      <div className="flex items-stretch border-b border-[#E2E8F0] bg-slate-50/50 text-[10.5px] font-extrabold text-[#090d16] uppercase select-none">
         <div className="w-7 shrink-0 border-r border-[#E2E8F0]" />
         <div className="w-[38%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">Investigation Name</div>
         <div className="w-[18%] shrink-0 border-r border-[#E2E8F0] px-3 py-2 flex items-center">Test On</div>

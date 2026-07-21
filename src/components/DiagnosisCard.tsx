@@ -276,7 +276,7 @@ function AutoInput({
           }}
           itemTemplate={itemTemplate}
           placeholder={placeholder ?? label}
-          inputClassName="w-full h-8.5 px-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[11px] bg-white focus:outline-none font-semibold text-[#334155] placeholder:text-[#C0CADC] transition-all"
+          inputClassName="w-full h-8.5 px-3 border border-[#E2E8F0] focus:border-blue-400 focus:ring-1 focus:ring-blue-100 rounded-md text-[12.5px] bg-white focus:outline-none font-extrabold text-[#090d16] placeholder:text-slate-400 transition-all"
           className="w-full"
           panelClassName="custom-autocomplete-panel text-[11.5px] font-semibold"
         />

@@ -229,7 +229,7 @@ export default function ReferToDoctorCard({ referrals, setReferrals }: ReferToDo
 
               {/* Doctor Name / Specialty */}
               <div className="flex-1 border-r border-[#E2E8F0] flex items-center px-3">
-                <span className="text-[11px] font-bold text-[#1e293b]">{item.doctorName}</span>
+                <span className="text-[12.5px] font-extrabold text-[#090d16]">{item.doctorName}</span>
               </div>
 
               {/* Notes for the doctor */}
@@ -239,7 +239,7 @@ export default function ReferToDoctorCard({ referrals, setReferrals }: ReferToDo
                   value={item.notes}
                   onChange={(e) => patch(item.id, { notes: e.target.value })}
                   placeholder="Notes for the doctor"
-                  className="w-full h-full border-0 focus:ring-0 px-3 text-[11px] font-semibold text-[#334155] bg-transparent outline-none placeholder:text-[#CBD5E0]"
+                  className="w-full h-full border-0 focus:ring-0 px-3 text-[12.5px] font-extrabold text-[#090d16] bg-transparent outline-none placeholder:text-slate-400"
                 />
               </div>
 
