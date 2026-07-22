@@ -107,6 +107,7 @@ interface Patient {
   isOngoing: boolean;
   arrivalTime: string;
   arrivalMinutesAgo: number;
+  referring_doctor?: string;
   opdRegistration?: {
     registration_id: string;
     appointment_date_time?: string;
@@ -170,6 +171,7 @@ function RxPageContent() {
   const [currentRxPatient, setCurrentRxPatient] = useState<Patient | null>(null);
   const [pastVisitsCount, setPastVisitsCount] = useState<number>(0);
   const [legacyVisitsCount, setLegacyVisitsCount] = useState<number>(0);
+  const [isFinishing, setIsFinishing] = useState(false);
 
   const fetchHeaderCounts = async (patientUhid: string, currentRegId: string | number, name: string, phone: any) => {
     if (!patientUhid) return;
@@ -440,7 +442,7 @@ function RxPageContent() {
     const loadPatientData = async () => {
       try {
         setLoading(true);
-        // Fetch OPD registration details first (rxPatientId corresponds to the OPD registration_id)
+        // Fetch OPD registration details first
         const { data: regData, error: rError } = await supabase
           .from("aka_opd_registration")
           .select("*")
@@ -457,12 +459,43 @@ function RxPageContent() {
 
         const patientUhid = regData.patient_uhid;
 
-        // Fetch patient details using the UHID from the registration
-        const { data: pData, error: pError } = await supabase
-          .from("patient_detail")
-          .select("*")
-          .eq("uhid", patientUhid)
-          .maybeSingle();
+        // Fetch patient details and ALL child records concurrently in parallel!
+        const [
+          { data: pData, error: pError },
+          { data: histData, error: hError },
+          { data: symRows, error: sError },
+          { data: diagRows, error: dError },
+          { data: medRows, error: mError },
+          { data: labRows, error: lError },
+          { data: resultRows, error: resError },
+          { data: refRows, error: refError },
+          { data: procRows, error: procError }
+        ] = await Promise.all([
+          supabase.from("patient_detail").select("*").eq("uhid", patientUhid).maybeSingle(),
+          supabase.from("aka_patient_medical_history").select("*").eq("patient_uhid", patientUhid).maybeSingle(),
+          supabase.from("aka_symptoms").select("*").eq("registration_id", regData.registration_id),
+          supabase.from("aka_diagnoses").select("*").eq("registration_id", regData.registration_id),
+          supabase.from("aka_patient_medications").select(`
+            patient_medication_id,
+            medicine_id,
+            dose,
+            freq,
+            timing,
+            duration,
+            start_from,
+            instruction,
+            medicine:medicine_id (
+              name,
+              salt_composition,
+              short_composition1,
+              type
+            )
+          `).eq("registration_id", regData.registration_id),
+          supabase.from("aka_patient_labs").select("*").eq("registration_id", regData.registration_id),
+          supabase.from("aka_lab_result").select("*").eq("registration_id", regData.registration_id),
+          supabase.from("aka_refer_to").select("*").eq("registration_id", regData.registration_id),
+          supabase.from("aka_procedure").select("*").eq("registration_id", regData.registration_id)
+        ]);
 
         if (pError) throw pError;
         if (!pData) {
@@ -500,6 +533,7 @@ function RxPageContent() {
           dob: pData.dob || "",
           permanentAddress: pData.address || pData.permanent_address || "",
           localAddress: pData.local_address || pData.address || pData.permanent_address || "",
+          referring_doctor: regData?.referring_doctor || pData?.referring_doctor || "",
           country: pData.country || "India",
           state: pData.state || "Maharashtra",
           statusTags: ["Ongoing"],
@@ -534,15 +568,10 @@ function RxPageContent() {
         };
 
         setCurrentRxPatient(mappedPatient);
+        // Header counts run asynchronously in background without delaying main page load!
         fetchHeaderCounts(patientUhid, rxPatientId || "", pData.name || "", pData.number || "");
 
-        // Fetch patient medical history from the table
-        const { data: histData, error: hError } = await supabase
-          .from("aka_patient_medical_history")
-          .select("*")
-          .eq("patient_uhid", patientUhid)
-          .maybeSingle();
-
+        // Set history data
         if (hError) {
           console.error("Failed to load patient history:", hError);
         } else if (histData) {
@@ -559,145 +588,93 @@ function RxPageContent() {
           if (Array.isArray(histData.travel_history)) setTravelHistory(histData.travel_history);
         }
 
-        // Fetch patient symptoms from the table
-        if (regData?.registration_id) {
-          const { data: symRows, error: sError } = await supabase
-            .from("aka_symptoms")
-            .select("*")
-            .eq("registration_id", regData.registration_id);
-
-          if (sError) {
-            console.error("Failed to load patient symptoms:", sError);
-          } else if (symRows) {
-            const mappedSymptoms = symRows.map((row: any) => ({
-              id: String(row.symptom_id),
-              name: row.name || "",
-              duration: row.duration || "",
-              severity: row.severity || "",
-              headacheSites: row.headache_sites || [],
-              painTypes: row.pain_types || [],
-              clinicalCourse: row.clinical_course || "",
-              note: row.note || ""
-            }));
-            setSymptoms(mappedSymptoms);
-          }
+        // Set symptoms
+        if (sError) {
+          console.error("Failed to load patient symptoms:", sError);
+        } else if (symRows) {
+          const mappedSymptoms = symRows.map((row: any) => ({
+            id: String(row.symptom_id),
+            name: row.name || "",
+            duration: row.duration || "",
+            severity: row.severity || "",
+            headacheSites: row.headache_sites || [],
+            painTypes: row.pain_types || [],
+            clinicalCourse: row.clinical_course || "",
+            note: row.note || ""
+          }));
+          setSymptoms(mappedSymptoms);
         }
 
-        // Fetch patient diagnoses from the table
-        if (regData?.registration_id) {
-          const { data: diagRows, error: dError } = await supabase
-            .from("aka_diagnoses")
-            .select("*")
-            .eq("registration_id", regData.registration_id);
-
-          if (dError) {
-            console.error("Failed to load patient diagnoses:", dError);
-          } else if (diagRows) {
-            const mappedDiagnoses = diagRows.map((row: any) => ({
-              id: String(row.diagnosis_id),
-              name: row.name || "",
-              since: row.since || "",
-              status: row.status || "",
-              severity: row.severity || "",
-              abdominalRegions: row.abdominal_regions || [],
-              painTypes: row.pain_types || [],
-              relievedBy: row.relieved_by || [],
-              abdominalTenderness: row.abdominal_tenderness || "",
-              palpations: row.palpations || [],
-              auscultations: row.auscultations || [],
-              clinicalCourse: row.clinical_course || "",
-              note: row.note || ""
-            }));
-            setDiagnoses(mappedDiagnoses);
-          }
+        // Set diagnoses
+        if (dError) {
+          console.error("Failed to load patient diagnoses:", dError);
+        } else if (diagRows) {
+          const mappedDiagnoses = diagRows.map((row: any) => ({
+            id: String(row.diagnosis_id),
+            name: row.name || "",
+            since: row.since || "",
+            status: row.status || "",
+            severity: row.severity || "",
+            abdominalRegions: row.abdominal_regions || [],
+            painTypes: row.pain_types || [],
+            relievedBy: row.relieved_by || [],
+            abdominalTenderness: row.abdominal_tenderness || "",
+            palpations: row.palpations || [],
+            auscultations: row.auscultations || [],
+            clinicalCourse: row.clinical_course || "",
+            note: row.note || ""
+          }));
+          setDiagnoses(mappedDiagnoses);
         }
 
-        // Fetch patient medications from the table
-        if (regData?.registration_id) {
-          const { data: medRows, error: mError } = await supabase
-            .from("aka_patient_medications")
-            .select(`
-              patient_medication_id,
-              medicine_id,
-              dose,
-              freq,
-              timing,
-              duration,
-              start_from,
-              instruction,
-              medicine:medicine_id (
-                name,
-                salt_composition,
-                short_composition1,
-                type
-              )
-            `)
-            .eq("registration_id", regData.registration_id);
-
-          if (mError) {
-            console.error("Failed to load patient medications:", mError);
-          } else if (medRows) {
-            const mappedMeds = medRows.map((row: any) => ({
-              id: String(row.patient_medication_id),
-              medicineId: row.medicine_id,
-              name: row.medicine?.name || "",
-              generic: row.medicine?.salt_composition || row.medicine?.short_composition1 || "",
-              form: row.medicine?.type?.toLowerCase() || "tablet",
-              dose: row.dose || "",
-              freq: row.freq || "",
-              timing: row.timing || "",
-              duration: row.duration || "",
-              start: row.start_from || "",
-              instr: row.instruction || ""
-            }));
-            setMedications(mappedMeds);
-          }
+        // Set medications
+        if (mError) {
+          console.error("Failed to load patient medications:", mError);
+        } else if (medRows) {
+          const mappedMeds = medRows.map((row: any) => ({
+            id: String(row.patient_medication_id),
+            medicineId: row.medicine_id,
+            name: row.medicine?.name || "",
+            generic: row.medicine?.salt_composition || row.medicine?.short_composition1 || "",
+            form: row.medicine?.type?.toLowerCase() || "tablet",
+            dose: row.dose || "",
+            freq: row.freq || "",
+            timing: row.timing || "",
+            duration: row.duration || "",
+            start: row.start_from || "",
+            instr: row.instruction || ""
+          }));
+          setMedications(mappedMeds);
         }
 
-        // Fetch patient labs from the table
-        if (regData?.registration_id) {
-          const { data: labRows, error: lError } = await supabase
-            .from("aka_patient_labs")
-            .select("*")
-            .eq("registration_id", regData.registration_id);
-
-          if (lError) {
-            console.error("Failed to load patient labs:", lError);
-          } else if (labRows) {
-            const mappedLabs = labRows.map((row: any) => ({
-              id: String(row.patient_lab_id),
-              name: row.name || "",
-              testOn: row.test_on || "",
-              repeatOn: row.repeat_on || "",
-              remarks: row.remarks || ""
-            }));
-            setLabs(mappedLabs);
-          }
+        // Set labs
+        if (lError) {
+          console.error("Failed to load patient labs:", lError);
+        } else if (labRows) {
+          const mappedLabs = labRows.map((row: any) => ({
+            id: String(row.patient_lab_id),
+            name: row.name || "",
+            testOn: row.test_on || "",
+            repeatOn: row.repeat_on || "",
+            remarks: row.remarks || ""
+          }));
+          setLabs(mappedLabs);
         }
 
-        // Fetch patient lab results from aka_lab_result table
-        if (regData?.registration_id) {
-          const { data: resultRows, error: resError } = await supabase
-            .from("aka_lab_result")
-            .select("*")
-            .eq("registration_id", regData.registration_id);
-
-          if (resError) {
-            console.error("Failed to load patient lab results:", resError);
-          } else if (resultRows && resultRows.length > 0) {
-            const mappedResults = resultRows.map((row: any) => ({
-              id: String(row.lab_result_id),
-              name: row.name || "",
-              unit: row.unit || "",
-              reading: row.reading || "",
-              interpretation: row.interpretation || "",
-              date: row.result_date || "",
-              notes: row.notes || ""
-            }));
-            setLabResults(mappedResults);
-          } else {
-            setLabResults([]);
-          }
+        // Set lab results
+        if (resError) {
+          console.error("Failed to load patient lab results:", resError);
+        } else if (resultRows && resultRows.length > 0) {
+          const mappedResults = resultRows.map((row: any) => ({
+            id: String(row.lab_result_id),
+            name: row.name || "",
+            unit: row.unit || "",
+            reading: row.reading || "",
+            interpretation: row.interpretation || "",
+            date: row.result_date || "",
+            notes: row.notes || ""
+          }));
+          setLabResults(mappedResults);
         } else {
           setLabResults([]);
         }
@@ -711,70 +688,47 @@ function RxPageContent() {
           setSugar(mappedPatient.vitals.sugar || "");
         }
 
-        // Fetch referrals from aka_refer_to table
-        if (regData?.registration_id) {
-          const { data: refRows, error: refError } = await supabase
-            .from("aka_refer_to")
-            .select("*")
-            .eq("registration_id", regData.registration_id);
-
-          if (refError) {
-            console.error("Failed to load referrals:", refError);
-          } else if (refRows && refRows.length > 0) {
-            setReferrals(refRows.map((r: any) => ({
-              id: String(r.refer_id),
-              doctorName: r.doctor_name || "",
-              notes: r.notes || ""
-            })));
-          } else {
-            setReferrals([]);
-          }
+        // Set referrals
+        if (refError) {
+          console.error("Failed to load referrals:", refError);
+        } else if (refRows && refRows.length > 0) {
+          setReferrals(refRows.map((r: any) => ({
+            id: String(r.refer_id),
+            doctorName: r.doctor_name || "",
+            notes: r.notes || ""
+          })));
         } else {
-          setReferrals([{ id: "1", doctorName: "shaikh mudassir", notes: "" }]);
+          setReferrals([]);
         }
 
-        // Fetch procedures from aka_procedure table
-        if (regData?.registration_id) {
-          const { data: procRows, error: procError } = await supabase
-            .from("aka_procedure")
-            .select("*")
-            .eq("registration_id", regData.registration_id);
-
-          if (procError) {
-            console.error("Failed to load procedures:", procError);
-          } else if (procRows && procRows.length > 0) {
-            setRxProcedures(procRows.map((r: any) => ({
-              id: String(r.procedure_id),
-              name: r.name || "",
-              duration: r.duration || "",
-              note: r.note || ""
-            })));
-          } else {
-            setRxProcedures([]);
-          }
+        // Set procedures
+        if (procError) {
+          console.error("Failed to load procedures:", procError);
+        } else if (procRows && procRows.length > 0) {
+          setRxProcedures(procRows.map((r: any) => ({
+            id: String(r.procedure_id),
+            name: r.name || "",
+            duration: r.duration || "",
+            note: r.note || ""
+          })));
         } else {
-          setRxProcedures([
-            { id: "1", name: "Actinotherapy", duration: "After 3 Days", note: "" },
-            { id: "2", name: "APTT", duration: "After 3 Days", note: "" }
-          ]);
+          setRxProcedures([]);
         }
 
         // Load notes, follow-up and advice from aka_opd_registration if exists
-        if (regData) {
-          setNotesForPatient(regData.notes_for_patient || "");
-          setPrivateNotes(regData.private_notes || "");
-          setFollowUpVal(regData.follow_up || "");
-          setFollowUpNotes(regData.follow_up_notes || "");
-          setAdvicesInput(regData.advice || "");
-          setAdvRest(regData.advice_rest || false);
-          setAdvWater(regData.advice_water || false);
-          setSurgeryPerformed(regData.surgery_performed || "");
-          setSurgeryDate(regData.surgery_date || "");
-          setSurgeryNotes(regData.surgery_notes || "");
-          setExaminationFindings(regData.examination_findings || "");
-          setPlanSurgeryAdvised(regData.plan_surgery_advised || "");
-          setProcedureDone(regData.procedure_done || "");
-        }
+        setNotesForPatient(regData.notes_for_patient || "");
+        setPrivateNotes(regData.private_notes || "");
+        setFollowUpVal(regData.follow_up || "");
+        setFollowUpNotes(regData.follow_up_notes || "");
+        setAdvicesInput(regData.advice || "");
+        setAdvRest(regData.advice_rest || false);
+        setAdvWater(regData.advice_water || false);
+        setSurgeryPerformed(regData.surgery_performed || "");
+        setSurgeryDate(regData.surgery_date || "");
+        setSurgeryNotes(regData.surgery_notes || "");
+        setExaminationFindings(regData.examination_findings || "");
+        setPlanSurgeryAdvised(regData.plan_surgery_advised || "");
+        setProcedureDone(regData.procedure_done || "");
 
         // Try load from local storage
         const savedRx = localStorage.getItem(`saved_rx_${rxPatientId}`);
@@ -843,9 +797,8 @@ function RxPageContent() {
             setReferrals([{ id: "1", doctorName: "shaikh mudassir", notes: "" }]);
           }
         }
-
       } catch (err) {
-        console.error("Failed to load patient:", err);
+        console.error("Error loading patient data:", err);
       } finally {
         setLoading(false);
       }
@@ -1609,7 +1562,8 @@ function RxPageContent() {
   }, [referrals, currentRxPatient, loading]);
 
   const handleFinishPrescription = async () => {
-    if (!currentRxPatient) return;
+    if (!currentRxPatient || isFinishing) return;
+    setIsFinishing(true);
     
     try {
       // 1. Save state in local storage
@@ -1646,10 +1600,9 @@ function RxPageContent() {
         }
       }
 
-      // 3. Save updated vitals in aka_opd_registration database table
-      if (currentRxPatient.opdRegistration?.registration_id) {
-        const regId = currentRxPatient.opdRegistration.registration_id;
-        const { error } = await supabase
+      // 3. Save updated vitals and child sections in database in parallel!
+      if (regId) {
+        const saveRegPromise = supabase
           .from("aka_opd_registration")
           .update({
             bp,
@@ -1673,422 +1626,123 @@ function RxPageContent() {
             is_completed: true
           })
           .eq("registration_id", regId);
-        
-        if (error) throw error;
 
-        const activeDbIds = symptoms
-          .map((sym) => Number(sym.id))
-          .filter((id) => !isNaN(id) && id > 0);
+        const saveSymptoms = async () => {
+          const activeDbIds = symptoms.map((sym) => Number(sym.id)).filter((id) => !isNaN(id) && id > 0);
+          if (activeDbIds.length > 0) {
+            await supabase.from("aka_symptoms").delete().eq("registration_id", regId).not("symptom_id", "in", `(${activeDbIds.join(",")})`);
+          } else {
+            await supabase.from("aka_symptoms").delete().eq("registration_id", regId);
+          }
+          const rowsToUpdate = symptoms.filter((sym) => !isNaN(Number(sym.id)) && Number(sym.id) > 0 && Number(sym.id) < 10000000000).map((sym) => ({ symptom_id: Number(sym.id), registration_id: regId, name: sym.name || "", duration: sym.duration || "", severity: sym.severity || "", headache_sites: sym.headacheSites || [], pain_types: sym.painTypes || [], clinical_course: sym.clinicalCourse || "", note: sym.note || "" }));
+          const rowsToInsert = symptoms.filter((sym) => isNaN(Number(sym.id)) || Number(sym.id) >= 10000000000).map((sym) => ({ registration_id: regId, name: sym.name || "", duration: sym.duration || "", severity: sym.severity || "", headache_sites: sym.headacheSites || [], pain_types: sym.painTypes || [], clinical_course: sym.clinicalCourse || "", note: sym.note || "" }));
+          await Promise.all([
+            rowsToUpdate.length > 0 ? supabase.from("aka_symptoms").upsert(rowsToUpdate, { onConflict: "symptom_id" }) : Promise.resolve(),
+            rowsToInsert.length > 0 ? supabase.from("aka_symptoms").insert(rowsToInsert) : Promise.resolve()
+          ]);
+        };
 
-        if (activeDbIds.length > 0) {
-          const { error: delError } = await supabase
-            .from("aka_symptoms")
-            .delete()
-            .eq("registration_id", regId)
-            .not("symptom_id", "in", `(${activeDbIds.join(",")})`);
-          if (delError) throw delError;
-        } else {
-          const { error: delError } = await supabase
-            .from("aka_symptoms")
-            .delete()
-            .eq("registration_id", regId);
-          if (delError) throw delError;
-        }
+        const saveDiagnoses = async () => {
+          const diagActiveIds = diagnoses.map((d) => Number(d.id)).filter((id) => !isNaN(id) && id > 0);
+          if (diagActiveIds.length > 0) {
+            await supabase.from("aka_diagnoses").delete().eq("registration_id", regId).not("diagnosis_id", "in", `(${diagActiveIds.join(",")})`);
+          } else {
+            await supabase.from("aka_diagnoses").delete().eq("registration_id", regId);
+          }
+          const diagToUpdate = diagnoses.filter((d) => !isNaN(Number(d.id)) && Number(d.id) > 0 && Number(d.id) < 10000000000).map((d) => ({ diagnosis_id: Number(d.id), registration_id: regId, name: d.name || "", since: d.since || "", status: d.status || "", severity: d.severity || "", abdominal_regions: d.abdominalRegions || [], pain_types: d.painTypes || [], relieved_by: d.relievedBy || [], abdominal_tenderness: d.abdominalTenderness || "", palpations: d.palpations || [], auscultations: d.auscultations || [], clinical_course: d.clinicalCourse || "", note: d.note || "" }));
+          const diagToInsert = diagnoses.filter((d) => isNaN(Number(d.id)) || Number(d.id) >= 10000000000).map((d) => ({ registration_id: regId, name: d.name || "", since: d.since || "", status: d.status || "", severity: d.severity || "", abdominal_regions: d.abdominalRegions || [], pain_types: d.painTypes || [], relieved_by: d.relievedBy || [], abdominal_tenderness: d.abdominalTenderness || "", palpations: d.palpations || [], auscultations: d.auscultations || [], clinical_course: d.clinicalCourse || "", note: d.note || "" }));
+          await Promise.all([
+            diagToUpdate.length > 0 ? supabase.from("aka_diagnoses").upsert(diagToUpdate, { onConflict: "diagnosis_id" }) : Promise.resolve(),
+            diagToInsert.length > 0 ? supabase.from("aka_diagnoses").insert(diagToInsert) : Promise.resolve()
+          ]);
+        };
 
-        const rowsToUpdate = symptoms
-          .filter((sym) => !isNaN(Number(sym.id)) && Number(sym.id) > 0 && Number(sym.id) < 10000000000)
-          .map((sym) => ({
-            symptom_id: Number(sym.id),
-            registration_id: regId,
-            name: sym.name || "",
-            duration: sym.duration || "",
-            severity: sym.severity || "",
-            headache_sites: sym.headacheSites || [],
-            pain_types: sym.painTypes || [],
-            clinical_course: sym.clinicalCourse || "",
-            note: sym.note || ""
-          }));
+        const saveMedications = async () => {
+          const medActiveIds = medications.map((m) => Number(m.id)).filter((id) => !isNaN(id) && id > 0);
+          if (medActiveIds.length > 0) {
+            await supabase.from("aka_patient_medications").delete().eq("registration_id", regId).not("patient_medication_id", "in", `(${medActiveIds.join(",")})`);
+          } else {
+            await supabase.from("aka_patient_medications").delete().eq("registration_id", regId);
+          }
+          const medToUpdate = medications.filter((m) => !isNaN(Number(m.id)) && Number(m.id) > 0 && Number(m.id) < 10000000000).map((m) => ({ patient_medication_id: Number(m.id), registration_id: regId, medicine_id: m.medicineId || null, dose: m.dose || "", freq: m.freq || "", timing: m.timing || "", duration: m.duration || "", start_from: m.start || "", instruction: m.instr || "" }));
+          const medToInsert = medications.filter((m) => isNaN(Number(m.id)) || Number(m.id) >= 10000000000).map((m) => ({ registration_id: regId, medicine_id: m.medicineId || null, dose: m.dose || "", freq: m.freq || "", timing: m.timing || "", duration: m.duration || "", start_from: m.start || "", instruction: m.instr || "" }));
+          await Promise.all([
+            medToUpdate.length > 0 ? supabase.from("aka_patient_medications").upsert(medToUpdate, { onConflict: "patient_medication_id" }) : Promise.resolve(),
+            medToInsert.length > 0 ? supabase.from("aka_patient_medications").insert(medToInsert) : Promise.resolve()
+          ]);
+        };
 
-        const rowsToInsert = symptoms
-          .filter((sym) => isNaN(Number(sym.id)) || Number(sym.id) >= 10000000000)
-          .map((sym) => ({
-            registration_id: regId,
-            name: sym.name || "",
-            duration: sym.duration || "",
-            severity: sym.severity || "",
-            headache_sites: sym.headacheSites || [],
-            pain_types: sym.painTypes || [],
-            clinical_course: sym.clinicalCourse || "",
-            note: sym.note || ""
-          }));
+        const saveLabs = async () => {
+          const labActiveIds = labs.map((l) => Number(l.id)).filter((id) => !isNaN(id) && id > 0);
+          if (labActiveIds.length > 0) {
+            await supabase.from("aka_patient_labs").delete().eq("registration_id", regId).not("patient_lab_id", "in", `(${labActiveIds.join(",")})`);
+          } else {
+            await supabase.from("aka_patient_labs").delete().eq("registration_id", regId);
+          }
+          const labToUpdate = labs.filter((l) => !isNaN(Number(l.id)) && Number(l.id) > 0 && Number(l.id) < 10000000000).map((l) => ({ patient_lab_id: Number(l.id), registration_id: regId, name: l.name || "", test_on: l.testOn || "", repeat_on: l.repeatOn || "", remarks: l.remarks || "" }));
+          const labToInsert = labs.filter((l) => isNaN(Number(l.id)) || Number(l.id) >= 10000000000).map((l) => ({ registration_id: regId, name: l.name || "", test_on: l.testOn || "", repeat_on: l.repeatOn || "", remarks: l.remarks || "" }));
+          await Promise.all([
+            labToUpdate.length > 0 ? supabase.from("aka_patient_labs").upsert(labToUpdate, { onConflict: "patient_lab_id" }) : Promise.resolve(),
+            labToInsert.length > 0 ? supabase.from("aka_patient_labs").insert(labToInsert) : Promise.resolve()
+          ]);
+        };
 
-        if (rowsToUpdate.length > 0) {
-          const { error: upsertError } = await supabase
-            .from("aka_symptoms")
-            .upsert(rowsToUpdate, { onConflict: "symptom_id" });
-          if (upsertError) throw upsertError;
-        }
+        const saveLabResults = async () => {
+          const resultActiveIds = labResults.map((r) => Number(r.id)).filter((id) => !isNaN(id) && id > 0);
+          if (resultActiveIds.length > 0) {
+            await supabase.from("aka_lab_result").delete().eq("registration_id", regId).not("lab_result_id", "in", `(${resultActiveIds.join(",")})`);
+          } else {
+            await supabase.from("aka_lab_result").delete().eq("registration_id", regId);
+          }
+          const resultToUpdate = labResults.filter((r) => !isNaN(Number(r.id)) && Number(r.id) > 0 && Number(r.id) < 10000000000).map((r) => ({ lab_result_id: Number(r.id), registration_id: regId, patient_uhid: currentRxPatient.id, name: r.name || "", unit: r.unit || "", reading: r.reading || "", interpretation: r.interpretation || "", result_date: r.date || "", notes: r.notes || "" }));
+          const resultToInsert = labResults.filter((r) => isNaN(Number(r.id)) || Number(r.id) >= 10000000000).map((r) => ({ registration_id: regId, patient_uhid: currentRxPatient.id, name: r.name || "", unit: r.unit || "", reading: r.reading || "", interpretation: r.interpretation || "", result_date: r.date || "", notes: r.notes || "" }));
+          await Promise.all([
+            resultToUpdate.length > 0 ? supabase.from("aka_lab_result").upsert(resultToUpdate, { onConflict: "lab_result_id" }) : Promise.resolve(),
+            resultToInsert.length > 0 ? supabase.from("aka_lab_result").insert(resultToInsert) : Promise.resolve()
+          ]);
+        };
 
-        if (rowsToInsert.length > 0) {
-          const { error: insError } = await supabase
-            .from("aka_symptoms")
-            .insert(rowsToInsert);
-          if (insError) throw insError;
-        }
+        const saveProcedures = async () => {
+          const procedureActiveIds = rxProcedures.map((p) => Number(p.id)).filter((id) => !isNaN(id) && id > 0);
+          if (procedureActiveIds.length > 0) {
+            await supabase.from("aka_procedure").delete().eq("registration_id", regId).not("procedure_id", "in", `(${procedureActiveIds.join(",")})`);
+          } else {
+            await supabase.from("aka_procedure").delete().eq("registration_id", regId);
+          }
+          const procToUpdate = rxProcedures.filter((p) => !isNaN(Number(p.id)) && Number(p.id) > 0 && Number(p.id) < 10000000000).map((p) => ({ procedure_id: Number(p.id), registration_id: regId, patient_uhid: currentRxPatient.id, name: p.name || "", duration: p.duration || "", note: p.note || "" }));
+          const procToInsert = rxProcedures.filter((p) => isNaN(Number(p.id)) || Number(p.id) >= 10000000000).map((p) => ({ registration_id: regId, patient_uhid: currentRxPatient.id, name: p.name || "", duration: p.duration || "", note: p.note || "" }));
+          await Promise.all([
+            procToUpdate.length > 0 ? supabase.from("aka_procedure").upsert(procToUpdate, { onConflict: "procedure_id" }) : Promise.resolve(),
+            procToInsert.length > 0 ? supabase.from("aka_procedure").insert(procToInsert) : Promise.resolve()
+          ]);
+        };
 
-        const diagActiveIds = diagnoses
-          .map((d) => Number(d.id))
-          .filter((id) => !isNaN(id) && id > 0);
+        const saveReferrals = async () => {
+          const referActiveIds = referrals.map((r) => Number(r.id)).filter((id) => !isNaN(id) && id > 0);
+          if (referActiveIds.length > 0) {
+            await supabase.from("aka_refer_to").delete().eq("registration_id", regId).not("refer_id", "in", `(${referActiveIds.join(",")})`);
+          } else {
+            await supabase.from("aka_refer_to").delete().eq("registration_id", regId);
+          }
+          const referToUpdate = referrals.filter((r) => !isNaN(Number(r.id)) && Number(r.id) > 0 && Number(r.id) < 10000000000).map((r) => ({ refer_id: Number(r.id), registration_id: regId, patient_uhid: currentRxPatient.id, doctor_name: r.doctorName || "", notes: r.notes || "" }));
+          const referToInsert = referrals.filter((r) => isNaN(Number(r.id)) || Number(r.id) >= 10000000000).map((r) => ({ registration_id: regId, patient_uhid: currentRxPatient.id, doctor_name: r.doctorName || "", notes: r.notes || "" }));
+          await Promise.all([
+            referToUpdate.length > 0 ? supabase.from("aka_refer_to").upsert(referToUpdate, { onConflict: "refer_id" }) : Promise.resolve(),
+            referToInsert.length > 0 ? supabase.from("aka_refer_to").insert(referToInsert) : Promise.resolve()
+          ]);
+        };
 
-        if (diagActiveIds.length > 0) {
-          const { error: delError } = await supabase
-            .from("aka_diagnoses")
-            .delete()
-            .eq("registration_id", regId)
-            .not("diagnosis_id", "in", `(${diagActiveIds.join(",")})`);
-          if (delError) throw delError;
-        } else {
-          const { error: delError } = await supabase
-            .from("aka_diagnoses")
-            .delete()
-            .eq("registration_id", regId);
-          if (delError) throw delError;
-        }
-
-        const diagToUpdate = diagnoses
-          .filter((d) => !isNaN(Number(d.id)) && Number(d.id) > 0 && Number(d.id) < 10000000000)
-          .map((d) => ({
-            diagnosis_id: Number(d.id),
-            registration_id: regId,
-            name: d.name || "",
-            since: d.since || "",
-            status: d.status || "",
-            severity: d.severity || "",
-            abdominal_regions: d.abdominalRegions || [],
-            pain_types: d.painTypes || [],
-            relieved_by: d.relievedBy || [],
-            abdominal_tenderness: d.abdominalTenderness || "",
-            palpations: d.palpations || [],
-            auscultations: d.auscultations || [],
-            clinical_course: d.clinicalCourse || "",
-            note: d.note || ""
-          }));
-
-        const diagToInsert = diagnoses
-          .filter((d) => isNaN(Number(d.id)) || Number(d.id) >= 10000000000)
-          .map((d) => ({
-            registration_id: regId,
-            name: d.name || "",
-            since: d.since || "",
-            status: d.status || "",
-            severity: d.severity || "",
-            abdominal_regions: d.abdominalRegions || [],
-            pain_types: d.painTypes || [],
-            relieved_by: d.relievedBy || [],
-            abdominal_tenderness: d.abdominalTenderness || "",
-            palpations: d.palpations || [],
-            auscultations: d.auscultations || [],
-            clinical_course: d.clinicalCourse || "",
-            note: d.note || ""
-          }));
-
-        if (diagToUpdate.length > 0) {
-          const { error: upsertError } = await supabase
-            .from("aka_diagnoses")
-            .upsert(diagToUpdate, { onConflict: "diagnosis_id" });
-          if (upsertError) throw upsertError;
-        }
-
-        if (diagToInsert.length > 0) {
-          const { error: insError } = await supabase
-            .from("aka_diagnoses")
-            .insert(diagToInsert);
-          if (insError) throw insError;
-        }
-
-        const medActiveIds = medications
-          .map((m) => Number(m.id))
-          .filter((id) => !isNaN(id) && id > 0);
-
-        if (medActiveIds.length > 0) {
-          const { error: delError } = await supabase
-            .from("aka_patient_medications")
-            .delete()
-            .eq("registration_id", regId)
-            .not("patient_medication_id", "in", `(${medActiveIds.join(",")})`);
-          if (delError) throw delError;
-        } else {
-          const { error: delError } = await supabase
-            .from("aka_patient_medications")
-            .delete()
-            .eq("registration_id", regId);
-          if (delError) throw delError;
-        }
-
-        const medToUpdate = medications
-          .filter((m) => m.medicineId && !isNaN(Number(m.id)) && Number(m.id) > 0 && Number(m.id) < 10000000000)
-          .map((m) => ({
-            patient_medication_id: Number(m.id),
-            registration_id: regId,
-            medicine_id: m.medicineId,
-            dose: m.dose || "",
-            freq: m.freq || "",
-            timing: m.timing || "",
-            duration: m.duration || "",
-            start_from: m.start || "",
-            instruction: m.instr || ""
-          }));
-
-        const medToInsert = medications
-          .filter((m) => m.medicineId && (isNaN(Number(m.id)) || Number(m.id) >= 10000000000))
-          .map((m) => ({
-            registration_id: regId,
-            medicine_id: m.medicineId,
-            dose: m.dose || "",
-            freq: m.freq || "",
-            timing: m.timing || "",
-            duration: m.duration || "",
-            start_from: m.start || "",
-            instruction: m.instr || ""
-          }));
-
-        if (medToUpdate.length > 0) {
-          const { error: upsertError } = await supabase
-            .from("aka_patient_medications")
-            .upsert(medToUpdate, { onConflict: "patient_medication_id" });
-          if (upsertError) throw upsertError;
-        }
-
-        if (medToInsert.length > 0) {
-          const { error: insError } = await supabase
-            .from("aka_patient_medications")
-            .insert(medToInsert);
-          if (insError) throw insError;
-        }
-
-        // Save labs to database
-        const labActiveIds = labs
-          .map((l) => Number(l.id))
-          .filter((id) => !isNaN(id) && id > 0);
-
-        if (labActiveIds.length > 0) {
-          const { error: delError } = await supabase
-            .from("aka_patient_labs")
-            .delete()
-            .eq("registration_id", regId)
-            .not("patient_lab_id", "in", `(${labActiveIds.join(",")})`);
-          if (delError) throw delError;
-        } else {
-          const { error: delError } = await supabase
-            .from("aka_patient_labs")
-            .delete()
-            .eq("registration_id", regId);
-          if (delError) throw delError;
-        }
-
-        const labToUpdate = labs
-          .filter((l) => !isNaN(Number(l.id)) && Number(l.id) > 0 && Number(l.id) < 10000000000)
-          .map((l) => ({
-            patient_lab_id: Number(l.id),
-            registration_id: regId,
-            name: l.name || "",
-            test_on: l.testOn || "",
-            repeat_on: l.repeatOn || "",
-            remarks: l.remarks || ""
-          }));
-
-        const labToInsert = labs
-          .filter((l) => isNaN(Number(l.id)) || Number(l.id) >= 10000000000)
-          .map((l) => ({
-            registration_id: regId,
-            name: l.name || "",
-            test_on: l.testOn || "",
-            repeat_on: l.repeatOn || "",
-            remarks: l.remarks || ""
-          }));
-
-        if (labToUpdate.length > 0) {
-          const { error: upsertError } = await supabase
-            .from("aka_patient_labs")
-            .upsert(labToUpdate, { onConflict: "patient_lab_id" });
-          if (upsertError) throw upsertError;
-        }
-
-        if (labToInsert.length > 0) {
-          const { error: insError } = await supabase
-            .from("aka_patient_labs")
-            .insert(labToInsert);
-          if (insError) throw insError;
-        }
-
-        // Save lab results to database aka_lab_result
-        const resultActiveIds = labResults
-          .map((r) => Number(r.id))
-          .filter((id) => !isNaN(id) && id > 0);
-
-        if (resultActiveIds.length > 0) {
-          const { error: delError } = await supabase
-            .from("aka_lab_result")
-            .delete()
-            .eq("registration_id", regId)
-            .not("lab_result_id", "in", `(${resultActiveIds.join(",")})`);
-          if (delError) throw delError;
-        } else {
-          const { error: delError } = await supabase
-            .from("aka_lab_result")
-            .delete()
-            .eq("registration_id", regId);
-          if (delError) throw delError;
-        }
-
-        const resultToUpdate = labResults
-          .filter((r) => !isNaN(Number(r.id)) && Number(r.id) > 0 && Number(r.id) < 10000000000)
-          .map((r) => ({
-            lab_result_id: Number(r.id),
-            registration_id: regId,
-            patient_uhid: currentRxPatient.id,
-            name: r.name || "",
-            unit: r.unit || "",
-            reading: r.reading || "",
-            interpretation: r.interpretation || "",
-            result_date: r.date || "",
-            notes: r.notes || ""
-          }));
-
-        const resultToInsert = labResults
-          .filter((r) => isNaN(Number(r.id)) || Number(r.id) >= 10000000000)
-          .map((r) => ({
-            registration_id: regId,
-            patient_uhid: currentRxPatient.id,
-            name: r.name || "",
-            unit: r.unit || "",
-            reading: r.reading || "",
-            interpretation: r.interpretation || "",
-            result_date: r.date || "",
-            notes: r.notes || ""
-          }));
-
-        if (resultToUpdate.length > 0) {
-          const { error: upsertError } = await supabase
-            .from("aka_lab_result")
-            .upsert(resultToUpdate, { onConflict: "lab_result_id" });
-          if (upsertError) throw upsertError;
-        }
-
-        if (resultToInsert.length > 0) {
-          const { error: insError } = await supabase
-            .from("aka_lab_result")
-            .insert(resultToInsert);
-          if (insError) throw insError;
-        }
-
-        // Save procedures to database aka_procedure
-        const procedureActiveIds = rxProcedures
-          .map((p) => Number(p.id))
-          .filter((id) => !isNaN(id) && id > 0);
-
-        if (procedureActiveIds.length > 0) {
-          const { error: delError } = await supabase
-            .from("aka_procedure")
-            .delete()
-            .eq("registration_id", regId)
-            .not("procedure_id", "in", `(${procedureActiveIds.join(",")})`);
-          if (delError) throw delError;
-        } else {
-          const { error: delError } = await supabase
-            .from("aka_procedure")
-            .delete()
-            .eq("registration_id", regId);
-          if (delError) throw delError;
-        }
-
-        const procToUpdate = rxProcedures
-          .filter((p) => !isNaN(Number(p.id)) && Number(p.id) > 0 && Number(p.id) < 10000000000)
-          .map((p) => ({
-            procedure_id: Number(p.id),
-            registration_id: regId,
-            patient_uhid: currentRxPatient.id,
-            name: p.name || "",
-            duration: p.duration || "",
-            note: p.note || ""
-          }));
-
-        const procToInsert = rxProcedures
-          .filter((p) => isNaN(Number(p.id)) || Number(p.id) >= 10000000000)
-          .map((p) => ({
-            registration_id: regId,
-            patient_uhid: currentRxPatient.id,
-            name: p.name || "",
-            duration: p.duration || "",
-            note: p.note || ""
-          }));
-
-        if (procToUpdate.length > 0) {
-          const { error: upsertError } = await supabase
-            .from("aka_procedure")
-            .upsert(procToUpdate, { onConflict: "procedure_id" });
-          if (upsertError) throw upsertError;
-        }
-
-        if (procToInsert.length > 0) {
-          const { error: insError } = await supabase
-            .from("aka_procedure")
-            .insert(procToInsert);
-          if (insError) throw insError;
-        }
-
-        // Save referrals to database aka_refer_to
-        const referActiveIds = referrals
-          .map((r) => Number(r.id))
-          .filter((id) => !isNaN(id) && id > 0);
-
-        if (referActiveIds.length > 0) {
-          const { error: delError } = await supabase
-            .from("aka_refer_to")
-            .delete()
-            .eq("registration_id", regId)
-            .not("refer_id", "in", `(${referActiveIds.join(",")})`);
-          if (delError) throw delError;
-        } else {
-          const { error: delError } = await supabase
-            .from("aka_refer_to")
-            .delete()
-            .eq("registration_id", regId);
-          if (delError) throw delError;
-        }
-
-        const referToUpdate = referrals
-          .filter((r) => !isNaN(Number(r.id)) && Number(r.id) > 0 && Number(r.id) < 10000000000)
-          .map((r) => ({
-            refer_id: Number(r.id),
-            registration_id: regId,
-            patient_uhid: currentRxPatient.id,
-            doctor_name: r.doctorName || "",
-            notes: r.notes || ""
-          }));
-
-        const referToInsert = referrals
-          .filter((r) => isNaN(Number(r.id)) || Number(r.id) >= 10000000000)
-          .map((r) => ({
-            registration_id: regId,
-            patient_uhid: currentRxPatient.id,
-            doctor_name: r.doctorName || "",
-            notes: r.notes || ""
-          }));
-
-        if (referToUpdate.length > 0) {
-          const { error: upsertError } = await supabase
-            .from("aka_refer_to")
-            .upsert(referToUpdate, { onConflict: "refer_id" });
-          if (upsertError) throw upsertError;
-        }
-
-        if (referToInsert.length > 0) {
-          const { error: insError } = await supabase
-            .from("aka_refer_to")
-            .insert(referToInsert);
-          if (insError) throw insError;
-        }
+        // ALL database saves run concurrently in parallel!
+        await Promise.all([
+          saveRegPromise,
+          saveSymptoms(),
+          saveDiagnoses(),
+          saveMedications(),
+          saveLabs(),
+          saveLabResults(),
+          saveProcedures(),
+          saveReferrals()
+        ]);
       }
 
       // 4. Redirect to dynamic prescription print page
@@ -2099,6 +1753,8 @@ function RxPageContent() {
       }
     } catch (err) {
       console.error("Failed to save prescription:", err);
+    } finally {
+      setIsFinishing(false);
     }
   };
 
@@ -2179,6 +1835,14 @@ function RxPageContent() {
                   <span className="text-slate-400 font-normal">•</span>
                   <span className="select-text text-slate-600 font-medium truncate max-w-[280px]" title={currentRxPatient.localAddress || currentRxPatient.permanentAddress}>
                     {currentRxPatient.localAddress || currentRxPatient.permanentAddress}
+                  </span>
+                </>
+              )}
+              {(currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor) && (
+                <>
+                  <span className="text-slate-400 font-normal">•</span>
+                  <span className="select-text text-slate-600 font-medium truncate max-w-[200px]" title={currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor}>
+                    Ref: {currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor}
                   </span>
                 </>
               )}
@@ -2475,18 +2139,25 @@ function RxPageContent() {
         <div className="flex items-center gap-2">
           <button 
             onClick={handleFinishPrescription}
-            className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
+            disabled={isFinishing}
+            className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded transition-colors flex items-center justify-center min-w-[36px]"
             title="Print Prescription"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
+            {isFinishing ? (
+              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+            )}
           </button>
           <button
             onClick={handleFinishPrescription}
-            className="px-5 py-1.5 bg-primary hover:bg-primary-hover text-white rounded text-sm font-extrabold shadow-md transition-colors"
+            disabled={isFinishing}
+            className="px-5 py-1.5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded text-sm font-extrabold shadow-md transition-colors flex items-center gap-2"
           >
-            Finish Prescription
+            {isFinishing && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+            {isFinishing ? "Finishing..." : "Finish Prescription"}
           </button>
         </div>
       </footer>

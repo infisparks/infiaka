@@ -29,9 +29,11 @@ interface Patient {
   isOngoing: boolean;
   arrivalTime: string;
   arrivalMinutesAgo: number;
+  referring_doctor?: string;
   opdRegistration?: {
     registration_id: string;
     treating_doctor?: string;
+    referring_doctor?: string;
   };
 }
 
@@ -163,12 +165,13 @@ function DocumentsPageContent() {
       try {
         let uhid = "";
         let treatingDoctor = "";
+        let referringDoctor = "";
 
         // Try checking if it's registration ID
         if (rxPatientId.match(/^\d+$/)) {
           const { data: regData, error: rError } = await supabase
             .from("aka_opd_registration")
-            .select("patient_uhid, treating_doctor")
+            .select("patient_uhid, treating_doctor, referring_doctor")
             .eq("registration_id", Number(rxPatientId))
             .maybeSingle();
 
@@ -176,6 +179,7 @@ function DocumentsPageContent() {
           if (regData) {
             uhid = regData.patient_uhid;
             treatingDoctor = regData.treating_doctor || "";
+            referringDoctor = regData.referring_doctor || "";
           }
         }
 
@@ -210,6 +214,7 @@ function DocumentsPageContent() {
           dob: pData.dob || "",
           permanentAddress: pData.address || "",
           localAddress: pData.local_address || "",
+          referring_doctor: referringDoctor || pData.referring_doctor || "",
           statusTags: ["Ongoing"],
           billAmount: 0,
           paymentMethod: "Cash",
@@ -221,7 +226,8 @@ function DocumentsPageContent() {
           arrivalMinutesAgo: 0,
           opdRegistration: {
             registration_id: rxPatientId.match(/^\d+$/) ? rxPatientId : "",
-            treating_doctor: treatingDoctor
+            treating_doctor: treatingDoctor,
+            referring_doctor: referringDoctor
           }
         };
 
@@ -460,7 +466,25 @@ function DocumentsPageContent() {
               <span className="text-sm font-bold text-foreground select-text">{currentRxPatient.name}</span>
               <span className="text-sm font-medium text-[#718096]">{currentRxPatient.age}y | {currentRxPatient.gender}</span>
             </div>
-            <span className="text-xs text-[#A0AEC0] font-semibold tracking-tight select-text">{currentRxPatient.phone}</span>
+            <div className="flex items-center gap-1.5 text-xs text-[#A0AEC0] font-semibold tracking-tight">
+              <span className="select-text">{currentRxPatient.phone}</span>
+              {(currentRxPatient.localAddress || currentRxPatient.permanentAddress) && (
+                <>
+                  <span className="text-slate-400 font-normal">•</span>
+                  <span className="select-text text-slate-600 font-medium truncate max-w-[280px]" title={currentRxPatient.localAddress || currentRxPatient.permanentAddress}>
+                    {currentRxPatient.localAddress || currentRxPatient.permanentAddress}
+                  </span>
+                </>
+              )}
+              {(currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor) && (
+                <>
+                  <span className="text-slate-400 font-normal">•</span>
+                  <span className="select-text text-slate-600 font-medium truncate max-w-[200px]" title={currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor}>
+                    Ref: {currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
 

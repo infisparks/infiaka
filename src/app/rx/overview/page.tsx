@@ -30,6 +30,7 @@ interface Patient {
   isOngoing: boolean;
   arrivalTime: string;
   arrivalMinutesAgo: number;
+  referring_doctor?: string;
   opdRegistration?: {
     registration_id: string;
     appointment_date_time?: string;
@@ -386,6 +387,7 @@ function OverviewContent() {
           dob: pData.dob || "",
           permanentAddress: pData.address || pData.permanent_address || "",
           localAddress: pData.local_address || pData.address || pData.permanent_address || "",
+          referring_doctor: regData?.referring_doctor || pData?.referring_doctor || "",
           country: pData.country || "India",
           state: pData.state || "Maharashtra",
           statusTags: ["Ongoing"],
@@ -421,7 +423,7 @@ function OverviewContent() {
 
         setCurrentRxPatient(mappedPatient);
         fetchLegacyCount(pData.name || "", pData.number || "");
-        await loadAllHistory(patientUhid);
+        loadAllHistory(patientUhid);
       } catch (err) {
         console.error("Failed to load initial overview data:", err);
       } finally {
@@ -1040,6 +1042,14 @@ function OverviewContent() {
                   <span className="text-slate-400 font-normal">•</span>
                   <span className="select-text text-slate-600 font-medium truncate max-w-[280px]" title={currentRxPatient.localAddress || currentRxPatient.permanentAddress}>
                     {currentRxPatient.localAddress || currentRxPatient.permanentAddress}
+                  </span>
+                </>
+              )}
+              {(currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor) && (
+                <>
+                  <span className="text-slate-400 font-normal">•</span>
+                  <span className="select-text text-slate-600 font-medium truncate max-w-[200px]" title={currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor}>
+                    Ref: {currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor}
                   </span>
                 </>
               )}

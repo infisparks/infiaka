@@ -11,11 +11,15 @@ interface Patient {
   phone: string;
   gender: string;
   age: number;
+  localAddress?: string;
+  permanentAddress?: string;
+  referring_doctor?: string;
   opdRegistration?: {
     registration_id: string;
     appointment_date_time?: string;
     clinic_name?: string;
     treating_doctor?: string;
+    referring_doctor?: string;
   };
 }
 
@@ -267,11 +271,15 @@ function CanvasPageContent() {
           phone: String(pData?.number || ""),
           gender: pData?.gender || "Male",
           age: pData?.age || 0,
+          localAddress: pData?.local_address || pData?.address || "",
+          permanentAddress: pData?.address || "",
+          referring_doctor: regData?.referring_doctor || pData?.referring_doctor || "",
           opdRegistration: {
             registration_id: regData.registration_id,
             appointment_date_time: regData.appointment_date_time,
             clinic_name: regData.clinic_name,
             treating_doctor: regData.treating_doctor,
+            referring_doctor: regData.referring_doctor || "",
           },
         };
 
@@ -721,9 +729,25 @@ function CanvasPageContent() {
                     {currentRxPatient.age}y | {currentRxPatient.gender}
                   </span>
                 </div>
-                <span className="text-xs text-[#A0AEC0] font-semibold tracking-tight select-none">
-                  {currentRxPatient.phone}
-                </span>
+                <div className="flex items-center gap-1.5 text-xs text-[#A0AEC0] font-semibold tracking-tight select-none">
+                  <span className="select-text">{currentRxPatient.phone}</span>
+                  {(currentRxPatient.localAddress || currentRxPatient.permanentAddress) && (
+                    <>
+                      <span className="text-slate-400 font-normal">•</span>
+                      <span className="select-text text-slate-600 font-medium truncate max-w-[280px]" title={currentRxPatient.localAddress || currentRxPatient.permanentAddress}>
+                        {currentRxPatient.localAddress || currentRxPatient.permanentAddress}
+                      </span>
+                    </>
+                  )}
+                  {(currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor) && (
+                    <>
+                      <span className="text-slate-400 font-normal">•</span>
+                      <span className="select-text text-slate-600 font-medium truncate max-w-[200px]" title={currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor}>
+                        Ref: {currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor}
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
             ) : (
               <span className="text-xs font-bold text-slate-700 select-none">Patient Canvas</span>

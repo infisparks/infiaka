@@ -30,6 +30,7 @@ interface Patient {
   isOngoing: boolean;
   arrivalTime: string;
   arrivalMinutesAgo: number;
+  referring_doctor?: string;
   opdRegistration?: {
     clinic_name?: string;
     treating_doctor?: string;
@@ -203,6 +204,7 @@ function CertificatePageContent() {
           dob: pData.dob || "",
           permanentAddress: pData.address || "",
           localAddress: pData.local_address || "",
+          referring_doctor: regData.referring_doctor || pData.referring_doctor || "",
           statusTags: ["Ongoing"],
           billAmount: 0,
           paymentMethod: "Cash",
@@ -624,6 +626,11 @@ function CertificatePageContent() {
           <span className="text-[14px] font-extrabold text-[#111827]">{currentRxPatient.name}</span>
           <span className="px-2 py-0.5 bg-[#F1F5F9] text-xs font-extrabold rounded-md text-[#475569]">{currentRxPatient.gender} / {currentRxPatient.age} {currentRxPatient.ageUnit}</span>
           <span className="text-xs text-slate-400 font-bold">UHID: {currentRxPatient.id}</span>
+          {(currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor) && (
+            <span className="text-xs text-slate-600 font-medium truncate max-w-[200px]" title={currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor}>
+              • Ref: {currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor}
+            </span>
+          )}
         </div>
 
         {/* Navigation tab bar in the center */}

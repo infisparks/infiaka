@@ -324,22 +324,9 @@ ${clinicName}`;
           return;
         }
 
-        // 2. Fetch Patient Details
-        const { data: patient, error: patientErr } = await supabase
-          .from("patient_detail")
-          .select("*")
-          .eq("uhid", reg.patient_uhid)
-          .maybeSingle();
-
-        if (patientErr) throw patientErr;
-        if (!patient) {
-          showToast("Patient record not found", "error");
-          setLoading(false);
-          return;
-        }
-
-        // 3. Fetch related arrays concurrently
+        // 2. Fetch Patient Details and related records concurrently
         const [
+          { data: patient, error: patientErr },
           { data: syms },
           { data: diags },
           { data: meds },
@@ -349,6 +336,7 @@ ${clinicName}`;
           { data: results },
           { data: history }
         ] = await Promise.all([
+          supabase.from("patient_detail").select("*").eq("uhid", reg.patient_uhid).maybeSingle(),
           supabase.from("aka_symptoms").select("*").eq("registration_id", Number(registrationId)),
           supabase.from("aka_diagnoses").select("*").eq("registration_id", Number(registrationId)),
           supabase.from("aka_patient_medications").select(`
@@ -366,6 +354,13 @@ ${clinicName}`;
           supabase.from("aka_lab_result").select("*").eq("registration_id", Number(registrationId)),
           supabase.from("aka_patient_medical_history").select("*").eq("patient_uhid", reg.patient_uhid).maybeSingle()
         ]);
+
+        if (patientErr) throw patientErr;
+        if (!patient) {
+          showToast("Patient record not found", "error");
+          setLoading(false);
+          return;
+        }
 
         // 4. Map data fields
         const mappedSyms = (syms || []).map(s => ({

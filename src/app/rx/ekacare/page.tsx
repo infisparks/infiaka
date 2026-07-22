@@ -29,6 +29,11 @@ interface Patient {
   isOngoing: boolean;
   arrivalTime: string;
   arrivalMinutesAgo: number;
+  referring_doctor?: string;
+  opdRegistration?: {
+    registration_id?: string;
+    referring_doctor?: string;
+  };
 }
 
 const CustomToast = ({ message, type, onClose }: { message: string; type: "success" | "error" | "info"; onClose: () => void }) => {
@@ -228,6 +233,7 @@ function EkaCarePageContent() {
           dob: pData.dob || "",
           permanentAddress: pData.address || "",
           localAddress: pData.local_address || "",
+          referring_doctor: regData.referring_doctor || pData.referring_doctor || "",
           country: pData.country || "India",
           state: pData.state || "Maharashtra",
           statusTags: ["Ongoing"],
@@ -239,6 +245,10 @@ function EkaCarePageContent() {
           isOngoing: true,
           arrivalTime: "",
           arrivalMinutesAgo: 0,
+          opdRegistration: {
+            registration_id: regData.registration_id,
+            referring_doctor: regData.referring_doctor || ""
+          }
         };
 
         setCurrentRxPatient(mappedPatient);
@@ -322,7 +332,25 @@ function EkaCarePageContent() {
               <span className="text-sm font-bold text-foreground select-text">{currentRxPatient.name}</span>
               <span className="text-sm font-medium text-[#718096]">{currentRxPatient.age}y | {currentRxPatient.gender}</span>
             </div>
-            <span className="text-xs text-[#A0AEC0] font-semibold tracking-tight select-text">{currentRxPatient.phone}</span>
+            <div className="flex items-center gap-1.5 text-xs text-[#A0AEC0] font-semibold tracking-tight">
+              <span className="select-text">{currentRxPatient.phone}</span>
+              {(currentRxPatient.localAddress || currentRxPatient.permanentAddress) && (
+                <>
+                  <span className="text-slate-400 font-normal">•</span>
+                  <span className="select-text text-slate-600 font-medium truncate max-w-[280px]" title={currentRxPatient.localAddress || currentRxPatient.permanentAddress}>
+                    {currentRxPatient.localAddress || currentRxPatient.permanentAddress}
+                  </span>
+                </>
+              )}
+              {(currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor) && (
+                <>
+                  <span className="text-slate-400 font-normal">•</span>
+                  <span className="select-text text-slate-600 font-medium truncate max-w-[200px]" title={currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor}>
+                    Ref: {currentRxPatient.referring_doctor || currentRxPatient.opdRegistration?.referring_doctor}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
