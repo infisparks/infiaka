@@ -63,6 +63,16 @@ export default function PrescriptionDetailPage() {
 
   const printRef = useRef<any>(null);
 
+  // Derived state & handler for Letterhead toggle
+  const isWithLetterhead = printShowLetterhead && printShowHeader && printShowLetterheadPage2 && printShowHeaderPage2;
+
+  const handleToggleWithLetterhead = (checked: boolean) => {
+    setPrintShowLetterhead(checked);
+    setPrintShowHeader(checked);
+    setPrintShowLetterheadPage2(checked);
+    setPrintShowHeaderPage2(checked);
+  };
+
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
@@ -823,6 +833,24 @@ ${clinicName}`;
               </div>
             )}
 
+            {/* Letterhead Toggle for Mobile */}
+            <div className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-200">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-800">
+                <input
+                  type="checkbox"
+                  checked={isWithLetterhead}
+                  onChange={(e) => handleToggleWithLetterhead(e.target.checked)}
+                  className="w-4 h-4 text-indigo-650 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
+                />
+                <span>Print with Letterhead (All Pages)</span>
+              </label>
+              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                isWithLetterhead ? "bg-indigo-100 text-indigo-700" : "bg-slate-200 text-slate-600"
+              }`}>
+                {isWithLetterhead ? "ON" : "OFF"}
+              </span>
+            </div>
+
             {/* Primary Mobile Action Buttons */}
             <div className="pt-1 flex flex-col sm:flex-row gap-2">
               <button
@@ -896,7 +924,18 @@ ${clinicName}`;
           </button>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap justify-between sm:justify-end">
+          {/* With Letterhead Toggle Checkbox */}
+          <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-2 rounded-xl border border-slate-200 transition-colors">
+            <input
+              type="checkbox"
+              checked={isWithLetterhead}
+              onChange={(e) => handleToggleWithLetterhead(e.target.checked)}
+              className="w-4 h-4 text-indigo-650 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
+            />
+            <span className="whitespace-nowrap">With Letterhead</span>
+          </label>
+
           <button
             type="button"
             onClick={async () => {

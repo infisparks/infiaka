@@ -257,6 +257,197 @@ function DashboardContent() {
   const [activePrescPrintData, setActivePrescPrintData] = useState<any>(null);
   const [completeTarget, setCompleteTarget] = useState<{ patientId: string; regId?: string; currentIsCompleted: boolean } | null>(null);
 
+  // Global Patient Search States
+  const [globalSearchInput, setGlobalSearchInput] = useState("");
+  const [isGlobalSearching, setIsGlobalSearching] = useState(false);
+  const [globalSearchResults, setGlobalSearchResults] = useState<any[] | null>(null);
+  const [isGlobalSearchModalOpen, setIsGlobalSearchModalOpen] = useState(false);
+
+  const handleGlobalSearch = async (overrideQuery?: string) => {
+    const q = (overrideQuery !== undefined ? overrideQuery : globalSearchInput).trim();
+    if (!q) {
+      loadPatientsFromDb(selectedDate);
+      return;
+    }
+
+    setIsGlobalSearching(true);
+    try {
+      // 1. Safe query by name (ilike text)
+      const { data: byName } = await supabase
+        .from("patient_detail")
+        .select("*")
+        .ilike("name", `%${q}%`)
+        .limit(50);
+
+      // 2. Safe query by UHID (ilike text)
+      let byUhid: any[] = [];
+      try {
+        const { data: uData } = await supabase
+          .from("patient_detail")
+          .select("*")
+          .ilike("uhid", `%${q}%`)
+          .limit(50);
+        if (uData) byUhid = uData;
+      } catch (e) {}
+
+      // 3. Safe query by number if query contains digits
+      const cleanDigits = q.replace(/\D/g, "");
+      let byPhone: any[] = [];
+      if (cleanDigits.length > 0) {
+        const numVal = parseInt(cleanDigits, 10);
+        if (!isNaN(numVal)) {
+          const { data: pData } = await supabase
+            .from("patient_detail")
+            .select("*")
+            .eq("number", numVal)
+            .limit(50);
+          if (pData) byPhone = pData;
+        }
+      }
+
+      // Combine matched patients & deduplicate by uhid
+      const patientMap = new Map<string, any>();
+      [...(byName || []), ...(byUhid || []), ...byPhone].forEach((p) => {
+        if (p && p.uhid && !patientMap.has(p.uhid)) {
+          patientMap.set(p.uhid, p);
+        }
+      });
+
+      let matchedRegs: any[] = [];
+      if (cleanDigits.length > 0) {
+        const numVal = parseInt(cleanDigits, 10);
+        if (!isNaN(numVal)) {
+          const { data: regById } = await supabase
+            .from("aka_opd_registration")
+            .select("*")
+            .eq("registration_id", numVal)
+            .or("is_deleted.is.null,is_deleted.eq.false")
+            .limit(20);
+
+          if (regById && regById.length > 0) {
+            matchedRegs = regById;
+            const missingUhids = regById.map((r) => r.patient_uhid).filter((u) => u && !patientMap.has(u));
+            if (missingUhids.length > 0) {
+              const { data: extraPatients } = await supabase
+                .from("patient_detail")
+                .select("*")
+                .in("uhid", missingUhids);
+
+              (extraPatients || []).forEach((p) => {
+                if (p && p.uhid && !patientMap.has(p.uhid)) {
+                  patientMap.set(p.uhid, p);
+                }
+              });
+            }
+          }
+        }
+      }
+
+      const matchedPatients = Array.from(patientMap.values());
+      const uhids = matchedPatients.map((p) => p.uhid);
+
+      if (uhids.length > 0) {
+        const { data: regsByUhid } = await supabase
+          .from("aka_opd_registration")
+          .select("*")
+          .in("patient_uhid", uhids)
+          .or("is_deleted.is.null,is_deleted.eq.false")
+          .order("registration_id", { ascending: false });
+
+        if (regsByUhid) {
+          const existingIds = new Set(matchedRegs.map((r) => r.registration_id));
+          regsByUhid.forEach((r) => {
+            if (!existingIds.has(r.registration_id)) {
+              matchedRegs.push(r);
+            }
+          });
+        }
+      }
+
+      if (matchedRegs.length === 0) {
+        setPatients([]);
+        return;
+      }
+
+      // Map matched registrations directly to Patient view representation for main queue list
+      const mapped: Patient[] = matchedRegs.map((reg, idx) => {
+        const p = (matchedPatients || []).find((pat) => pat.uhid === reg.patient_uhid) || {
+          uhid: reg.patient_uhid,
+          name: "Patient " + reg.patient_uhid,
+          number: "",
+          gender: "Male",
+          age: 25,
+          age_unit: "Year"
+        };
+
+        const billAmt = reg.services
+          ? reg.services.reduce((acc: number, s: any) => acc + (Number(s.fee) || 0), 0)
+          : 0;
+        const paymentsList = reg.payments && Array.isArray(reg.payments) ? reg.payments : [];
+        const modesWithAmount: string[] = paymentsList.filter((p: any) => (p.amount || 0) > 0).map((p: any) => String(p.mode));
+        const uniqueModes: string[] = Array.from(new Set(modesWithAmount.length > 0 ? modesWithAmount : paymentsList.map((p: any) => String(p.mode))));
+        let pMethod = "Cash";
+        if (uniqueModes.includes("Cash") && uniqueModes.includes("Online")) {
+          pMethod = "Cash + Online";
+        } else if (uniqueModes.length > 0) {
+          pMethod = uniqueModes[0];
+        }
+
+        let isComp = reg.is_completed || false;
+        if (typeof window !== "undefined" && !isComp) {
+          const completedList = JSON.parse(localStorage.getItem("completed_appointments") || "[]");
+          isComp = completedList.includes(String(reg.registration_id));
+        }
+
+        return {
+          patient_id: p.patient_id,
+          id: p.uhid,
+          queueNo: String(idx + 1).padStart(2, "0"),
+          title: p.title || "Mr",
+          name: p.name,
+          phoneDialCode: "+91",
+          phone: String(p.number || ""),
+          gender: p.gender || "Male",
+          age: p.age || 25,
+          ageUnit: p.age_unit || "Year",
+          dob: p.dob || "",
+          permanentAddress: p.address || "",
+          localAddress: p.local_address || "",
+          country: p.country || "India",
+          state: p.state || "Maharashtra",
+          statusTags: isComp ? ["Completed"] : ["Ongoing"],
+          billAmount: billAmt,
+          paymentMethod: pMethod,
+          isAbhaCreated: false,
+          customTags: [],
+          isCompleted: isComp,
+          isOngoing: !isComp,
+          arrivalTime: reg.appointment_date_time
+            ? new Date(reg.appointment_date_time).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+            : "09:00 AM",
+          arrivalMinutesAgo: 5,
+          opdRegistration: {
+            registration_id: reg.registration_id,
+            clinic_name: reg.clinic_name,
+            treating_doctor: reg.treating_doctor,
+            referring_doctor: reg.referring_doctor,
+            appointment_date_time: reg.appointment_date_time,
+            services: reg.services,
+            payments: reg.payments,
+            created_at: reg.created_at,
+          },
+        };
+      }).filter(Boolean) as Patient[];
+
+      setPatients(mapped);
+    } catch (err) {
+      console.error("Global search error:", err);
+      alert("Error performing global patient search.");
+    } finally {
+      setIsGlobalSearching(false);
+    }
+  };
+
   // Print settings loaded from aka_setting
   const [printShowHeader, setPrintShowHeader] = useState(true);
   const [printShowHeaderPage2, setPrintShowHeaderPage2] = useState(false);
@@ -2134,16 +2325,16 @@ function DashboardContent() {
       <div className="flex-1 flex flex-col overflow-hidden h-full relative">
         
         {/* HEADER BAR */}
-        <header className="h-10 bg-white border-b border-[#E5E7EB] px-3 flex items-center justify-between shrink-0 select-none">
-          <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary cursor-pointer hover:bg-primary/20">
+        <header className="min-h-11 bg-white border-b border-[#E5E7EB] px-3 py-1.5 flex flex-wrap md:flex-nowrap items-center justify-between gap-2 shrink-0 select-none">
+          <div className="flex items-center gap-2 overflow-x-auto shrink-0 py-0.5 max-w-full">
+            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary cursor-pointer hover:bg-primary/20 shrink-0">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16m-7 6h7" />
               </svg>
             </div>
 
             {/* Date Navigator */}
-            <div className="flex items-center border border-[#E5E7EB] rounded-md bg-white p-0.5 overflow-hidden">
+            <div className="flex items-center border border-[#E5E7EB] rounded-md bg-white p-0.5 shrink-0">
               <button
                 onClick={handlePrevDate}
                 className="p-1 hover:bg-gray-100 rounded text-[#718096]"
@@ -2152,7 +2343,7 @@ function DashboardContent() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <span className="px-2 text-[11px] font-bold text-primary tracking-tight min-w-[80px] text-center select-text">
+              <span className="px-2 text-[11px] font-bold text-primary tracking-tight min-w-[75px] text-center select-text">
                 {formatDateLabel(selectedDate)}
               </span>
               <button
@@ -2166,15 +2357,18 @@ function DashboardContent() {
             </div>
 
             <button
-              onClick={() => setSelectedDate(getTodayLabel())}
-              className="px-2 py-1 border border-[#E5E7EB] hover:bg-gray-50 rounded-md text-[11px] font-medium text-foreground bg-white"
+              onClick={() => {
+                setGlobalSearchInput("");
+                setSelectedDate(getTodayLabel());
+              }}
+              className="px-2 py-1 border border-[#E5E7EB] hover:bg-gray-50 rounded-md text-[11px] font-medium text-foreground bg-white shrink-0"
             >
               Today
             </button>
 
             {/* Clinic Filter Dropdown */}
-            <div className="flex items-center border border-[#E5E7EB] rounded-md bg-white px-2 py-0.5 cursor-pointer hover:bg-gray-50">
-              <div className="w-2 h-2 rounded-full bg-indigo-500 mr-1.5 flex items-center justify-center">
+            <div className="flex items-center border border-[#E5E7EB] rounded-md bg-white px-2 py-0.5 cursor-pointer hover:bg-gray-50 shrink-0">
+              <div className="w-2 h-2 rounded-full bg-indigo-500 mr-1 flex items-center justify-center">
                 <div className="w-1 h-1 rounded-full bg-white"></div>
               </div>
               <select
@@ -2183,7 +2377,7 @@ function DashboardContent() {
                   setSelectedClinicFilter(e.target.value);
                   localStorage.setItem("selected_clinic_filter", e.target.value);
                 }}
-                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent pr-1.5 cursor-pointer max-w-[130px] truncate"
+                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent cursor-pointer max-w-[110px] truncate"
               >
                 <option value="All">All Clinics</option>
                 {clinicCache.map((name) => (
@@ -2195,8 +2389,8 @@ function DashboardContent() {
             </div>
 
             {/* Doctor Filter Dropdown */}
-            <div className="flex items-center border border-[#E5E7EB] rounded-md bg-white px-2 py-0.5 cursor-pointer hover:bg-gray-50">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 flex items-center justify-center">
+            <div className="flex items-center border border-[#E5E7EB] rounded-md bg-white px-2 py-0.5 cursor-pointer hover:bg-gray-50 shrink-0">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 mr-1 flex items-center justify-center">
                 <div className="w-1 h-1 rounded-full bg-white"></div>
               </div>
               <select
@@ -2205,7 +2399,7 @@ function DashboardContent() {
                   setSelectedDoctorFilter(e.target.value);
                   localStorage.setItem("selected_doctor_filter", e.target.value);
                 }}
-                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent pr-1.5 cursor-pointer max-w-[130px] truncate"
+                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent cursor-pointer max-w-[110px] truncate"
               >
                 <option value="All">All Doctors</option>
                 {doctorCache.map((name) => (
@@ -2215,73 +2409,68 @@ function DashboardContent() {
                 ))}
               </select>
             </div>
-
-            <button className="p-1 border border-[#E5E7EB] rounded-md bg-white hover:bg-gray-50">
-              <svg className="w-3.5 h-3.5 text-[#718096]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-              </svg>
-            </button>
-            <div className="relative">
-              <input
-                type="date"
-                id="custom-date-picker"
-                onChange={(e) => {
-                  if (e.target.value) {
-                    setSelectedDate(e.target.value);
-                  }
-                }}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                title="Select custom date"
-              />
-              <button type="button" className="p-1 border border-[#E5E7EB] rounded-md bg-white hover:bg-gray-50 flex items-center justify-center">
-                <svg className="w-3.5 h-3.5 text-[#718096]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </button>
-            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Global Search command */}
-            <div className="relative flex items-center border border-[#E5E7EB] bg-white rounded-md px-2 py-0.5 w-40 sm:w-48">
-              <svg className="w-3 h-3 text-[#A0AEC0] mr-1.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          {/* Global Search Input & Button (Always Visible on Mobile & Desktop) */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleGlobalSearch();
+            }}
+            className="flex items-center gap-1.5 w-full md:w-auto shrink-0 justify-end"
+          >
+            <div className="relative flex items-center border border-[#CBD5E0] focus-within:border-primary bg-white rounded-lg px-2 py-1 flex-1 md:w-64 shadow-2xs transition-all">
+              <svg className="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
                 type="text"
-                placeholder="Search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="text-[11px] text-foreground focus:outline-none w-full bg-transparent placeholder:text-[#A0AEC0]"
+                placeholder="Search Name, Phone, UHID..."
+                value={globalSearchInput}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setGlobalSearchInput(val);
+                  if (!val.trim()) {
+                    loadPatientsFromDb(selectedDate);
+                  }
+                }}
+                className="text-xs font-semibold text-slate-800 focus:outline-none w-full bg-transparent placeholder:text-slate-400"
               />
-              <span className="text-[9px] text-[#A0AEC0] font-medium border border-gray-150 px-1 py-0.2 rounded shrink-0 bg-gray-50">
-                ⌘ K
-              </span>
+              {globalSearchInput && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGlobalSearchInput("");
+                    loadPatientsFromDb(selectedDate);
+                  }}
+                  className="text-slate-400 hover:text-slate-600 text-xs font-bold px-1 cursor-pointer"
+                  title="Clear search"
+                >
+                  ✕
+                </button>
+              )}
             </div>
 
-            <div className="flex items-center border border-[#E5E7EB] rounded-md bg-white px-2 py-0.5 hover:bg-gray-50 cursor-pointer">
-              <span className="text-[11px] font-semibold text-foreground truncate max-w-[80px] sm:max-w-[120px]">
-                Mr ahlakh mud...
-              </span>
-              <svg className="w-2.5 h-2.5 text-[#718096] ml-1 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
-
-            <span className="px-2 py-0.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded text-[9px] font-bold tracking-wide shadow-xs shrink-0 select-none">
-              ★ Premium
-            </span>
-
-            <div className="px-2 py-0.5 bg-emerald-500 text-white rounded text-[10px] font-extrabold shadow-xs shrink-0 flex items-center justify-center">
-              44
-            </div>
-
-            <button className="p-1 hover:bg-gray-100 rounded text-[#718096]">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.5" />
-              </svg>
+            <button
+              type="submit"
+              disabled={isGlobalSearching}
+              className="px-3.5 py-1.5 bg-primary hover:bg-primary-hover disabled:bg-slate-300 text-white text-xs font-extrabold rounded-lg transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1.5"
+            >
+              {isGlobalSearching ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Searching...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <span>Search</span>
+                </>
+              )}
             </button>
-          </div>
+          </form>
         </header>
 
         {/* DARK TOOLBAR */}
@@ -3936,6 +4125,149 @@ function DashboardContent() {
                 >
                   {completeTarget.currentIsCompleted ? "Yes, Undo" : "Yes, Complete"}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* GLOBAL PATIENT SEARCH RESULTS MODAL */}
+        {isGlobalSearchModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 md:p-6 text-left select-none overflow-y-auto">
+            <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-auto flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-150">
+              {/* Modal Header */}
+              <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold">
+                      Global Search Results for &quot;{globalSearchInput}&quot;
+                    </h3>
+                    <p className="text-[10.5px] text-slate-400 font-medium">
+                      Found {globalSearchResults?.length || 0} patient records across database history
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setIsGlobalSearchModalOpen(false)}
+                  className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#F8FAFC]">
+                {globalSearchResults?.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 font-medium space-y-2">
+                    <p className="text-sm font-bold text-slate-600">No matching patient records found.</p>
+                    <p className="text-xs">Try searching by full patient name, phone number, or UHID.</p>
+                  </div>
+                ) : (
+                  globalSearchResults?.map((patient) => {
+                    const latestReg = patient.latestRegistration;
+                    const regId = latestReg?.registration_id;
+                    const dateStr = latestReg?.appointment_date_time
+                      ? new Date(latestReg.appointment_date_time).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                      : "No OPD Visit";
+
+                    return (
+                      <div
+                        key={patient.uhid}
+                        className="bg-white border border-[#E2E8F0] rounded-xl p-3.5 shadow-2xs hover:border-purple-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3"
+                      >
+                        {/* Left: Patient Details */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-black text-sm shrink-0">
+                            {patient.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-extrabold text-slate-900 truncate">
+                                {patient.title} {patient.name}
+                              </h4>
+                              <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-bold text-slate-700 shrink-0">
+                                UHID: {patient.uhid}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500 font-medium mt-0.5">
+                              <span>{patient.age} {patient.ageUnit} / {patient.gender}</span>
+                              {patient.phone && <span>📞 {patient.phone}</span>}
+                              <span>🗓️ Latest: {dateStr}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                          {regId ? (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setIsGlobalSearchModalOpen(false);
+                                  openPrescription(regId);
+                                }}
+                                className="px-2.5 py-1.5 bg-primary hover:bg-primary-hover text-white text-[11px] font-extrabold rounded-lg shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
+                              >
+                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Add Rx
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setIsGlobalSearchModalOpen(false);
+                                  handlePrintPrescription(patient.uhid, regId);
+                                }}
+                                className="px-2.5 py-1.5 border border-[#CBD5E0] hover:bg-slate-50 text-slate-700 text-[10.5px] font-bold rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                              >
+                                📄 Print Prescription
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setIsGlobalSearchModalOpen(false);
+                                  handlePrintBill(patient.uhid);
+                                }}
+                                className="px-2.5 py-1.5 border border-[#CBD5E0] hover:bg-slate-50 text-slate-700 text-[10.5px] font-bold rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                              >
+                                🖨️ Print Bill
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setIsGlobalSearchModalOpen(false);
+                                  router.push(`/rx/documents?rx=${regId}`);
+                                }}
+                                className="px-2.5 py-1.5 border border-[#CBD5E0] hover:bg-slate-50 text-slate-700 text-[10.5px] font-bold rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                              >
+                                📂 Docs
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setIsGlobalSearchModalOpen(false);
+                                openBooking(patient.uhid);
+                              }}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg shadow-2xs transition-colors"
+                            >
+                              + Book New Appointment
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
