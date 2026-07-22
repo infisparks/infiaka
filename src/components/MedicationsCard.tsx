@@ -102,6 +102,25 @@ async function saveMedicineDefaultDosage(medicineId: number, defaults: {
   }
 }
 
+async function incrementMedicineUsageCount(medicineId: number) {
+  if (!medicineId) return;
+  try {
+    const { data } = await supabase
+      .from("medicine")
+      .select("usage_count")
+      .eq("id", medicineId)
+      .maybeSingle();
+
+    const currentCount = Number(data?.usage_count || 0);
+    await supabase
+      .from("medicine")
+      .update({ usage_count: currentCount + 1 })
+      .eq("id", medicineId);
+  } catch (err) {
+    console.error("Error incrementing medicine usage count:", err);
+  }
+}
+
 async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
   try {
     const q = query?.trim() ?? "";
@@ -121,11 +140,12 @@ async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
       };
     };
 
-    // Empty query — show first 10 alphabetically
+    // Empty query — show top 10 most used
     if (!q) {
       const { data } = await supabase
         .from("medicine")
-        .select("id, name, salt_composition, short_composition1, type, metadata")
+        .select("id, name, salt_composition, short_composition1, type, metadata, usage_count")
+        .order("usage_count", { ascending: false })
         .order("name", { ascending: true })
         .limit(10);
       return (data || []).map(toItem);
@@ -135,15 +155,17 @@ async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
     const [tier1Result, tier2Result] = await Promise.all([
       supabase
         .from("medicine")
-        .select("id, name, salt_composition, short_composition1, type, metadata")
+        .select("id, name, salt_composition, short_composition1, type, metadata, usage_count")
         .ilike("name", `${q}%`)
+        .order("usage_count", { ascending: false })
         .order("name", { ascending: true })
         .limit(12),
       supabase
         .from("medicine")
-        .select("id, name, salt_composition, short_composition1, type, metadata")
+        .select("id, name, salt_composition, short_composition1, type, metadata, usage_count")
         .ilike("name", `%${q}%`)
         .not("name", "ilike", `${q}%`)   // exclude starts-with results
+        .order("usage_count", { ascending: false })
         .order("name", { ascending: true })
         .limit(10)
     ]);
@@ -165,8 +187,9 @@ async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
     if (results.length < 8) {
       const { data: tier3 } = await supabase
         .from("medicine")
-        .select("id, name, salt_composition, short_composition1, type, metadata")
+        .select("id, name, salt_composition, short_composition1, type, metadata, usage_count")
         .or(`salt_composition.ilike.${q}%,short_composition1.ilike.${q}%`)
+        .order("usage_count", { ascending: false })
         .order("name", { ascending: true })
         .limit(8);
       for (const m of (tier3 || [])) {
@@ -700,6 +723,10 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
       if (meta.default_instr) defaultInstr = meta.default_instr;
     }
 
+    if (medicineId) {
+      incrementMedicineUsageCount(medicineId);
+    }
+
     const newMed = {
       id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       medicineId,
@@ -902,6 +929,7 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                         value={med.name}
                         onChange={(v) => patch(med.id, { name: v })}
                         onSelect={async (m) => {
+                          if (m.id) incrementMedicineUsageCount(m.id);
                           patch(med.id, { 
                             medicineId: m.id, 
                             name: m.name, 
@@ -929,11 +957,12 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                           
                           const { data: existing } = await supabase
                             .from("medicine")
-                            .select("id, name, salt_composition, short_composition1, type, metadata")
+                            .select("id, name, salt_composition, short_composition1, type, metadata, usage_count")
                             .eq("name", cleanName)
                             .maybeSingle();
 
                           if (existing) {
+                            incrementMedicineUsageCount(Number(existing.id));
                             const meta = existing.metadata || {};
                             patch(med.id, { 
                               medicineId: Number(existing.id), 
@@ -947,6 +976,7 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                             });
                           } else {
                             const inserted = await insertMedicineIntoDb(cleanName, med.generic, med.form || "tablet");
+                            if (inserted.id) incrementMedicineUsageCount(inserted.id);
                             patch(med.id, { 
                               medicineId: inserted.id, 
                               name: inserted.name,
