@@ -3,16 +3,26 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase, getUserRole } from "@/lib/supabase";
 
 interface SidebarProps {
-  active: "queue" | "book" | "upcoming" | "payments" | "orders" | "more" | "deleted" | "inventory";
+  active: "queue" | "book" | "upcoming" | "payments" | "orders" | "more" | "deleted" | "inventory" | "ipd";
   onQueueClick?: (e: React.MouseEvent) => void;
   onBookClick?: (e: React.MouseEvent) => void;
 }
 
 export default function Sidebar({ active, onQueueClick, onBookClick }: SidebarProps) {
   const router = useRouter();
+  const [userRole, setUserRole] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user?.email) {
+        const role = await getUserRole(session.user.email);
+        setUserRole(role);
+      }
+    });
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -143,6 +153,22 @@ export default function Sidebar({ active, onQueueClick, onBookClick }: SidebarPr
           </svg>
           <span className="text-[10px] font-bold mt-0.5 tracking-tight leading-none text-center">Inv</span>
         </Link>
+
+        {/* IPD Tab (Admin Only) */}
+        {userRole === "admin" && (
+          <Link
+            href="/ipd"
+            className={`w-11 py-1.5 rounded-lg flex flex-col items-center justify-center transition-colors ${
+              active === "ipd" ? "text-primary bg-primary/10" : "text-[#718096] hover:bg-gray-100"
+            }`}
+            title="IPD Management (Admin Only)"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5m0 0h4m-4 0V11m0 0h4m-4 0H9m4 0V7m0 0h4m-4 0H9" />
+            </svg>
+            <span className="text-[10px] font-bold mt-0.5 tracking-tight">IPD</span>
+          </Link>
+        )}
 
         {/* More Tab */}
         <a

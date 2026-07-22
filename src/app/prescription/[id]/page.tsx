@@ -46,6 +46,9 @@ export default function PrescriptionDetailPage() {
   // Initial loaded settings to support reset/cancel
   const [initialSettings, setInitialSettings] = useState<any>(null);
 
+  // Mobile active tab view ("preview" | "settings")
+  const [activeMobileTab, setActiveMobileTab] = useState<"preview" | "settings">("preview");
+
   // Settings Configuration States
   const [printShowHeader, setPrintShowHeader] = useState(true);
   const [printShowHeaderPage2, setPrintShowHeaderPage2] = useState(false);
@@ -572,32 +575,55 @@ ${clinicName}`;
       )}
 
       {/* HEADER BAR */}
-      <header className="h-12 bg-white border-b border-[#E2E8F0] px-4 flex items-center justify-between shrink-0 shadow-2xs z-10">
-        <div className="flex items-center gap-3">
+      <header className="h-12 bg-white border-b border-[#E2E8F0] px-3 sm:px-4 flex items-center justify-between shrink-0 shadow-2xs z-10 select-none">
+        <div className="flex items-center gap-2.5 min-w-0">
           <button
             onClick={() => router.push("/")}
-            className="p-1 hover:bg-[#E2E8F0] rounded-md text-[#718096] transition-colors cursor-pointer"
+            className="p-1 hover:bg-[#E2E8F0] rounded-md text-[#718096] transition-colors cursor-pointer shrink-0"
+            title="Back to Dashboard"
           >
             <svg className="w-4 h-4 text-slate-800" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
-          <div className="text-left leading-tight">
-            <span className="text-[12px] font-bold text-slate-800">
-              Prescription View - {activePrintData.patient.name} ({activePrintData.patient.age}y / {activePrintData.patient.gender})
+          <div className="text-left leading-tight truncate">
+            <span className="text-[12px] font-bold text-slate-800 truncate block">
+              Prescription - {activePrintData.patient.name} ({activePrintData.patient.age}y / {activePrintData.patient.gender})
             </span>
-            <div className="text-[9px] text-[#A0AEC0] font-semibold tracking-tight">
+            <div className="text-[9px] text-[#A0AEC0] font-semibold tracking-tight truncate">
               OPD ID: {registrationId} | Phone: {activePrintData.patient.phone}
             </div>
           </div>
         </div>
       </header>
 
+      {/* MOBILE TAB BAR (Shown on small screens < md) */}
+      <div className="flex md:hidden bg-slate-200 p-1 border-b border-slate-300 text-xs font-extrabold select-none shrink-0">
+        <button
+          onClick={() => setActiveMobileTab("preview")}
+          className={`flex-1 py-1.5 text-center rounded-lg transition-all ${
+            activeMobileTab === "preview" ? "bg-white text-indigo-700 shadow-xs" : "text-slate-600"
+          }`}
+        >
+          📄 View & Download PDF
+        </button>
+        <button
+          onClick={() => setActiveMobileTab("settings")}
+          className={`flex-1 py-1.5 text-center rounded-lg transition-all ${
+            activeMobileTab === "settings" ? "bg-white text-indigo-700 shadow-xs" : "text-slate-600"
+          }`}
+        >
+          ⚙️ Print Settings
+        </button>
+      </div>
+
       {/* SPLIT SCREEN CONTENT PANEL */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
         
-        {/* LEFT PANEL: CONFIGURATION */}
-        <aside className="w-80 bg-white border-r border-[#E2E8F0] flex flex-col overflow-y-auto select-text p-4 space-y-5">
+        {/* LEFT PANEL: CONFIGURATION (Hidden on mobile if activeMobileTab !== "settings") */}
+        <aside className={`w-full md:w-80 bg-white border-r border-[#E2E8F0] flex flex-col overflow-y-auto select-text p-4 space-y-5 ${
+          activeMobileTab === "settings" ? "flex" : "hidden md:flex"
+        }`}>
           <div className="border-b pb-2 mb-1">
             <h3 className="text-sm font-bold text-slate-850">Print Configuration</h3>
             <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">Adjust document dimensions and layouts. Settings apply dynamically to the PDF.</p>
@@ -753,12 +779,38 @@ ${clinicName}`;
           </div>
         </aside>
 
-        {/* RIGHT PANEL: LIVE PDF PREVIEW */}
-        <main className="flex-1 p-4 bg-slate-100/50 relative">
+        {/* RIGHT PANEL: LIVE PDF PREVIEW (Hidden on mobile if activeMobileTab !== "preview") */}
+        <main className={`flex-1 p-2 md:p-4 bg-slate-100/50 relative flex flex-col ${
+          activeMobileTab === "preview" ? "flex" : "hidden md:flex"
+        }`}>
+          {/* QUICK MOBILE ACTION BANNER */}
+          <div className="flex md:hidden items-center justify-between gap-2 p-2 bg-white border border-indigo-100 mb-2 rounded-xl shadow-2xs shrink-0">
+            <button
+              type="button"
+              onClick={async () => {
+                if (printRef.current) {
+                  await printRef.current.generatePDF(true);
+                  showToast("Downloading PDF Prescription...", "success");
+                }
+              }}
+              className="flex-1 py-2 bg-indigo-650 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-lg shadow-xs flex items-center justify-center gap-1"
+            >
+              📥 Download PDF
+            </button>
+            <button
+              type="button"
+              disabled={sendingWhatsapp}
+              onClick={handleSendWhatsApp}
+              className="py-2 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-lg shadow-xs flex items-center justify-center gap-1"
+            >
+              💬 WhatsApp
+            </button>
+          </div>
+
           {previewBlobUrl ? (
-            <iframe src={previewBlobUrl} className="w-full h-full rounded-xl border border-slate-200 shadow-sm bg-white" />
+            <iframe src={previewBlobUrl} className="w-full h-full min-h-[480px] md:min-h-0 rounded-xl border border-slate-200 shadow-sm bg-white" />
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm animate-pulse">
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm animate-pulse">
               <svg className="w-8 h-8 text-indigo-500 animate-spin mb-2" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
                 <path fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" className="opacity-75" />
@@ -771,58 +823,48 @@ ${clinicName}`;
       </div>
 
       {/* ACTION FOOTER */}
-      <footer className="h-12 bg-white border-t border-[#E2E8F0] px-4 flex items-center justify-between shrink-0 shadow-sm">
-        <div className="flex items-center gap-2">
+      <footer className="bg-white border-t border-[#E2E8F0] p-2.5 sm:px-4 flex flex-col sm:flex-row items-center justify-between shrink-0 shadow-sm gap-2 select-none">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
           <button
             type="button"
             onClick={() => {
               showToast("Prescription saved as template successfully!", "success");
             }}
-            className="px-3.5 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10.5px] font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            className="flex-1 sm:flex-initial px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10.5px] font-bold text-slate-700 rounded-lg flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-2xs"
           >
-            📂 Save as Template
+            📂 Template
           </button>
           <button
             type="button"
             onClick={() => {
               router.push(`/rx?rx=${registrationId}`);
             }}
-            className="px-3.5 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10.5px] font-bold text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            className="flex-1 sm:flex-initial px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10.5px] font-bold text-slate-700 rounded-lg flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-2xs"
           >
-            ✏️ Edit
+            ✏️ Edit Rx
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
           <button
             type="button"
             onClick={async () => {
               if (printRef.current) {
                 await printRef.current.generatePDF(true);
-                showToast("Downloading PDF Configuration Report...", "success");
+                showToast("Downloading PDF Prescription...", "success");
               }
             }}
-            className="px-3.5 py-1.5 bg-white border border-indigo-200 hover:bg-indigo-50 text-[10.5px] font-bold text-indigo-650 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            className="flex-1 sm:flex-initial px-3.5 py-1.5 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-[10.5px] font-extrabold text-indigo-700 rounded-lg flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-2xs"
           >
-            📥 Download PDF Report
+            📥 Download PDF
           </button>
           <button
             type="button"
             disabled={sendingWhatsapp}
             onClick={handleSendWhatsApp}
-            className="px-3.5 py-1.5 bg-white border border-green-200 hover:bg-green-50 disabled:bg-slate-100 disabled:text-slate-400 text-[10.5px] font-bold text-green-700 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            className="flex-1 sm:flex-initial px-3.5 py-1.5 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:bg-slate-100 disabled:text-slate-400 text-[10.5px] font-extrabold text-emerald-700 rounded-lg flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-2xs"
           >
-            {sendingWhatsapp ? (
-              <>
-                <svg className="w-3.5 h-3.5 animate-spin text-green-600" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
-                  <path fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" className="opacity-75" />
-                </svg>
-                <span>Sending PDF...</span>
-              </>
-            ) : (
-              <>💬 Send PDF on WhatsApp</>
-            )}
+            {sendingWhatsapp ? "Sending..." : "💬 WhatsApp"}
           </button>
           <button
             type="button"
@@ -834,7 +876,7 @@ ${clinicName}`;
                 }
               }
             }}
-            className="px-4.5 py-1.5 bg-indigo-650 hover:bg-indigo-750 text-[11px] font-extrabold text-white rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+            className="flex-1 sm:flex-initial px-4 py-1.5 bg-indigo-650 hover:bg-indigo-750 text-[11px] font-extrabold text-white rounded-lg flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-md"
           >
             🖨️ Print
           </button>
