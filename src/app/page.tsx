@@ -271,6 +271,8 @@ function DashboardContent() {
     }
 
     setIsGlobalSearching(true);
+    // Auto switch active tab to COMPLETED to show all completed & search records
+    setActiveTab("COMPLETED");
     try {
       // 1. Safe query by name (ilike text)
       const { data: byName } = await supabase
