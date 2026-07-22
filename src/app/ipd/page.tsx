@@ -43,6 +43,149 @@ const DEFAULT_PAYERS = ["TPA", "Corporate", "Cash"];
 const DEFAULT_COMPLETE = ["Y", "N", "TBC"];
 const DEFAULT_REMARKS = ["Y", "N", "TBC"];
 
+interface SearchableSelectProps {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  options: string[];
+  placeholder?: string;
+  required?: boolean;
+}
+
+function SearchableSelect({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder = "Select...",
+  required = false,
+}: SearchableSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // De-duplicate options list case-insensitively so no duplicate items ever appear
+  const cleanOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    (options || []).forEach((opt) => {
+      const trimmed = opt?.trim();
+      if (trimmed) {
+        const lower = trimmed.toLowerCase();
+        if (!map.has(lower)) {
+          map.set(lower, trimmed);
+        }
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [options]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return cleanOptions;
+    return cleanOptions.filter((opt) => opt.toLowerCase().includes(q));
+  }, [cleanOptions, search]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (filteredOptions.length > 0) {
+        onChange(filteredOptions[0]);
+      } else if (search.trim()) {
+        onChange(search.trim());
+      }
+      setIsOpen(false);
+      setSearch("");
+    }
+  };
+
+  return (
+    <div className="relative flex flex-col gap-1" ref={dropdownRef}>
+      <label className="block text-xs font-bold text-slate-700 uppercase">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+
+      <div
+        onClick={() => {
+          setIsOpen(!isOpen);
+          setSearch("");
+        }}
+        className="w-full px-3 py-2 bg-white border border-slate-300 hover:border-primary focus:border-primary rounded-lg text-xs font-semibold text-slate-900 cursor-pointer flex items-center justify-between shadow-2xs transition-colors"
+      >
+        <span className={value ? "text-slate-900 truncate font-semibold" : "text-slate-400 font-normal"}>
+          {value || placeholder}
+        </span>
+        <div className="flex items-center gap-1 shrink-0 ml-1">
+          {value && (
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange("");
+              }}
+              className="text-slate-400 hover:text-slate-600 p-0.5 text-xs font-bold cursor-pointer"
+              title="Clear selection"
+            >
+              ✕
+            </span>
+          )}
+          <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-2 space-y-1.5 animate-in fade-in zoom-in-95 duration-100 flex flex-col max-h-60">
+          <input
+            type="text"
+            placeholder={`Search ${label}...`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary"
+            autoFocus
+          />
+
+          <div className="flex-1 overflow-y-auto space-y-0.5 max-h-44 pr-0.5">
+            {filteredOptions.length === 0 ? (
+              <div className="py-2.5 text-center text-xs text-slate-400 font-medium">
+                {search.trim() ? `Press Enter to set "${search.trim()}"` : "No matching options"}
+              </div>
+            ) : (
+              filteredOptions.map((opt) => (
+                <div
+                  key={opt}
+                  onClick={() => {
+                    onChange(opt);
+                    setIsOpen(false);
+                    setSearch("");
+                  }}
+                  className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg cursor-pointer transition-colors flex items-center justify-between ${
+                    value === opt ? "bg-purple-50 text-purple-700 font-bold" : "hover:bg-slate-100 text-slate-800"
+                  }`}
+                >
+                  <span className="truncate">{opt}</span>
+                  {value === opt && <span className="text-purple-600 font-bold shrink-0 ml-1">✓</span>}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function IpdPage() {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -66,9 +209,9 @@ export default function IpdPage() {
   const [openDropdown, setOpenDropdown] = useState<"hosp" | "diag" | "surg" | "doc" | null>(null);
   const filterRef = useRef<HTMLDivElement>(null);
 
-  // Analytics graph toggle
-  const [showGraphs, setShowGraphs] = useState(true);
-  const [graphTab, setGraphTab] = useState<"hospital" | "doctor">("hospital");
+  // Separate analytics graph toggles (Default FALSE as requested)
+  const [showHospitalGraph, setShowHospitalGraph] = useState(false);
+  const [showDoctorGraph, setShowDoctorGraph] = useState(false);
 
   // Dynamic dropdown catalogs loaded from DB
   const [hospitalOptions, setHospitalOptions] = useState<string[]>(DEFAULT_HOSPITALS);
@@ -193,26 +336,36 @@ export default function IpdPage() {
     }
   };
 
-  // Distinct options derived from records
+  // Combined hospitals (defaults + catalog + previous records)
+  const combinedHospitals = useMemo(() => {
+    const list = [...hospitalOptions];
+    records.forEach((r) => { if (r.hospital?.trim()) list.push(r.hospital.trim()); });
+    return list;
+  }, [hospitalOptions, records]);
+
+  // Distinct diagnoses derived from catalog + previous records
   const allDiagnoses = useMemo(() => {
-    const set = new Set<string>();
-    records.forEach((r) => { if (r.diagnosis?.trim()) set.add(r.diagnosis.trim()); });
-    return Array.from(set).sort();
+    const list: string[] = [];
+    records.forEach((r) => { if (r.diagnosis?.trim()) list.push(r.diagnosis.trim()); });
+    return list;
   }, [records]);
 
+  // Distinct surgeries derived from catalog + previous records
   const allSurgeries = useMemo(() => {
-    const set = new Set<string>();
-    records.forEach((r) => { if (r.surgery?.trim()) set.add(r.surgery.trim()); });
-    return Array.from(set).sort();
+    const list: string[] = [];
+    records.forEach((r) => { if (r.surgery?.trim()) list.push(r.surgery.trim()); });
+    return list;
   }, [records]);
 
+  // Distinct doctors derived from catalog + previous records
   const allDoctors = useMemo(() => {
-    const set = new Set<string>();
+    const list: string[] = [];
     records.forEach((r) => {
-      if (r.visiting_doc?.trim()) set.add(r.visiting_doc.trim());
-      if (r.surgeons_name?.trim()) set.add(r.surgeons_name.trim());
+      if (r.visiting_doc?.trim()) list.push(r.visiting_doc.trim());
+      if (r.surgeons_name?.trim()) list.push(r.surgeons_name.trim());
+      if (r.asst_surgeon?.trim()) list.push(r.asst_surgeon.trim());
     });
-    return Array.from(set).sort();
+    return list;
   }, [records]);
 
   const availableMonths = useMemo(() => {
@@ -541,24 +694,32 @@ export default function IpdPage() {
             <p className="text-xs text-[#6B7280]">Surgeries analytics, multi-filter reporting, and billing management</p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={() => setShowGraphs(!showGraphs)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 ${
-                showGraphs
-                  ? "bg-purple-50 border-purple-200 text-purple-700"
-                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+              onClick={() => setShowHospitalGraph(!showHospitalGraph)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                showHospitalGraph
+                  ? "bg-purple-600 text-white border-purple-600 shadow-xs"
+                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
               }`}
             >
-              <svg className="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              {showGraphs ? "Hide Analytics Graphs" : "Show Analytics Graphs"}
+              📊 {showHospitalGraph ? "Hide Hospital Graph" : "Show Hospital Graph"}
+            </button>
+
+            <button
+              onClick={() => setShowDoctorGraph(!showDoctorGraph)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                showDoctorGraph
+                  ? "bg-indigo-650 text-white border-indigo-650 shadow-xs"
+                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              👨‍⚕️ {showDoctorGraph ? "Hide Doctor Visiting Graph" : "Show Doctor Visiting Graph"}
             </button>
 
             <button
               onClick={handleOpenAddDrawer}
-              className="px-3.5 py-1.5 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 shrink-0"
+              className="px-3.5 py-1.5 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
             >
               <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -631,7 +792,7 @@ export default function IpdPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Name, diagnosis, bill..."
-                  className="w-full px-2.5 py-1.5 border border-[#E5E7EB] rounded-lg text-xs focus:outline-none focus:border-primary"
+                  className="w-full px-2.5 py-1.5 border border-[#E5E7EB] rounded-lg text-xs focus:outline-none focus:border-primary font-medium"
                 />
               </div>
 
@@ -761,88 +922,83 @@ export default function IpdPage() {
             </div>
           </div>
 
-          {/* ANALYTICS GRAPH COMPONENT */}
-          {showGraphs && (
-            <div className="bg-white border border-[#E5E7EB] rounded-xl p-4 shadow-2xs space-y-3">
+          {/* HOSPITAL ANALYTICS GRAPH */}
+          {showHospitalGraph && (
+            <div className="bg-white border border-[#E5E7EB] rounded-xl p-3.5 md:p-4 shadow-2xs space-y-3 select-text">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wide">Interactive Analytics Graphs</span>
+                  <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wide">Hospital Analytics Graph</span>
                   <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
-                    {filteredRecords.length} Filtered Surgeries
+                    {filteredRecords.length} Filtered Records
                   </span>
                 </div>
-
-                <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
-                  <button
-                    onClick={() => setGraphTab("hospital")}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                      graphTab === "hospital" ? "bg-white text-primary shadow-xs" : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    Hospital Graph
-                  </button>
-                  <button
-                    onClick={() => setGraphTab("doctor")}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                      graphTab === "doctor" ? "bg-white text-primary shadow-xs" : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    Doctor / Visiting Graph
-                  </button>
-                </div>
+                <button
+                  onClick={() => setShowHospitalGraph(false)}
+                  className="text-xs text-slate-400 hover:text-slate-600 font-bold cursor-pointer"
+                >
+                  ✕ Close
+                </button>
               </div>
 
-              {/* HOSPITAL GRAPH CONTENT */}
-              {graphTab === "hospital" && (
-                <div className="space-y-2">
-                  <div className="text-xs font-bold text-slate-600">Surgeries & Billing by Hospital</div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {hospitalGraphData.slice(0, 10).map((h) => {
-                      const pct = Math.round((h.count / maxHospCount) * 100);
-                      return (
-                        <div key={h.name} className="space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                          <div className="flex items-center justify-between text-xs font-bold">
-                            <span className="text-slate-900 truncate max-w-[200px]">{h.name}</span>
-                            <span className="text-primary font-extrabold">{h.count} Surgeries ({fmtCurr(h.bill)})</span>
-                          </div>
-                          <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden flex">
-                            <div
-                              style={{ width: `${pct}%` }}
-                              className="h-full bg-gradient-to-r from-purple-600 to-indigo-500 rounded-full transition-all duration-300"
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+              <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                {hospitalGraphData.slice(0, 15).map((h) => {
+                  const pct = Math.max(8, Math.round((h.count / maxHospCount) * 100));
+                  return (
+                    <div key={h.name} className="space-y-1 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <div className="flex items-center justify-between text-xs font-bold flex-wrap gap-1">
+                        <span className="text-slate-900 truncate max-w-[180px] sm:max-w-[280px]">{h.name}</span>
+                        <span className="text-primary font-extrabold text-[11px]">{h.count} Surgeries ({fmtCurr(h.bill)})</span>
+                      </div>
+                      <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden flex">
+                        <div
+                          style={{ width: `${pct}%` }}
+                          className="h-full bg-gradient-to-r from-purple-600 to-indigo-500 rounded-full transition-all duration-300"
+                        ></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-              {/* DOCTOR GRAPH CONTENT */}
-              {graphTab === "doctor" && (
-                <div className="space-y-2">
-                  <div className="text-xs font-bold text-slate-600">Surgeries & Surgeon Fees by Doctor / Visiting Doctor</div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {doctorGraphData.slice(0, 10).map((d) => {
-                      const pct = Math.round((d.count / maxDocCount) * 100);
-                      return (
-                        <div key={d.name} className="space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                          <div className="flex items-center justify-between text-xs font-bold">
-                            <span className="text-slate-900 truncate max-w-[200px]">{d.name}</span>
-                            <span className="text-indigo-600 font-extrabold">{d.count} Surgeries ({fmtCurr(d.fees)} Fees)</span>
-                          </div>
-                          <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden flex">
-                            <div
-                              style={{ width: `${pct}%` }}
-                              className="h-full bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full transition-all duration-300"
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+          {/* DOCTOR VISITING ANALYTICS GRAPH */}
+          {showDoctorGraph && (
+            <div className="bg-white border border-[#E5E7EB] rounded-xl p-3.5 md:p-4 shadow-2xs space-y-3 select-text">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wide">Doctor / Visiting Doctor Analytics Graph</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
+                    {filteredRecords.length} Filtered Records
+                  </span>
                 </div>
-              )}
+                <button
+                  onClick={() => setShowDoctorGraph(false)}
+                  className="text-xs text-slate-400 hover:text-slate-600 font-bold cursor-pointer"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                {doctorGraphData.slice(0, 15).map((d) => {
+                  const pct = Math.max(8, Math.round((d.count / maxDocCount) * 100));
+                  return (
+                    <div key={d.name} className="space-y-1 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <div className="flex items-center justify-between text-xs font-bold flex-wrap gap-1">
+                        <span className="text-slate-900 truncate max-w-[180px] sm:max-w-[280px]">{d.name}</span>
+                        <span className="text-indigo-600 font-extrabold text-[11px]">{d.count} Surgeries ({fmtCurr(d.fees)} Fees)</span>
+                      </div>
+                      <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden flex">
+                        <div
+                          style={{ width: `${pct}%` }}
+                          className="h-full bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full transition-all duration-300"
+                        ></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -902,37 +1058,36 @@ export default function IpdPage() {
                             {r.payer || "-"}
                           </span>
                         </td>
-                        <td className="py-2 px-3 border-r border-[#E5E7EB] text-right font-bold whitespace-nowrap text-slate-900">{fmtCurr(r.bill_amount)}</td>
-                        <td className="py-2 px-3 border-r border-[#E5E7EB] text-right font-semibold whitespace-nowrap text-emerald-700">{fmtCurr(r.net_pkg)}</td>
-                        <td className="py-2 px-3 border-r border-[#E5E7EB] text-right font-semibold whitespace-nowrap text-indigo-700">{fmtCurr(r.surgeons_fees)}</td>
-                        <td className="py-2 px-3 border-r border-[#E5E7EB] text-right whitespace-nowrap text-slate-600">{fmtCurr(r.hosp_charges)}</td>
-                        <td className="py-2 px-3 border-r border-[#E5E7EB] text-right whitespace-nowrap text-slate-600">{fmtCurr(r.eqpmt_charges)}</td>
-                        <td className="py-2 px-3 border-r border-[#E5E7EB] text-center whitespace-nowrap">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            r.complete === "Y" ? "bg-emerald-100 text-emerald-800" : r.complete === "N" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"
+                        <td className="py-2 px-3 border-r border-[#E5E7EB] text-right font-bold text-slate-900">{fmtCurr(r.bill_amount)}</td>
+                        <td className="py-2 px-3 border-r border-[#E5E7EB] text-right font-semibold text-emerald-700">{fmtCurr(r.net_pkg)}</td>
+                        <td className="py-2 px-3 border-r border-[#E5E7EB] text-right font-semibold text-indigo-700">{fmtCurr(r.surgeons_fees)}</td>
+                        <td className="py-2 px-3 border-r border-[#E5E7EB] text-right text-slate-600">{fmtCurr(r.hosp_charges)}</td>
+                        <td className="py-2 px-3 border-r border-[#E5E7EB] text-right text-slate-600">{fmtCurr(r.eqpmt_charges)}</td>
+                        <td className="py-2 px-3 border-r border-[#E5E7EB] text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                            r.complete === "Y" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
                           }`}>
                             {r.complete || "N"}
                           </span>
                         </td>
                         <td className="py-2 px-3 text-center whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-1.5">
+                          <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => handleOpenEditDrawer(r)}
-                              className="p-1 text-slate-500 hover:text-primary hover:bg-slate-100 rounded transition-colors"
+                              className="p-1 hover:bg-slate-100 rounded-md text-indigo-650 transition-colors"
                               title="Edit Record"
                             >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                               </svg>
                             </button>
-
                             <button
                               onClick={() => handleDelete(r.id)}
                               disabled={deletingId === r.id}
-                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                              className="p-1 hover:bg-slate-100 rounded-md text-red-600 transition-colors disabled:opacity-30"
                               title="Delete Record"
                             >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
                             </button>
@@ -957,10 +1112,10 @@ export default function IpdPage() {
             className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity animate-in fade-in duration-150"
           />
 
-          <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-            <div className="w-screen max-w-xl bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200 border-l border-slate-200">
+          <div className="fixed inset-y-0 right-0 w-full md:max-w-xl flex">
+            <div className="w-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200 border-l border-slate-200">
               {/* Drawer Header */}
-              <div className="px-6 py-4 bg-primary text-white flex items-center justify-between shrink-0">
+              <div className="px-5 py-4 bg-primary text-white flex items-center justify-between shrink-0 sticky top-0 z-20">
                 <div>
                   <h3 className="text-base font-extrabold">
                     {editingRecord ? "Edit IPD Record" : "Add New IPD Record"}
@@ -969,7 +1124,7 @@ export default function IpdPage() {
                 </div>
                 <button
                   onClick={() => setIsDrawerOpen(false)}
-                  className="p-1.5 hover:bg-primary-hover rounded-lg transition-colors text-white"
+                  className="p-1.5 hover:bg-primary-hover rounded-lg transition-colors text-white cursor-pointer"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -978,7 +1133,7 @@ export default function IpdPage() {
               </div>
 
               {/* Drawer Body */}
-              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
+              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
                 {/* SECTION 1: BASIC & ADMISSION DETAILS */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-1">
@@ -1020,73 +1175,37 @@ export default function IpdPage() {
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Hospital</label>
-                      <input
-                        type="text"
-                        list="drawer-hospital-list"
-                        value={formData.hospital || ""}
-                        onChange={(e) => setFormData({ ...formData, hospital: e.target.value })}
-                        placeholder="Select or type hospital"
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-primary font-semibold"
-                      />
-                      <datalist id="drawer-hospital-list">
-                        {hospitalOptions.map((h) => (
-                          <option key={h} value={h} />
-                        ))}
-                      </datalist>
-                    </div>
+                    <SearchableSelect
+                      label="Hospital"
+                      value={formData.hospital || ""}
+                      onChange={(val) => setFormData({ ...formData, hospital: val })}
+                      options={combinedHospitals}
+                      placeholder="Select or search hospital"
+                    />
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Sex</label>
-                      <input
-                        type="text"
-                        list="drawer-sex-list"
-                        value={formData.sex || ""}
-                        onChange={(e) => setFormData({ ...formData, sex: e.target.value })}
-                        placeholder="M or F"
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-primary font-semibold"
-                      />
-                      <datalist id="drawer-sex-list">
-                        {sexOptions.map((s) => (
-                          <option key={s} value={s} />
-                        ))}
-                      </datalist>
-                    </div>
+                    <SearchableSelect
+                      label="Sex"
+                      value={formData.sex || ""}
+                      onChange={(val) => setFormData({ ...formData, sex: val })}
+                      options={sexOptions}
+                      placeholder="Select gender"
+                    />
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Payer</label>
-                      <input
-                        type="text"
-                        list="drawer-payer-list"
-                        value={formData.payer || ""}
-                        onChange={(e) => setFormData({ ...formData, payer: e.target.value })}
-                        placeholder="TPA, Corporate, Cash"
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-primary font-semibold"
-                      />
-                      <datalist id="drawer-payer-list">
-                        {payerOptions.map((p) => (
-                          <option key={p} value={p} />
-                        ))}
-                      </datalist>
-                    </div>
+                    <SearchableSelect
+                      label="Payer"
+                      value={formData.payer || ""}
+                      onChange={(val) => setFormData({ ...formData, payer: val })}
+                      options={payerOptions}
+                      placeholder="Select payer type"
+                    />
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Complete</label>
-                      <input
-                        type="text"
-                        list="drawer-complete-list"
-                        value={formData.complete || ""}
-                        onChange={(e) => setFormData({ ...formData, complete: e.target.value })}
-                        placeholder="Y, N, TBC"
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-primary font-semibold"
-                      />
-                      <datalist id="drawer-complete-list">
-                        {completeOptions.map((c) => (
-                          <option key={c} value={c} />
-                        ))}
-                      </datalist>
-                    </div>
+                    <SearchableSelect
+                      label="Complete"
+                      value={formData.complete || ""}
+                      onChange={(val) => setFormData({ ...formData, complete: val })}
+                      options={completeOptions}
+                      placeholder="Select status"
+                    />
                   </div>
                 </div>
 
@@ -1097,58 +1216,46 @@ export default function IpdPage() {
                   </h4>
 
                   <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Diagnosis</label>
-                      <input
-                        type="text"
-                        value={formData.diagnosis || ""}
-                        onChange={(e) => setFormData({ ...formData, diagnosis: e.target.value })}
-                        placeholder="e.g. Complex fistula in ano with Abscess"
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-primary font-medium"
-                      />
-                    </div>
+                    <SearchableSelect
+                      label="Diagnosis"
+                      value={formData.diagnosis || ""}
+                      onChange={(val) => setFormData({ ...formData, diagnosis: val })}
+                      options={allDiagnoses}
+                      placeholder="Select or search diagnosis"
+                    />
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Surgery Procedure</label>
-                      <input
-                        type="text"
-                        value={formData.surgery || ""}
-                        onChange={(e) => setFormData({ ...formData, surgery: e.target.value })}
-                        placeholder="e.g. FiLac with DOA"
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-primary font-medium"
-                      />
-                    </div>
+                    <SearchableSelect
+                      label="Surgery Procedure"
+                      value={formData.surgery || ""}
+                      onChange={(val) => setFormData({ ...formData, surgery: val })}
+                      options={allSurgeries}
+                      placeholder="Select or search surgery"
+                    />
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Visiting Doc / Surgeon</label>
-                        <input
-                          type="text"
-                          value={formData.visiting_doc || formData.surgeons_name || ""}
-                          onChange={(e) => setFormData({ ...formData, visiting_doc: e.target.value, surgeons_name: e.target.value })}
-                          placeholder="e.g. Dr Ninad Gandbhir"
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-primary font-medium"
-                        />
-                      </div>
+                      <SearchableSelect
+                        label="Visiting Doc / Surgeon"
+                        value={formData.visiting_doc || formData.surgeons_name || ""}
+                        onChange={(val) => setFormData({ ...formData, visiting_doc: val, surgeons_name: val })}
+                        options={allDoctors}
+                        placeholder="Select or search surgeon"
+                      />
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Assistant Surgeon</label>
-                        <input
-                          type="text"
-                          value={formData.asst_surgeon || ""}
-                          onChange={(e) => setFormData({ ...formData, asst_surgeon: e.target.value })}
-                          placeholder="e.g. Dr Minakshee"
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-primary font-medium"
-                        />
-                      </div>
+                      <SearchableSelect
+                        label="Assistant Surgeon"
+                        value={formData.asst_surgeon || ""}
+                        onChange={(val) => setFormData({ ...formData, asst_surgeon: val })}
+                        options={allDoctors}
+                        placeholder="Select assistant surgeon"
+                      />
                     </div>
                   </div>
                 </div>
 
-                {/* SECTION 3: FINANCIALS & BILLING (Mouse wheel scroll disabled) */}
+                {/* SECTION 3: FINANCIALS & BILLING */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-1">
-                    3. Financial & Billing Charges (Mouse Scroll Disabled)
+                    3. Financial & Billing Charges
                   </h4>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1233,18 +1340,18 @@ export default function IpdPage() {
                 </div>
 
                 {/* Drawer Footer Actions */}
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-200">
+                <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-200 sticky bottom-0 bg-white py-2 z-10">
                   <button
                     type="button"
                     onClick={() => setIsDrawerOpen(false)}
-                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all"
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSaving}
-                    className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                   >
                     {isSaving ? "Saving Record..." : editingRecord ? "Update Record" : "Save Record"}
                   </button>
