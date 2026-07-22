@@ -26,7 +26,6 @@ export default function PlanSurgeryAdvisedCard({
   planSurgeryAdvised,
   setPlanSurgeryAdvised,
 }: PlanSurgeryAdvisedCardProps) {
-  const [searchInput, setSearchInput] = useState("");
   const [surgeryOptions, setSurgeryOptions] = useState<string[]>(DEFAULT_SURGERIES);
   const [isFocused, setIsFocused] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -103,14 +102,16 @@ export default function PlanSurgeryAdvisedCard({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Filter dropdown options based on searchInput
+  // Filter dropdown options based on current input
   const getSuggestions = (): string[] => {
-    const clean = searchInput.trim().toLowerCase();
-    const filtered = surgeryOptions.filter((o) => o.toLowerCase().includes(clean));
+    const parts = planSurgeryAdvised.split(",");
+    const lastPart = (parts[parts.length - 1] || "").trim().toLowerCase();
+    
+    const filtered = surgeryOptions.filter((o) => o.toLowerCase().includes(lastPart));
 
-    // Show "+ Create..." option if search term is entered and not exact match
-    if (searchInput.trim() && !surgeryOptions.some((o) => o.toLowerCase() === searchInput.trim().toLowerCase())) {
-      return [...filtered, `+ Create "${searchInput.trim()}"`];
+    const rawLast = (parts[parts.length - 1] || "").trim();
+    if (rawLast && !surgeryOptions.some((o) => o.toLowerCase() === rawLast.toLowerCase())) {
+      return [...filtered, `+ Create "${rawLast}"`];
     }
     return filtered;
   };
@@ -126,36 +127,30 @@ export default function PlanSurgeryAdvisedCard({
       saveNewOption(finalVal);
     }
 
-    // Append cleanly without duplicate/continuous commas
-    const current = planSurgeryAdvised.trim().replace(/[\s,]+$/, "");
-    if (current) {
-      if (!current.toLowerCase().includes(finalVal.toLowerCase())) {
-        setPlanSurgeryAdvised(`${current}, ${finalVal}`);
-      }
+    const parts = planSurgeryAdvised.split(",");
+    if (parts.length > 1) {
+      parts[parts.length - 1] = " " + finalVal;
+      setPlanSurgeryAdvised(parts.join(","));
     } else {
       setPlanSurgeryAdvised(finalVal);
     }
 
-    setSearchInput("");
     setIsFocused(false);
     setSelectedIndex(-1);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (suggestions.length === 0) return;
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!isFocused || suggestions.length === 0) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setSelectedIndex((prev) => Math.min(prev + 1, suggestions.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSelectedIndex((prev) => Math.max(prev - 1, 0));
-    } else if (e.key === "Enter") {
+    } else if (e.key === "Enter" && e.ctrlKey) {
       if (selectedIndex >= 0 && suggestions[selectedIndex]) {
         e.preventDefault();
         handleSelectOption(suggestions[selectedIndex]);
-      } else if (searchInput.trim()) {
-        e.preventDefault();
-        handleSelectOption(`+ Create "${searchInput.trim()}"`);
       }
     } else if (e.key === "Escape") {
       setIsFocused(false);
@@ -174,78 +169,65 @@ export default function PlanSurgeryAdvisedCard({
         </span>
       </div>
 
-      <div className="space-y-3">
-        {/* Autocomplete Input with Dropdown & Create Option */}
-        <div ref={containerRef} className="relative w-full">
-          <label className="block text-xs font-extrabold text-[#64748B] mb-1 uppercase tracking-wider">
-            Select or Create Surgery / Plan
-          </label>
-          <div className="relative flex items-center">
-            <input
-              type="text"
-              value={searchInput}
-              onFocus={() => setIsFocused(true)}
-              onChange={(e) => {
-                setSearchInput(e.target.value);
-                setIsFocused(true);
-                setSelectedIndex(-1);
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder="Search or type surgery (e.g. Appendectomy, Cataract Surgery)..."
-              className="w-full h-10 px-3.5 pr-10 border border-[#E2E8F0] focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 rounded-lg text-sm font-semibold text-[#1E293B] placeholder:text-[#C0CADC] focus:bg-white focus:outline-none transition-all"
-            />
-            <button
-              type="button"
-              onClick={() => setIsFocused(!isFocused)}
-              className="absolute right-3 text-slate-400 hover:text-slate-600"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Suggestions Dropdown */}
-          {isFocused && suggestions.length > 0 && (
-            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-[#E2E8F0] rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-50">
-              {suggestions.map((opt, idx) => {
-                const isCreate = opt.startsWith('+ Create "');
-                const isSelected = idx === selectedIndex;
-                return (
-                  <div
-                    key={opt}
-                    onClick={() => handleSelectOption(opt)}
-                    onMouseEnter={() => setSelectedIndex(idx)}
-                    className={`px-3.5 py-2.5 cursor-pointer text-sm font-semibold transition-colors flex items-center justify-between ${
-                      isSelected ? "bg-indigo-50 text-indigo-700" : "hover:bg-[#F8FAFC] text-[#1E293B]"
-                    } ${isCreate ? "text-indigo-600 font-extrabold bg-indigo-50/40" : ""}`}
-                  >
-                    <span>{opt}</span>
-                    {isCreate && (
-                      <span className="text-xs bg-indigo-600 text-white font-extrabold px-2 py-0.5 rounded shadow-2xs">
-                        + Add to catalog
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Textarea for Selected Plan & Custom Details */}
-        <div>
-          <label className="block text-xs font-extrabold text-[#64748B] mb-1 uppercase tracking-wider">
-            Advised Plan / Recommendations Details
-          </label>
+      <div ref={containerRef} className="relative w-full space-y-1">
+        <label className="block text-xs font-extrabold text-[#64748B] mb-1 uppercase tracking-wider">
+          Advised Plan / Recommendations Details
+        </label>
+        <div className="relative flex items-center">
           <textarea
             rows={3}
             value={planSurgeryAdvised}
-            onChange={(e) => setPlanSurgeryAdvised(e.target.value)}
-            placeholder="Enter surgical procedure plan or recommendations advised..."
-            className="w-full p-3 border border-[#E2E8F0] focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 rounded-lg text-sm font-semibold text-[#090d16] placeholder:text-slate-400 focus:bg-white focus:outline-none transition-all resize-none"
+            onFocus={() => setIsFocused(true)}
+            onChange={(e) => {
+              setPlanSurgeryAdvised(e.target.value);
+              setIsFocused(true);
+              setSelectedIndex(-1);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Type or select surgical procedure plan or recommendations advised (e.g. Appendectomy, Cataract Surgery)..."
+            className="w-full p-3 pr-10 border border-[#E2E8F0] focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 rounded-lg text-sm font-semibold text-[#090d16] placeholder:text-slate-400 focus:bg-white focus:outline-none transition-all resize-none"
           />
+          <button
+            type="button"
+            onClick={() => setIsFocused(!isFocused)}
+            className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 p-1"
+            title="Toggle Surgery Dropdown Options"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
         </div>
+
+        {/* Suggestions Dropdown */}
+        {isFocused && suggestions.length > 0 && (
+          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-[#E2E8F0] rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-50">
+            {suggestions.map((opt, idx) => {
+              const isCreate = opt.startsWith('+ Create "');
+              const isSelected = idx === selectedIndex;
+              return (
+                <div
+                  key={opt}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelectOption(opt);
+                  }}
+                  onMouseEnter={() => setSelectedIndex(idx)}
+                  className={`px-3.5 py-2.5 cursor-pointer text-sm font-semibold transition-colors flex items-center justify-between ${
+                    isSelected ? "bg-indigo-50 text-indigo-700" : "hover:bg-[#F8FAFC] text-[#1E293B]"
+                  } ${isCreate ? "text-indigo-600 font-extrabold bg-indigo-50/40" : ""}`}
+                >
+                  <span>{opt}</span>
+                  {isCreate && (
+                    <span className="text-xs bg-indigo-600 text-white font-extrabold px-2 py-0.5 rounded shadow-2xs">
+                      + Add to catalog
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );

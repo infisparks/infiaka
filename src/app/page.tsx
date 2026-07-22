@@ -680,7 +680,7 @@ function DashboardContent() {
   const [discountAmount, setDiscountAmount] = useState<number | "">("");
 
   const [servicesRows, setServicesRows] = useState<Array<{ id: string; name: string; fee: number | string; qty?: number; type?: 'service' | 'product' }>>([
-    { id: "1", name: "First consultation", fee: 2000, qty: 1, type: "service" }
+    { id: "1", name: "First consultation", fee: "", qty: 1, type: "service" }
   ]);
   const [paymentsRows, setPaymentsRows] = useState<Array<{ id: string; mode: string; amount: number }>>([
     { id: "1", mode: "Cash", amount: 0 }
@@ -807,7 +807,7 @@ function DashboardContent() {
     setVisitCategory("First consultation");
     setReferringDoctor("");
     setDiscountAmount(0);
-    setServicesRows([{ id: "1", name: "First consultation", fee: 2000, qty: 1, type: "service" }]);
+    setServicesRows([{ id: "1", name: "First consultation", fee: "", qty: 1, type: "service" }]);
     setPaymentsRows([{ id: "1", mode: "Cash", amount: 0 }]);
     setInitialBp("");
     setInitialPulse("");
@@ -854,7 +854,7 @@ function DashboardContent() {
         if (reg.services && reg.services.length > 0) {
           setServicesRows(reg.services);
         } else {
-          setServicesRows([{ id: "1", name: "First consultation", fee: 2000 }]);
+          setServicesRows([{ id: "1", name: "First consultation", fee: "" }]);
         }
         
         if (reg.payments && reg.payments.length > 0) {
@@ -1265,16 +1265,14 @@ function DashboardContent() {
         return [...prev, { name: finalVal.trim(), price: Number(rowFee) || 0, type }];
       });
 
-      const nextFee = type === "product" ? "" : rowFee;
-      updateServiceRow(rowId, finalVal, nextFee, type);
+      updateServiceRow(rowId, finalVal, "", type);
     } else {
       const matched = serviceCache.find((s) => s.name.toLowerCase() === val.toLowerCase());
       if (matched) {
         const type = matched.type || "service";
-        const fee = type === "product" ? "" : matched.price;
-        updateServiceRow(rowId, matched.name, fee, type);
+        updateServiceRow(rowId, matched.name, "", type);
       } else {
-        updateServiceRow(rowId, val, rowFee);
+        updateServiceRow(rowId, val, "");
       }
     }
     setServiceRowFocused(null);
@@ -1561,10 +1559,10 @@ function DashboardContent() {
       });
 
       const isLegacySelect = !!selectedBookingPatient?.isLegacy;
-      const isUpdate = !!selectedBookingPatient && !selectedBookingPatient.isLegacy && selectedBookingPatient.id.startsWith("DLPC");
+      const isExistingPatient = !!selectedBookingPatient && !selectedBookingPatient.isLegacy && !selectedBookingPatient.isNew && !!selectedBookingPatient.id;
       let targetUhid = "";
 
-      if (isUpdate) {
+      if (isExistingPatient) {
         targetUhid = selectedBookingPatient!.id;
         const { error: pError } = await supabase
           .from("patient_detail")
@@ -1584,6 +1582,26 @@ function DashboardContent() {
           })
           .eq("uhid", targetUhid);
         if (pError) throw pError;
+      } else if (isLegacySelect && selectedBookingPatient?.id) {
+        targetUhid = selectedBookingPatient.id;
+        const { error: pError } = await supabase
+          .from("patient_detail")
+          .upsert({
+            uhid: targetUhid,
+            name: fullName,
+            number: Number(phone) || null,
+            age: Number(age) || null,
+            gender: gender,
+            address: permanentAddress,
+            age_unit: ageUnit,
+            dob: dob || null,
+            title: title,
+            state: state,
+            local_address: localAddress,
+            country: country,
+            updated_at: new Date().toISOString()
+          }, { onConflict: "uhid" });
+        if (pError) throw pError;
       } else {
         const insertData: any = {
           name: fullName,
@@ -1598,10 +1616,6 @@ function DashboardContent() {
           local_address: localAddress,
           country: country
         };
-        
-        if (isLegacySelect && selectedBookingPatient?.id) {
-          insertData.uhid = selectedBookingPatient.id;
-        }
 
         const { data: newP, error: pError } = await supabase
           .from("patient_detail")
@@ -1614,7 +1628,19 @@ function DashboardContent() {
 
       const formattedAppointmentDateTime = appointmentDate ? `${appointmentDate}T${getCurrentTimeHHMM()}:00+05:30` : null;
 
-      if (isUpdate && selectedBookingPatient!.opdRegistration?.registration_id) {
+      const sanitizedServices = servicesRows.map((s) => ({
+        ...s,
+        fee: s.fee === "" || s.fee === undefined || s.fee === null ? 0 : (Number(s.fee) || 0)
+      }));
+
+      const sanitizedPayments = paymentsRows.map((p) => ({
+        ...p,
+        amount: (p as any).amount === "" || (p as any).amount === undefined || (p as any).amount === null ? 0 : (Number((p as any).amount) || 0)
+      }));
+
+      const numericDiscount = discountAmount === "" || discountAmount === undefined || discountAmount === null ? 0 : (Number(discountAmount) || 0);
+
+      if (isExistingPatient && selectedBookingPatient!.opdRegistration?.registration_id) {
         // Update existing registration details
         const { error: rError } = await supabase
           .from("aka_opd_registration")
@@ -1624,9 +1650,9 @@ function DashboardContent() {
             treating_doctor: treatingDoctor,
             visit_category: visitCategory,
             referring_doctor: referringDoctor,
-            discount_amount: discountAmount || 0,
-            services: servicesRows,
-            payments: paymentsRows,
+            discount_amount: numericDiscount,
+            services: sanitizedServices,
+            payments: sanitizedPayments,
             bp: initialBp,
             pulse: initialPulse,
             weight: initialWeight,
@@ -1646,9 +1672,9 @@ function DashboardContent() {
             treating_doctor: treatingDoctor,
             visit_category: visitCategory,
             referring_doctor: referringDoctor,
-            discount_amount: discountAmount || 0,
-            services: servicesRows,
-            payments: paymentsRows,
+            discount_amount: numericDiscount,
+            services: sanitizedServices,
+            payments: sanitizedPayments,
             bp: initialBp,
             pulse: initialPulse,
             weight: initialWeight,
@@ -2584,7 +2610,7 @@ function DashboardContent() {
                     </svg>
                     <input
                       type="text"
-                      placeholder="Type name or phone (e.g. mudassir)"
+                      placeholder="Type name, phone or UHID (e.g. mudassir)"
                       value={bookingSearch}
                       onChange={(e) => setBookingSearch(e.target.value)}
                       className="text-[11px] text-foreground focus:outline-none w-full bg-transparent placeholder:text-[#A0AEC0]"
@@ -2612,7 +2638,7 @@ function DashboardContent() {
                               {patient.name.charAt(0).toUpperCase()}
                             </div>
                             <span className="text-[10px] font-bold text-foreground">
-                              {patient.name} ({patient.gender}, {patient.age}y) - {patient.phone}
+                              {patient.name} ({patient.gender}, {patient.age}y) {patient.id ? `• UHID: ${patient.id}` : ""} {patient.phone ? `- ${patient.phone}` : ""}
                               {patient.isLegacy && (
                                 <span className="ml-2 bg-amber-100 text-amber-800 text-[8.5px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider">
                                   Legacy Data
@@ -2629,7 +2655,8 @@ function DashboardContent() {
                         onClick={() => {
                           setFullName(bookingSearch);
                           setSelectedBookingPatient({
-                            id: Date.now().toString(),
+                            id: "",
+                            isNew: true,
                             queueNo: "",
                             name: bookingSearch,
                             gender: "Male",
@@ -2660,7 +2687,7 @@ function DashboardContent() {
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                     <span className="text-[10px] font-bold text-emerald-800">
-                      OPD Registering: {fullName || "New Patient"}
+                      OPD Registering: {fullName || "New Patient"} {selectedBookingPatient.id ? `(UHID: ${selectedBookingPatient.id})` : ""}
                     </span>
                   </div>
                   <button
@@ -3336,7 +3363,7 @@ function DashboardContent() {
                               updateServiceRow(row.id, typedName, row.fee);
                               const matched = serviceCache.find((s) => s.name.toLowerCase() === typedName.toLowerCase());
                               if (matched) {
-                                updateServiceRow(row.id, matched.name, matched.price, matched.type);
+                                updateServiceRow(row.id, matched.name, row.fee, matched.type);
                               }
                               setActiveDDFocus("service-" + row.id);
                               setActiveDDIndex(-1);
@@ -3407,8 +3434,7 @@ function DashboardContent() {
                             value={row.type || "service"}
                             onChange={(e) => {
                               const newType = e.target.value as "service" | "product";
-                              const nextFee = newType === "product" ? "" : row.fee;
-                              updateServiceRow(row.id, row.name, nextFee, newType, newType === "service" ? 1 : (row.qty || 1));
+                              updateServiceRow(row.id, row.name, row.fee, newType, newType === "service" ? 1 : (row.qty || 1));
                             }}
                             className="w-full h-7 px-1.5 border border-[#CBD5E0] rounded text-[11px] bg-white focus:outline-none cursor-pointer"
                           >
@@ -3438,12 +3464,11 @@ function DashboardContent() {
                           <label className="text-[8px] font-bold text-[#718096] uppercase">Fee (₹) *</label>
                           <input
                             type="number"
-                            required
                             min="0"
-                            value={row.fee}
+                            value={row.fee === 0 || row.fee === "0" ? "" : row.fee}
                             onWheel={(e) => e.currentTarget.blur()}
                             onChange={(e) => updateServiceRow(row.id, row.name, e.target.value === "" ? "" : Number(e.target.value))}
-                            placeholder="2000"
+                            placeholder="Enter fee"
                             className="w-full h-7 px-2 border border-[#CBD5E0] rounded text-[11px] bg-white focus:outline-none text-right font-bold"
                           />
                         </div>
