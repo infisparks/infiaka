@@ -255,6 +255,7 @@ function DashboardContent() {
   // PrintPrescription specific states & ref
   const printPrescRef = useRef<any>(null);
   const [activePrescPrintData, setActivePrescPrintData] = useState<any>(null);
+  const [completeTarget, setCompleteTarget] = useState<{ patientId: string; regId?: string; currentIsCompleted: boolean } | null>(null);
 
   // Print settings loaded from aka_setting
   const [printShowHeader, setPrintShowHeader] = useState(true);
@@ -1320,6 +1321,19 @@ function DashboardContent() {
             updatedList = completedList.filter((id: string) => id !== String(trackingKey));
           }
           localStorage.setItem("completed_appointments", JSON.stringify(updatedList));
+
+          // Also update database is_completed flag
+          const dbRegId = p.opdRegistration?.registration_id || regId;
+          if (dbRegId) {
+            supabase
+              .from("aka_opd_registration")
+              .update({ is_completed: nextVal })
+              .eq("registration_id", dbRegId)
+              .then(({ error }) => {
+                if (error) console.error("Error updating completed status in DB:", error);
+              });
+          }
+
           return {
             ...p,
             isCompleted: nextVal,
@@ -1700,18 +1714,18 @@ function DashboardContent() {
     if (!patient) return;
 
     try {
-      const isWhatsapp = false; // default print format is A5 Landscape
+      const isWhatsapp = false;
 
-      // Page parameters
-      const PAGE_W = 210; // Width is 210mm for A4 Portrait and A5 Landscape
-      const PAGE_H = isWhatsapp ? 297 : 148; // Height is 297mm for A4 and 148mm for A5
+      // Page parameters: Standard A4 Portrait (210mm x 297mm)
+      const PAGE_W = 210;
+      const PAGE_H = 297;
       const MARGIN = 12;
       const CONTENT_W = PAGE_W - MARGIN * 2;
 
       const doc = new jsPDF({
-          orientation: isWhatsapp ? 'p' : 'l', // Portrait for WhatsApp, Landscape for print
+          orientation: 'p',
           unit: 'mm',
-          format: isWhatsapp ? 'a4' : 'a5',
+          format: 'a4',
           compress: true
       });
 
@@ -1795,7 +1809,7 @@ function DashboardContent() {
       const greenColor: [number, number, number]    = [22, 163, 74];
 
       // ── PATIENT PROFILE CARD ───────────────────────────────────────
-      const cardY = isWhatsapp ? 43 : 34;
+      const cardY = 34;
       doc.setFillColor(248, 250, 252);
       doc.setDrawColor(...borderColor);
       doc.setLineWidth(0.2);
@@ -1827,7 +1841,8 @@ function DashboardContent() {
       
       // Date offset alignment
       doc.setFont("Poppins", "normal").setFontSize(7).setTextColor(...textGray);
-      doc.text("Date: " + new Date(opd.created_at).toLocaleDateString('en-GB'), PAGE_W - MARGIN - 35, cardY + 11.5, { align: "right" });
+      const invoiceDateStr = opd.created_at ? (isNaN(new Date(opd.created_at).getTime()) ? new Date().toLocaleDateString('en-GB') : new Date(opd.created_at).toLocaleDateString('en-GB')) : new Date().toLocaleDateString('en-GB');
+      doc.text("Date: " + invoiceDateStr, PAGE_W - MARGIN - 35, cardY + 11.5, { align: "right" });
 
       // Status Badge
       const isPaid = (amountPaid >= netAmount);
@@ -1840,7 +1855,7 @@ function DashboardContent() {
       doc.setFont("Poppins", "bold").setFontSize(5.5).setTextColor(textBadge[0], textBadge[1], textBadge[2]);
       doc.text(statusText, PAGE_W - MARGIN - 22, cardY + 11.8, { align: "center" });
 
-      const cardSpacing = isWhatsapp ? 19 : 17;
+      const cardSpacing = 17;
       let currentY = cardY + cardSpacing;
 
       // ── SUMMARY TABLE ──────────────────────────────────────────────
@@ -1855,10 +1870,10 @@ function DashboardContent() {
           tableBody = [["1", "Outpatient Consultation / Visit Fees", `₹${totalFees.toFixed(2)}`]];
       }
 
-      const headFontSize = isWhatsapp ? 7.5 : 7;
-      const bodyFontSize = isWhatsapp ? 8 : 7.5;
-      const headPadding = isWhatsapp ? { top: 2.2, bottom: 2.2, left: 3, right: 3 } : { top: 1.5, bottom: 1.5, left: 3, right: 3 };
-      const bodyPadding = isWhatsapp ? 3 : 1.8;
+      const headFontSize = 7;
+      const bodyFontSize = 7.5;
+      const headPadding = { top: 1.5, bottom: 1.5, left: 3, right: 3 };
+      const bodyPadding = 1.8;
 
       autoTable(doc, {
           startY: currentY,
@@ -1890,7 +1905,7 @@ function DashboardContent() {
           margin: { left: MARGIN, right: MARGIN }
       });
 
-      currentY = (doc as any).lastAutoTable.finalY + (isWhatsapp ? 2 : 1.5);
+      currentY = (doc as any).lastAutoTable.finalY + 1.5;
       const totalsStartY = currentY;
 
       // ── TOTALS SECTION ─────────────────────────────────────────────
@@ -1899,11 +1914,11 @@ function DashboardContent() {
       const totalsBoxX = PAGE_W - MARGIN - 50;
       const totalsBoxW = 50;
 
-      const rowGap = isWhatsapp ? 4.2 : 3.4;
+      const rowGap = 3.4;
 
       const drawRow = (label: string, value: number, color: [number, number, number] = textDark, isBold = false, size = 7.5) => {
           doc.setFont("Poppins", isBold ? "bold" : "normal")
-             .setFontSize(isWhatsapp ? size : size - 0.5)
+             .setFontSize(size - 0.5)
              .setTextColor(color[0], color[1], color[2]);
           doc.text(label, totalsLabelX, currentY);
           doc.text(`₹${value.toFixed(2)}`, totalsValueX, currentY, { align: "right" });
@@ -1913,9 +1928,9 @@ function DashboardContent() {
       drawRow("Sub Total:", totalFees, textGray);
       if (discount > 0) drawRow("Discount:", discount, greenColor);
 
-      currentY += isWhatsapp ? 1.0 : 0.5; // Ample spacing below Sub Total / Discount row
+      currentY += 0.5;
       doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]).setLineWidth(0.25).line(totalsBoxX, currentY, PAGE_W - MARGIN, currentY);
-      currentY += isWhatsapp ? 4.0 : 3.0; // Ample spacing below line before drawing bold Total Payable text
+      currentY += 3.0;
       
       drawRow("Total Payable:", netAmount, textDark, true, 8);
       drawRow("Paid Amount:", amountPaid, textGray, false, 7.5);
@@ -1926,17 +1941,26 @@ function DashboardContent() {
       const balanceText = isDue ? redColor : greenColor;
       const balanceBorderColor = isDue ? [254, 202, 202] : [187, 247, 208];
 
-      const balanceBoxH = isWhatsapp ? 6 : 5;
-      const balanceTextOffset = isWhatsapp ? 2.5 : 2.0;
+      const balanceBoxH = 5;
+      const balanceTextOffset = 2.0;
 
       doc.setFillColor(balanceBg[0], balanceBg[1], balanceBg[2]);
       doc.setDrawColor(balanceBorderColor[0], balanceBorderColor[1], balanceBorderColor[2]);
       doc.setLineWidth(0.25);
       doc.roundedRect(totalsBoxX, currentY - 2, totalsBoxW, balanceBoxH, 0.5, 0.5, "FD");
-      doc.setFont("Poppins", "bold").setFontSize(isWhatsapp ? 8.5 : 8.0).setTextColor(balanceText[0], balanceText[1], balanceText[2]);
+      doc.setFont("Poppins", "bold").setFontSize(8.0).setTextColor(balanceText[0], balanceText[1], balanceText[2]);
       doc.text("BALANCE DUE:", totalsBoxX + 4, currentY - 2 + balanceTextOffset + 0.8);
       doc.text(`₹${balance.toFixed(2)}`, totalsValueX - 2, currentY - 2 + balanceTextOffset + 0.8, { align: "right" });
-      currentY += isWhatsapp ? 8 : 5.5;
+      currentY += 5.5;
+
+      const parsePaymentTime = (timeVal: any) => {
+        if (!timeVal) return new Date().toLocaleDateString('en-GB');
+        const d = new Date(timeVal);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+        }
+        return String(timeVal);
+      };
 
       const paymentEntries = opd.payment_entries || [];
       if (paymentEntries.length > 0) {
@@ -1950,35 +1974,35 @@ function DashboardContent() {
                   const mode = (e.mode || 'CASH').toUpperCase();
                   const displayAmt = mode === 'REFUND' ? `- ₹${amt.toFixed(2)}` : `₹${amt.toFixed(2)}`;
                   return [
-                      e.time ? new Date(e.time).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
+                      parsePaymentTime(e.time),
                       mode,
                       displayAmt
                   ];
               }),
               theme: 'grid',
-              headStyles: { fillColor: primaryLight, textColor: primaryColor, fontSize: 6.5, font: 'Poppins', fontStyle: 'bold', cellPadding: isWhatsapp ? 1.5 : 1.0 },
-              bodyStyles: { fontSize: isWhatsapp ? 7 : 6.5, font: 'Poppins', cellPadding: isWhatsapp ? 1.5 : 1.0 },
+              headStyles: { fillColor: primaryLight, textColor: primaryColor, fontSize: 6.5, font: 'Poppins', fontStyle: 'bold', cellPadding: 1.0 },
+              bodyStyles: { fontSize: 6.5, font: 'Poppins', cellPadding: 1.0 },
               margin: { left: MARGIN, right: PAGE_W - totalsBoxX + 4 }
           });
       }
 
-      // ── STRICT A5 / A4 BOUNDARY FOOTER ──────────────────────────────
+      // ── STRICT FOOTER POSITIONING (Keep same top offset as original A5) ──
       const contentEndY = Math.max(currentY, (paymentEntries.length > 0 && (doc as any).lastAutoTable) ? (doc as any).lastAutoTable.finalY : 0);
-      const minFooterY = isWhatsapp ? 120 : 112;
-      const footerY = Math.max(minFooterY, contentEndY + 2); // strictly dynamic positioning with safe minimum boundary
+      const minFooterY = 112;
+      const footerY = Math.max(minFooterY, contentEndY + 4);
 
       // Subtle separator line
       doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]).setLineWidth(0.25).line(MARGIN, footerY, PAGE_W - MARGIN, footerY);
 
       doc.setFont("Poppins", "bold").setFontSize(6).setTextColor(textGray[0], textGray[1], textGray[2]);
-      doc.text("Scan QR on invoice to verify authenticity", MARGIN, footerY + (isWhatsapp ? 6 : 4.5));
+      doc.text("Scan QR on invoice to verify authenticity", MARGIN, footerY + 4.5);
       doc.setFont("Poppins", "normal").setFontSize(5.5).setTextColor(textGray[0], textGray[1], textGray[2]);
-      doc.text("System generated invoice — No signature required.", MARGIN, footerY + (isWhatsapp ? 10 : 8.0));
+      doc.text("System generated invoice — No signature required.", MARGIN, footerY + 8.0);
 
       // Signature line on the right
-      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]).setLineWidth(0.25).line(PAGE_W - MARGIN - 45, footerY + (isWhatsapp ? 9 : 7.0), PAGE_W - MARGIN, footerY + (isWhatsapp ? 9 : 7.0));
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]).setLineWidth(0.25).line(PAGE_W - MARGIN - 45, footerY + 7.0, PAGE_W - MARGIN, footerY + 7.0);
       doc.setFont("Poppins", "bold").setFontSize(6.5).setTextColor(textGray[0], textGray[1], textGray[2]);
-      doc.text("AUTHORIZED SIGNATURE", PAGE_W - MARGIN, footerY + (isWhatsapp ? 13 : 10.5), { align: "right" });
+      doc.text("AUTHORIZED SIGNATURE", PAGE_W - MARGIN, footerY + 10.5, { align: "right" });
 
       const pdfBlob = doc.output("blob");
       const blobUrl = URL.createObjectURL(pdfBlob);
@@ -2508,6 +2532,28 @@ function DashboardContent() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                       Print Prescription
+                    </button>
+
+                    {/* Mark Complete Button */}
+                    <button
+                      onClick={() => {
+                        setCompleteTarget({
+                          patientId: patient.id,
+                          regId: patient.opdRegistration?.registration_id ? String(patient.opdRegistration.registration_id) : undefined,
+                          currentIsCompleted: !!patient.isCompleted
+                        });
+                      }}
+                      className={`px-2 h-6 rounded text-[10px] font-bold flex items-center gap-1 transition-colors shrink-0 ${
+                        patient.isCompleted
+                          ? "bg-emerald-50 border border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+                          : "border border-emerald-500 text-emerald-600 hover:bg-emerald-50"
+                      }`}
+                      title={patient.isCompleted ? "Mark as Ongoing" : "Mark as Complete"}
+                    >
+                      <svg className="w-2.5 h-2.5 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      {patient.isCompleted ? "Completed" : "Complete"}
                     </button>
 
                     {/* Delete Appointment Button */}
@@ -3834,6 +3880,63 @@ function DashboardContent() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* COMPLETE / UNDO COMPLETE CONFIRMATION MODAL */}
+        {completeTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px] p-4 select-none text-left">
+            <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                completeTarget.currentIsCompleted ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"
+              }`}>
+                {completeTarget.currentIsCompleted ? (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
+              </div>
+
+              <h3 className="text-base font-extrabold text-slate-900 text-center mb-1">
+                {completeTarget.currentIsCompleted
+                  ? "Do you want to undo complete?"
+                  : "Do you want to complete this appointment?"}
+              </h3>
+
+              <p className="text-xs text-slate-500 font-medium text-center mb-5">
+                {completeTarget.currentIsCompleted
+                  ? "This will set the appointment status back to ongoing."
+                  : "This will mark the appointment as completed."}
+              </p>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCompleteTarget(null)}
+                  className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleToggleCompleted(completeTarget.patientId, completeTarget.regId);
+                    setCompleteTarget(null);
+                  }}
+                  className={`flex-1 py-2.5 px-4 text-white text-xs font-bold rounded-xl shadow-md transition-all ${
+                    completeTarget.currentIsCompleted
+                      ? "bg-amber-600 hover:bg-amber-700"
+                      : "bg-emerald-600 hover:bg-emerald-700"
+                  }`}
+                >
+                  {completeTarget.currentIsCompleted ? "Yes, Undo" : "Yes, Complete"}
+                </button>
+              </div>
             </div>
           </div>
         )}
