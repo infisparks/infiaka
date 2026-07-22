@@ -62,24 +62,70 @@ interface MedicineItem {
   name: string;
   generic: string;
   form?: string;
+  defaultDose?: string;
+  defaultFreq?: string;
+  defaultTiming?: string;
+  defaultDuration?: string;
+  defaultInstr?: string;
+}
+
+async function saveMedicineDefaultDosage(medicineId: number, defaults: {
+  dose?: string;
+  freq?: string;
+  timing?: string;
+  duration?: string;
+  instr?: string;
+}) {
+  if (!medicineId) return;
+  try {
+    const { data } = await supabase
+      .from("medicine")
+      .select("metadata")
+      .eq("id", medicineId)
+      .maybeSingle();
+
+    const existingMeta = data?.metadata || {};
+    const updatedMeta = { ...existingMeta };
+
+    if (defaults.dose !== undefined) updatedMeta.default_dose = defaults.dose;
+    if (defaults.freq !== undefined) updatedMeta.default_freq = defaults.freq;
+    if (defaults.timing !== undefined) updatedMeta.default_timing = defaults.timing;
+    if (defaults.duration !== undefined) updatedMeta.default_duration = defaults.duration;
+    if (defaults.instr !== undefined) updatedMeta.default_instr = defaults.instr;
+
+    await supabase
+      .from("medicine")
+      .update({ metadata: updatedMeta })
+      .eq("id", medicineId);
+  } catch (err) {
+    console.error("Error saving medicine metadata:", err);
+  }
 }
 
 async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
   try {
     const q = query?.trim() ?? "";
 
-    const toItem = (m: any): MedicineItem => ({
-      id: Number(m.id),
-      name: m.name ?? "",
-      generic: m.salt_composition || m.short_composition1 || "",
-      form: m.type?.toLowerCase() || "tablet"
-    });
+    const toItem = (m: any): MedicineItem => {
+      const meta = m.metadata || {};
+      return {
+        id: Number(m.id),
+        name: m.name ?? "",
+        generic: m.salt_composition || m.short_composition1 || "",
+        form: m.type?.toLowerCase() || "tablet",
+        defaultDose: meta.default_dose || "",
+        defaultFreq: meta.default_freq || "",
+        defaultTiming: meta.default_timing || "",
+        defaultDuration: meta.default_duration || "",
+        defaultInstr: meta.default_instr || ""
+      };
+    };
 
     // Empty query — show first 10 alphabetically
     if (!q) {
       const { data } = await supabase
         .from("medicine")
-        .select("id, name, salt_composition, short_composition1, type")
+        .select("id, name, salt_composition, short_composition1, type, metadata")
         .order("name", { ascending: true })
         .limit(10);
       return (data || []).map(toItem);
@@ -89,13 +135,13 @@ async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
     const [tier1Result, tier2Result] = await Promise.all([
       supabase
         .from("medicine")
-        .select("id, name, salt_composition, short_composition1, type")
+        .select("id, name, salt_composition, short_composition1, type, metadata")
         .ilike("name", `${q}%`)
         .order("name", { ascending: true })
         .limit(12),
       supabase
         .from("medicine")
-        .select("id, name, salt_composition, short_composition1, type")
+        .select("id, name, salt_composition, short_composition1, type, metadata")
         .ilike("name", `%${q}%`)
         .not("name", "ilike", `${q}%`)   // exclude starts-with results
         .order("name", { ascending: true })
@@ -119,7 +165,7 @@ async function searchMedicinesFromDb(query: string): Promise<MedicineItem[]> {
     if (results.length < 8) {
       const { data: tier3 } = await supabase
         .from("medicine")
-        .select("id, name, salt_composition, short_composition1, type")
+        .select("id, name, salt_composition, short_composition1, type, metadata")
         .or(`salt_composition.ilike.${q}%,short_composition1.ilike.${q}%`)
         .order("name", { ascending: true })
         .limit(8);
@@ -603,7 +649,17 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
   };
 
   /* ─── helpers ─── */
-  const addMedicine = async (med: { id?: number; name: string; generic: string; form?: string }) => {
+  const addMedicine = async (med: { 
+    id?: number; 
+    name: string; 
+    generic: string; 
+    form?: string;
+    defaultDose?: string;
+    defaultFreq?: string;
+    defaultTiming?: string;
+    defaultDuration?: string;
+    defaultInstr?: string;
+  }) => {
     // If the medicine generic matches empty, check if it's new custom typed text
     let name = med.name.trim();
     if (!name) return;
@@ -613,10 +669,16 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
 
     let medicineId: number | undefined;
 
+    let defaultDose = med.defaultDose || "";
+    let defaultFreq = med.defaultFreq || "";
+    let defaultTiming = med.defaultTiming || "";
+    let defaultDuration = med.defaultDuration || "";
+    let defaultInstr = med.defaultInstr || "";
+
     // If it's a new custom entry, insert it into public.medicine in Supabase
     const { data: existing } = await supabase
       .from("medicine")
-      .select("id, name, salt_composition, short_composition1, type")
+      .select("id, name, salt_composition, short_composition1, type, metadata")
       .eq("name", name)
       .maybeSingle();
 
@@ -630,6 +692,12 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
       medicineId = Number(existing.id);
       generic = existing.salt_composition || existing.short_composition1 || generic;
       form = existing.type?.toLowerCase() || form;
+      const meta = existing.metadata || {};
+      if (meta.default_dose) defaultDose = meta.default_dose;
+      if (meta.default_freq) defaultFreq = meta.default_freq;
+      if (meta.default_timing) defaultTiming = meta.default_timing;
+      if (meta.default_duration) defaultDuration = meta.default_duration;
+      if (meta.default_instr) defaultInstr = meta.default_instr;
     }
 
     const newMed = {
@@ -638,12 +706,12 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
       name,
       generic,
       form,
-      dose: "",
-      freq: "",
-      timing: "",
-      duration: "",
+      dose: defaultDose,
+      freq: defaultFreq,
+      timing: defaultTiming,
+      duration: defaultDuration,
       start: "",
-      instr: ""
+      instr: defaultInstr
     };
     setMedications((p) => [...p, newMed]);
     setMedInput("");
@@ -653,7 +721,33 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
 
   const dropdownClicked = useRef(false);
 
-  const patch  = (id: string, diff: Partial<Medication>) => setMedications((p) => p.map((m) => (m.id === id ? { ...m, ...diff } : m)));
+  const patch = (id: string, diff: Partial<Medication>) => {
+    setMedications((p) =>
+      p.map((m) => {
+        if (m.id === id) {
+          const updated = { ...m, ...diff };
+          if (
+            updated.medicineId &&
+            (diff.dose !== undefined ||
+              diff.freq !== undefined ||
+              diff.timing !== undefined ||
+              diff.duration !== undefined ||
+              diff.instr !== undefined)
+          ) {
+            saveMedicineDefaultDosage(updated.medicineId, {
+              dose: updated.dose,
+              freq: updated.freq,
+              timing: updated.timing,
+              duration: updated.duration,
+              instr: updated.instr
+            });
+          }
+          return updated;
+        }
+        return m;
+      })
+    );
+  };
 
   const handleInputBlur = async (categoryId: number, value: string) => {
     if (!value || !value.trim()) return;
@@ -733,43 +827,37 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
         <div className="w-7 shrink-0 border-r border-[#E2E8F0]" />
         
         {/* Col 1: Medicine */}
-        <div className="w-[27%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
+        <div className="w-[32%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Medicine</div>
           <div className="text-sm text-slate-700 lowercase font-semibold">Generic</div>
         </div>
         
         {/* Col 2: Dose */}
-        <div className="w-[10%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
+        <div className="w-[11%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Dose</div>
           <div className="text-sm text-slate-700 lowercase font-semibold">eg. 1 tablet</div>
         </div>
 
         {/* Col 3: Frequency */}
-        <div className="w-[10%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
+        <div className="w-[11%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Frequency</div>
           <div className="text-sm text-slate-700 lowercase font-semibold">eg. 1-0-1 etc</div>
         </div>
 
         {/* Col 4: Timing */}
-        <div className="w-[10%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
+        <div className="w-[11%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Timing</div>
           <div className="text-sm text-slate-700 lowercase font-semibold">eg. After meal</div>
         </div>
 
         {/* Col 5: Duration */}
-        <div className="w-[10%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
+        <div className="w-[11%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Duration</div>
           <div className="text-sm text-slate-700 lowercase font-semibold">eg. 3 days</div>
         </div>
 
-        {/* Col 6: Start From */}
-        <div className="w-[10%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
-          <div>Start From</div>
-          <div className="text-sm text-slate-700 lowercase font-semibold">eg. 1, 3, 5 etc</div>
-        </div>
-
-        {/* Col 7: Instructions */}
-        <div className="w-[18%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
+        {/* Col 6: Instructions */}
+        <div className="w-[21%] shrink-0 border-r border-[#E2E8F0] px-3 py-1.5 flex flex-col justify-center">
           <div>Instructions</div>
           <div className="text-sm text-slate-700 lowercase font-semibold">if any..</div>
         </div>
@@ -806,7 +894,7 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                 </div>
 
                 {/* Col 1: Medicine Input */}
-                <div className="w-[27%] shrink-0 border-r border-[#E2E8F0] bg-white px-2 py-1 flex flex-col justify-center relative overflow-visible gap-0.5">
+                <div className="w-[32%] shrink-0 border-r border-[#E2E8F0] bg-white px-2 py-1 flex flex-col justify-center relative overflow-visible gap-0.5">
                   {/* Name row: autocomplete + form badge + pencil */}
                   <div className="flex items-center gap-1 w-full h-6">
                     <div className="flex-1 min-w-0">
@@ -814,7 +902,17 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                         value={med.name}
                         onChange={(v) => patch(med.id, { name: v })}
                         onSelect={async (m) => {
-                          patch(med.id, { medicineId: m.id, name: m.name, generic: m.generic, form: m.form });
+                          patch(med.id, { 
+                            medicineId: m.id, 
+                            name: m.name, 
+                            generic: m.generic, 
+                            form: m.form,
+                            ...(m.defaultDose && { dose: m.defaultDose }),
+                            ...(m.defaultFreq && { freq: m.defaultFreq }),
+                            ...(m.defaultTiming && { timing: m.defaultTiming }),
+                            ...(m.defaultDuration && { duration: m.defaultDuration }),
+                            ...(m.defaultInstr && { instr: m.defaultInstr })
+                          });
                         }}
                         onBlur={async (v) => {
                           const cleanName = v.trim();
@@ -831,15 +929,21 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                           
                           const { data: existing } = await supabase
                             .from("medicine")
-                            .select("id, name, salt_composition, short_composition1, type")
+                            .select("id, name, salt_composition, short_composition1, type, metadata")
                             .eq("name", cleanName)
                             .maybeSingle();
 
                           if (existing) {
+                            const meta = existing.metadata || {};
                             patch(med.id, { 
                               medicineId: Number(existing.id), 
                               generic: existing.salt_composition || existing.short_composition1 || med.generic, 
-                              form: existing.type?.toLowerCase() || med.form 
+                              form: existing.type?.toLowerCase() || med.form,
+                              ...(meta.default_dose && { dose: meta.default_dose }),
+                              ...(meta.default_freq && { freq: meta.default_freq }),
+                              ...(meta.default_timing && { timing: meta.default_timing }),
+                              ...(meta.default_duration && { duration: meta.default_duration }),
+                              ...(meta.default_instr && { instr: meta.default_instr })
                             });
                           } else {
                             const inserted = await insertMedicineIntoDb(cleanName, med.generic, med.form || "tablet");
@@ -935,10 +1039,8 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                   ) : null}
                 </div>
 
-                {/* Col 1 medicine name with pencil (unchanged above) */}
-
                 {/* Col 2: Dose */}
-                <div className="relative w-[10%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
+                <div className="relative w-[11%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                   <InlineAutoComplete
                     value={med.dose}
                     onChange={(v) => patch(med.id, { dose: v })}
@@ -951,7 +1053,7 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                 </div>
 
                 {/* Col 3: Frequency */}
-                <div className="relative w-[10%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
+                <div className="relative w-[11%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                   <InlineAutoComplete
                     value={med.freq}
                     onChange={(v) => patch(med.id, { freq: v })}
@@ -964,7 +1066,7 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                 </div>
 
                 {/* Col 4: Timing */}
-                <div className="relative w-[10%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
+                <div className="relative w-[11%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                   <InlineAutoComplete
                     value={med.timing}
                     onChange={(v) => patch(med.id, { timing: v })}
@@ -977,7 +1079,7 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                 </div>
 
                 {/* Col 5: Duration */}
-                <div className="relative w-[10%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
+                <div className="relative w-[11%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                   <InlineAutoComplete
                     value={med.duration}
                     onChange={(v) => patch(med.id, { duration: v })}
@@ -989,19 +1091,8 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                   />
                 </div>
 
-                {/* Col 6: Start From */}
-                <div className="relative w-[10%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
-                  <InlineAutoComplete
-                    value={med.start}
-                    onChange={(v) => patch(med.id, { start: v })}
-                    onBlur={(v) => handleInputBlur(24, v)}
-                    options={startOptions}
-                    placeholder="Start From"
-                  />
-                </div>
-
-                {/* Col 7: Instructions */}
-                <div className="relative w-[18%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
+                {/* Col 6: Instructions */}
+                <div className="relative w-[21%] shrink-0 border-r border-[#E2E8F0] flex items-center bg-white">
                   <InlineAutoComplete
                     value={med.instr}
                     onChange={(v) => patch(med.id, { instr: v })}
@@ -1012,7 +1103,7 @@ export default function MedicationsCard({ medications, setMedications }: Medicat
                   />
                 </div>
 
-                {/* Col 8: Trash action */}
+                {/* Action Trash button */}
                 <div className="flex-1 flex items-center justify-center bg-white text-slate-300 hover:text-red-500 transition-colors cursor-pointer">
                   <button type="button" onClick={() => remove(med.id)} className="p-1">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
