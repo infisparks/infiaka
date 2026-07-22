@@ -783,34 +783,85 @@ ${clinicName}`;
         <main className={`flex-1 p-2 md:p-4 bg-slate-100/50 relative flex flex-col ${
           activeMobileTab === "preview" ? "flex" : "hidden md:flex"
         }`}>
-          {/* QUICK MOBILE ACTION BANNER */}
-          <div className="flex md:hidden items-center justify-between gap-2 p-2 bg-white border border-indigo-100 mb-2 rounded-xl shadow-2xs shrink-0">
-            <button
-              type="button"
-              onClick={async () => {
-                if (printRef.current) {
-                  await printRef.current.generatePDF(true);
-                  showToast("Downloading PDF Prescription...", "success");
-                }
-              }}
-              className="flex-1 py-2 bg-indigo-650 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-lg shadow-xs flex items-center justify-center gap-1"
-            >
-              📥 Download PDF
-            </button>
-            <button
-              type="button"
-              disabled={sendingWhatsapp}
-              onClick={handleSendWhatsApp}
-              className="py-2 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-lg shadow-xs flex items-center justify-center gap-1"
-            >
-              💬 WhatsApp
-            </button>
+          {/* MOBILE NATIVE PRESCRIPTION VIEW CARD */}
+          <div className="md:hidden bg-white border border-slate-200 rounded-2xl p-3.5 shadow-xs mb-2.5 space-y-2.5 select-text">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div>
+                <span className="text-[9.5px] font-extrabold text-indigo-600 uppercase tracking-wider">Prescription Overview</span>
+                <h3 className="text-sm font-extrabold text-slate-900">{activePrintData?.patient?.name}</h3>
+                <p className="text-[11px] text-slate-500 font-semibold">
+                  {activePrintData?.patient?.age}y / {activePrintData?.patient?.gender} • OPD ID: #{registrationId}
+                </p>
+              </div>
+              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-extrabold border border-emerald-200">
+                Ready
+              </span>
+            </div>
+
+            {/* Quick Vitals Row */}
+            {(activePrintData?.bp || activePrintData?.pulse || activePrintData?.weight || activePrintData?.spo2) && (
+              <div className="flex flex-wrap items-center gap-1.5 py-0.5">
+                {activePrintData.bp && <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold text-slate-700">BP: {activePrintData.bp}</span>}
+                {activePrintData.pulse && <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold text-slate-700">Pulse: {activePrintData.pulse} bpm</span>}
+                {activePrintData.weight && <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold text-slate-700">Weight: {activePrintData.weight} kg</span>}
+                {activePrintData.spo2 && <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold text-slate-700">SpO2: {activePrintData.spo2}%</span>}
+              </div>
+            )}
+
+            {/* Prescribed Medications Summary */}
+            {activePrintData?.medications && activePrintData.medications.length > 0 && (
+              <div className="space-y-1 pt-0.5">
+                <span className="text-[9.5px] font-extrabold text-slate-500 uppercase tracking-wider">Prescribed Medicines ({activePrintData.medications.length})</span>
+                <div className="space-y-1 max-h-32 overflow-y-auto pr-0.5">
+                  {activePrintData.medications.map((m: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between bg-slate-50 p-1.5 rounded-lg border border-slate-200 text-xs">
+                      <span className="font-bold text-slate-900 truncate max-w-[170px]">{i + 1}. {m.name}</span>
+                      <span className="text-[10.5px] text-slate-600 font-semibold">{m.dose || ""} {m.freq || ""} {m.duration || ""}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Primary Mobile Action Buttons */}
+            <div className="pt-1 flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (printRef.current) {
+                    await printRef.current.generatePDF(true);
+                    showToast("Downloading Prescription PDF...", "success");
+                  }
+                }}
+                className="w-full py-2.5 bg-primary hover:bg-primary-hover text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download Prescription PDF
+              </button>
+
+              {previewBlobUrl && (
+                <a
+                  href={previewBlobUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 font-extrabold text-xs rounded-xl text-center flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  👁️ Open Full Screen PDF
+                </a>
+              )}
+            </div>
           </div>
 
+          {/* PDF EMBED CONTAINER */}
           {previewBlobUrl ? (
-            <iframe src={previewBlobUrl} className="w-full h-full min-h-[480px] md:min-h-0 rounded-xl border border-slate-200 shadow-sm bg-white" />
+            <iframe
+              src={previewBlobUrl}
+              className="w-full h-full min-h-[380px] md:min-h-0 rounded-xl border border-slate-200 shadow-sm bg-white"
+            />
           ) : (
-            <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm animate-pulse">
+            <div className="flex flex-col items-center justify-center h-full min-h-[350px] text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm animate-pulse">
               <svg className="w-8 h-8 text-indigo-500 animate-spin mb-2" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
                 <path fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" className="opacity-75" />
@@ -823,29 +874,29 @@ ${clinicName}`;
       </div>
 
       {/* ACTION FOOTER */}
-      <footer className="bg-white border-t border-[#E2E8F0] p-2.5 sm:px-4 flex flex-col sm:flex-row items-center justify-between shrink-0 shadow-sm gap-2 select-none">
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+      <footer className="bg-white border-t border-[#E2E8F0] p-3 md:px-4 flex flex-col sm:flex-row items-center justify-between shrink-0 shadow-sm gap-2 select-none">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => {
               showToast("Prescription saved as template successfully!", "success");
             }}
-            className="flex-1 sm:flex-initial px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10.5px] font-bold text-slate-700 rounded-lg flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-2xs"
+            className="flex-1 sm:flex-initial px-3.5 py-2 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-xs font-bold text-slate-700 rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
           >
-            📂 Template
+            📂 Save Template
           </button>
           <button
             type="button"
             onClick={() => {
               router.push(`/rx?rx=${registrationId}`);
             }}
-            className="flex-1 sm:flex-initial px-3 py-1.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[10.5px] font-bold text-slate-700 rounded-lg flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-2xs"
+            className="flex-1 sm:flex-initial px-3.5 py-2 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-xs font-bold text-slate-700 rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
           >
             ✏️ Edit Rx
           </button>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={async () => {
@@ -854,7 +905,7 @@ ${clinicName}`;
                 showToast("Downloading PDF Prescription...", "success");
               }
             }}
-            className="flex-1 sm:flex-initial px-3.5 py-1.5 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-[10.5px] font-extrabold text-indigo-700 rounded-lg flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-2xs"
+            className="flex-1 sm:flex-initial px-3.5 py-2 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-xs font-extrabold text-indigo-700 rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
           >
             📥 Download PDF
           </button>
@@ -862,7 +913,7 @@ ${clinicName}`;
             type="button"
             disabled={sendingWhatsapp}
             onClick={handleSendWhatsApp}
-            className="flex-1 sm:flex-initial px-3.5 py-1.5 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:bg-slate-100 disabled:text-slate-400 text-[10.5px] font-extrabold text-emerald-700 rounded-lg flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-2xs"
+            className="flex-1 sm:flex-initial px-3.5 py-2 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:bg-slate-100 disabled:text-slate-400 text-xs font-extrabold text-emerald-700 rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
           >
             {sendingWhatsapp ? "Sending..." : "💬 WhatsApp"}
           </button>
@@ -876,7 +927,7 @@ ${clinicName}`;
                 }
               }
             }}
-            className="flex-1 sm:flex-initial px-4 py-1.5 bg-indigo-650 hover:bg-indigo-750 text-[11px] font-extrabold text-white rounded-lg flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-md"
+            className="flex-1 sm:flex-initial px-4 py-2 bg-indigo-650 hover:bg-indigo-750 text-xs font-extrabold text-white rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-md"
           >
             🖨️ Print
           </button>
