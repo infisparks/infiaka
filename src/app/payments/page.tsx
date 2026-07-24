@@ -76,6 +76,33 @@ function getRegistrationPaymentDetails(reg: Registration) {
   return { netPaid, cashPaid, onlinePaid };
 }
 
+const loadPoppinsFont = async (doc: jsPDF): Promise<string> => {
+  try {
+    const [regRes, boldRes] = await Promise.all([
+      fetch("https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Regular.ttf").then((res) => res.arrayBuffer()),
+      fetch("https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf").then((res) => res.arrayBuffer())
+    ]);
+
+    const toBase64 = (buffer: ArrayBuffer) => {
+      let binary = "";
+      const bytes = new Uint8Array(buffer);
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return window.btoa(binary);
+    };
+
+    doc.addFileToVFS("Poppins-Regular.ttf", toBase64(regRes));
+    doc.addFont("Poppins-Regular.ttf", "Poppins", "normal");
+    doc.addFileToVFS("Poppins-Bold.ttf", toBase64(boldRes));
+    doc.addFont("Poppins-Bold.ttf", "Poppins", "bold");
+    return "Poppins";
+  } catch (e) {
+    console.error("Failed to load Poppins web fonts, falling back to Helvetica:", e);
+    return "helvetica";
+  }
+};
+
 const downloadSingleReceiptPDF = async (reg: Registration) => {
   try {
     const doc = new jsPDF({
@@ -90,32 +117,7 @@ const downloadSingleReceiptPDF = async (reg: Registration) => {
     const MARGIN = 15;
     const CONTENT_W = PAGE_W - MARGIN * 2;
 
-    // Load Poppins font
-    let fontName = "helvetica";
-    try {
-      const [regRes, boldRes] = await Promise.all([
-        fetch("https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Regular.ttf").then(res => res.arrayBuffer()),
-        fetch("https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf").then(res => res.arrayBuffer())
-      ]);
-
-      const toBase64 = (buffer: ArrayBuffer) => {
-        let binary = "";
-        const bytes = new Uint8Array(buffer);
-        for (let i = 0; i < bytes.byteLength; i++) {
-          binary += String.fromCharCode(bytes[i]);
-        }
-        return window.btoa(binary);
-      };
-
-      doc.addFileToVFS("Poppins-Regular.ttf", toBase64(regRes));
-      doc.addFont("Poppins-Regular.ttf", "Poppins", "normal");
-      doc.addFileToVFS("Poppins-Bold.ttf", toBase64(boldRes));
-      doc.addFont("Poppins-Bold.ttf", "Poppins", "bold");
-      fontName = "Poppins";
-    } catch (e) {
-      console.error("Failed to load Poppins web fonts, falling back to Helvetica:", e);
-    }
-
+    const fontName = await loadPoppinsFont(doc);
     doc.setFont(fontName);
 
     // Color system
@@ -138,17 +140,17 @@ const downloadSingleReceiptPDF = async (reg: Registration) => {
     let currentY = 15;
 
     // Clinic Info (Left)
-    doc.setFont("Poppins", "bold").setFontSize(18).setTextColor(...primaryColor);
+    doc.setFont(fontName, "bold").setFontSize(18).setTextColor(...primaryColor);
     doc.text((reg.clinic_name || "OPD CLINIC").toUpperCase(), MARGIN, currentY);
     
-    doc.setFont("Poppins", "normal").setFontSize(8.5).setTextColor(...textGray);
+    doc.setFont(fontName, "normal").setFontSize(8.5).setTextColor(...textGray);
     doc.text("Comprehensive & Advanced Healthcare Clinic", MARGIN, currentY + 5.5);
     
     // Doctor Details (Right)
-    doc.setFont("Poppins", "bold").setFontSize(10).setTextColor(...textDark);
+    doc.setFont(fontName, "bold").setFontSize(10).setTextColor(...textDark);
     doc.text((reg.treating_doctor || "DR. LAXMAN SALVE").toUpperCase(), PAGE_W - MARGIN, currentY, { align: "right" });
     
-    doc.setFont("Poppins", "normal").setFontSize(8).setTextColor(...textGray);
+    doc.setFont(fontName, "normal").setFontSize(8).setTextColor(...textGray);
     doc.text("Consulting Physician / Specialist", PAGE_W - MARGIN, currentY + 4.5, { align: "right" });
     doc.text("Reg. No: FMC-98745-A", PAGE_W - MARGIN, currentY + 8.5, { align: "right" });
 
@@ -158,7 +160,7 @@ const downloadSingleReceiptPDF = async (reg: Registration) => {
 
     // Title
     currentY += 8;
-    doc.setFont("Poppins", "bold").setFontSize(12).setTextColor(...primaryColor);
+    doc.setFont(fontName, "bold").setFontSize(12).setTextColor(...primaryColor);
     doc.text("TAX INVOICE / RECEIPT", PAGE_W / 2, currentY, { align: "center" });
 
     // ── PATIENT & INVOICE CARD ───────────────────────────────────────
@@ -170,13 +172,13 @@ const downloadSingleReceiptPDF = async (reg: Registration) => {
 
     // Left Side - Patient Details
     const detailsCardY = currentY;
-    doc.setFont("Poppins", "bold").setFontSize(7).setTextColor(...textGray);
+    doc.setFont(fontName, "bold").setFontSize(7).setTextColor(...textGray);
     doc.text("PATIENT DETAILS", MARGIN + 5, detailsCardY + 5.5);
     
-    doc.setFont("Poppins", "bold").setFontSize(11).setTextColor(...textDark);
+    doc.setFont(fontName, "bold").setFontSize(11).setTextColor(...textDark);
     doc.text(reg.patient?.name || "Unknown Patient", MARGIN + 5, detailsCardY + 11.5);
     
-    doc.setFont("Poppins", "normal").setFontSize(8.5).setTextColor(...textDark);
+    doc.setFont(fontName, "normal").setFontSize(8.5).setTextColor(...textDark);
     const ageGender = reg.patient ? `${reg.patient.age} Y / ${reg.patient.gender}` : "N/A";
     doc.text(`${ageGender}   •   UHID: ${reg.patient_uhid}`, MARGIN + 5, detailsCardY + 16.5);
     if (reg.patient?.phone) {
@@ -184,13 +186,13 @@ const downloadSingleReceiptPDF = async (reg: Registration) => {
     }
 
     // Right Side - Invoice Details
-    doc.setFont("Poppins", "bold").setFontSize(7).setTextColor(...textGray);
+    doc.setFont(fontName, "bold").setFontSize(7).setTextColor(...textGray);
     doc.text("INVOICE DETAILS", PAGE_W - MARGIN - 30, detailsCardY + 5.5, { align: "right" });
     
-    doc.setFont("Poppins", "bold").setFontSize(10).setTextColor(...textDark);
+    doc.setFont(fontName, "bold").setFontSize(10).setTextColor(...textDark);
     doc.text(`Invoice ID: #${reg.registration_id}`, PAGE_W - MARGIN - 30, detailsCardY + 10.5, { align: "right" });
     
-    doc.setFont("Poppins", "normal").setFontSize(8.5).setTextColor(...textDark);
+    doc.setFont(fontName, "normal").setFontSize(8.5).setTextColor(...textDark);
     const formattedDate = new Date(reg.created_at).toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "short",
@@ -243,7 +245,7 @@ const downloadSingleReceiptPDF = async (reg: Registration) => {
         fillColor: primaryLight,
         textColor: primaryColor,
         fontSize: 8.5,
-        font: 'Poppins',
+        font: fontName,
         fontStyle: 'bold',
         lineWidth: { bottom: 0.3 },
         lineColor: [216, 180, 254],
@@ -251,7 +253,7 @@ const downloadSingleReceiptPDF = async (reg: Registration) => {
       },
       bodyStyles: {
         fontSize: 8.5,
-        font: 'Poppins',
+        font: fontName,
         cellPadding: 3,
         textColor: textDark,
         lineWidth: 0.05,
@@ -281,7 +283,7 @@ const downloadSingleReceiptPDF = async (reg: Registration) => {
     const totalsValueX = PAGE_W - MARGIN;
 
     const drawRow = (label: string, value: number, color: [number, number, number] = textDark, isBold = false, size = 9) => {
-      doc.setFont("Poppins", isBold ? "bold" : "normal")
+      doc.setFont(fontName, isBold ? "bold" : "normal")
          .setFontSize(size)
          .setTextColor(color[0], color[1], color[2]);
       doc.text(label, totalsLabelX, currentY);
@@ -312,7 +314,7 @@ const downloadSingleReceiptPDF = async (reg: Registration) => {
     doc.setLineWidth(0.2);
     doc.roundedRect(PAGE_W - MARGIN - 60, currentY - 2.5, 60, 7.5, 0.5, 0.5, "FD");
     
-    doc.setFont("Poppins", "bold").setFontSize(9.5).setTextColor(balanceText[0], balanceText[1], balanceText[2]);
+    doc.setFont(fontName, "bold").setFontSize(9.5).setTextColor(balanceText[0], balanceText[1], balanceText[2]);
     doc.text("BALANCE DUE:", PAGE_W - MARGIN - 56, currentY + 2.5);
     doc.text(`₹${balance.toFixed(2)}`, totalsValueX - 2, currentY + 2.5, { align: "right" });
     
@@ -320,7 +322,7 @@ const downloadSingleReceiptPDF = async (reg: Registration) => {
 
     // Payment Entries Table (if any)
     if (paymentsList.length > 0) {
-      doc.setFont("Poppins", "bold").setFontSize(8.5).setTextColor(...textGray);
+      doc.setFont(fontName, "bold").setFontSize(8.5).setTextColor(...textGray);
       doc.text("PAYMENT METHOD DISTRIBUTION", MARGIN, totalsStartY);
       autoTable(doc, {
         startY: totalsStartY + 2,
@@ -331,8 +333,8 @@ const downloadSingleReceiptPDF = async (reg: Registration) => {
           `₹${(Number(e.amount) || 0).toFixed(2)}`
         ]),
         theme: 'grid',
-        headStyles: { fillColor: primaryLight, textColor: primaryColor, fontSize: 7.5, font: 'Poppins', fontStyle: 'bold', cellPadding: 1.5 },
-        bodyStyles: { fontSize: 7.5, font: 'Poppins', cellPadding: 1.5 },
+        headStyles: { fillColor: primaryLight, textColor: primaryColor, fontSize: 7.5, font: fontName, fontStyle: 'bold', cellPadding: 1.5 },
+        bodyStyles: { fontSize: 7.5, font: fontName, cellPadding: 1.5 },
         margin: { left: MARGIN, right: PAGE_W - (PAGE_W - MARGIN - 60) + 5 }
       });
     }
@@ -343,14 +345,14 @@ const downloadSingleReceiptPDF = async (reg: Registration) => {
 
     doc.setDrawColor(...borderColor).setLineWidth(0.25).line(MARGIN, footerY, PAGE_W - MARGIN, footerY);
 
-    doc.setFont("Poppins", "bold").setFontSize(7).setTextColor(...textGray);
+    doc.setFont(fontName, "bold").setFontSize(7).setTextColor(...textGray);
     doc.text("Scan QR on invoice to verify authenticity", MARGIN, footerY + 5);
-    doc.setFont("Poppins", "normal").setFontSize(6.5).setTextColor(...textGray);
+    doc.setFont(fontName, "normal").setFontSize(6.5).setTextColor(...textGray);
     doc.text("System generated invoice — No physical signature required.", MARGIN, footerY + 9);
 
     // Signature
     doc.setDrawColor(...borderColor).setLineWidth(0.25).line(PAGE_W - MARGIN - 50, footerY + 8, PAGE_W - MARGIN, footerY + 8);
-    doc.setFont("Poppins", "bold").setFontSize(7.5).setTextColor(...textGray);
+    doc.setFont(fontName, "bold").setFontSize(7.5).setTextColor(...textGray);
     doc.text("AUTHORIZED SIGNATURE", PAGE_W - MARGIN, footerY + 12, { align: "right" });
 
     // Open PDF
@@ -369,7 +371,7 @@ function PaymentsContent() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Filter dates state
+  // Helper date generators
   const getTodayDateStr = () => {
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -378,20 +380,22 @@ function PaymentsContent() {
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  const [startDate, setStartDate] = useState(getTodayDateStr());
-  const [endDate, setEndDate] = useState(getTodayDateStr());
+  const getYesterdayDateStr = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // Default initial date preset option: "yesterday"
+  const [datePreset, setDatePreset] = useState<"yesterday" | "today" | "this_month" | "custom">("yesterday");
+  const [startDate, setStartDate] = useState(getYesterdayDateStr());
+  const [endDate, setEndDate] = useState(getYesterdayDateStr());
   const [selectedDoctor, setSelectedDoctor] = useState<string>("all");
   const [selectedHospital, setSelectedHospital] = useState<string>("all");
   const [registrations, setRegistrations] = useState<Registration[]>([]);
-
-  // Force today's date if user is staff
-  useEffect(() => {
-    if (userRole === "staff") {
-      const today = getTodayDateStr();
-      setStartDate(today);
-      setEndDate(today);
-    }
-  }, [userRole]);
 
   // Auth session check
   useEffect(() => {
@@ -424,13 +428,9 @@ function PaymentsContent() {
     try {
       setLoading(true);
       
-      // Query registrations within selected date bounds
-      const todayStr = getTodayDateStr();
-      const start = userRole === "staff" ? todayStr : startDate;
-      const end = userRole === "staff" ? todayStr : endDate;
-
-      const startIso = `${start}T00:00:00+05:30`;
-      const endIso = `${end}T23:59:59+05:30`;
+      // Query registrations within selected date bounds (both staff & admin can filter by date)
+      const startIso = `${startDate}T00:00:00+05:30`;
+      const endIso = `${endDate}T23:59:59+05:30`;
 
       const { data: regData, error: regError } = await supabase
         .from("aka_opd_registration")
@@ -577,89 +577,162 @@ function PaymentsContent() {
     return { cash, online, total };
   }, [filteredRegistrations]);
 
-  // Trigger browser blob url PDF export
-  const exportPDF = () => {
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-
-    // Formatting Helpers
-    const formattedRange = `${new Date(startDate).toLocaleDateString("en-IN")} to ${new Date(endDate).toLocaleDateString("en-IN")}`;
-
-    // Title / Header
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(30, 41, 59); // slate-800
-    doc.text("HMS BILLING & COLLECTION AUDIT REPORT", 14, 18);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(100, 116, 139); // slate-500
-    const filterText = `Doctor: ${selectedDoctor === "all" ? "All" : selectedDoctor} | Hospital: ${selectedHospital === "all" ? "All" : selectedHospital}`;
-    doc.text(`Generated on: ${new Date().toLocaleString("en-IN")}  |  Audit Period: ${formattedRange}  |  ${filterText}`, 14, 23);
-
-    // Divider Line
-    doc.setDrawColor(226, 232, 240);
-    doc.line(14, 26, 196, 26);
-
-    // KPI Cards block
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(79, 70, 229); // primary purple
-    doc.text("COLLECTION SUMMARY", 14, 33);
-
-    doc.setFontSize(9);
-    doc.setTextColor(30, 41, 59);
-    doc.text(`Total Cash Collection:  INR ${totals.cash.toLocaleString("en-IN")}/-`, 14, 39);
-    doc.text(`Total Online Collection: INR ${totals.online.toLocaleString("en-IN")}/-`, 80, 39);
-    
-    doc.setFont("helvetica", "bold");
-    doc.text(`Grand Total Collected: INR ${totals.total.toLocaleString("en-IN")}/-`, 142, 39);
-
-    // Table Content
-    const tableHeaders = [["OPD ID", "Patient Name", "UHID", "Method", "Discount", "Net Paid", "Date"]];
-    const tableRows = filteredRegistrations.map((reg) => {
-      const { netPaid } = getRegistrationPaymentDetails(reg);
-      const visitDate = new Date(reg.created_at).toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric"
+  // PDF Export Report - Styled identically to desktop UI
+  const exportPDF = async () => {
+    try {
+      const doc = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+        compress: true
       });
-      return [
-        `#${reg.registration_id}`,
-        reg.patient?.name || "Unknown Patient",
-        reg.patient_uhid,
-        reg.payment_method,
-        `INR ${reg.discount_amount}`,
-        `INR ${netPaid}`,
-        visitDate
-      ];
-    });
 
-    autoTable(doc, {
-      startY: 44,
-      head: tableHeaders,
-      body: tableRows,
-      theme: "striped",
-      headStyles: {
-        fillColor: [79, 70, 229], // primary indigo
-        textColor: [255, 255, 255],
-        fontSize: 8.5,
-        fontStyle: "bold"
-      },
-      bodyStyles: {
-        fontSize: 8,
-        textColor: [51, 65, 85]
-      },
-      margin: { left: 14, right: 14 }
-    });
+      const fontName = await loadPoppinsFont(doc);
+      doc.setFont(fontName);
 
-    // Output as Blob URL and Open in new window/tab
-    const pdfBlob = doc.output("blob");
-    const blobUrl = URL.createObjectURL(pdfBlob);
-    window.open(blobUrl, "_blank");
+      const PAGE_W = 297;
+      const PAGE_H = 210;
+      const MARGIN = 12;
+      const CONTENT_W = PAGE_W - MARGIN * 2;
+
+      // Color Palette matching Desktop UI
+      const primaryColor: [number, number, number] = [107, 33, 168];   // Deep Purple
+      const primaryLight: [number, number, number] = [243, 232, 255];  // Purple background
+      const textDark: [number, number, number] = [15, 23, 42];          // slate-900
+      const textGray: [number, number, number] = [100, 116, 139];       // slate-500
+      const borderColor: [number, number, number] = [226, 232, 240];    // slate-200
+
+      let currentY = 14;
+
+      // --- HEADER BAR ---
+      doc.setFont(fontName, "bold").setFontSize(16).setTextColor(...primaryColor);
+      doc.text("FINANCIAL BILLING & PAYMENTS REPORT", MARGIN, currentY);
+
+      doc.setFont(fontName, "normal").setFontSize(8.5).setTextColor(...textGray);
+      const startFormatted = new Date(startDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+      const endFormatted = new Date(endDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+      const filterText = `Audit Period: ${startFormatted} - ${endFormatted}   |   Doctor: ${selectedDoctor === "all" ? "All Doctors" : selectedDoctor}   |   Hospital: ${selectedHospital === "all" ? "All Hospitals" : selectedHospital}`;
+      doc.text(filterText, MARGIN, currentY + 5.5);
+
+      const generatedOn = `Generated on: ${new Date().toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}`;
+      doc.text(generatedOn, PAGE_W - MARGIN, currentY + 5.5, { align: "right" });
+
+      currentY += 10;
+      doc.setDrawColor(...borderColor).setLineWidth(0.3).line(MARGIN, currentY, PAGE_W - MARGIN, currentY);
+      currentY += 6;
+
+      // --- KPI CARDS BLOCK (MATCHING DESKTOP CARDS) ---
+      const cardWidth = (CONTENT_W - 3 * 4) / 4;
+      const cardHeight = 18;
+
+      const drawKpiCard = (x: number, title: string, mainVal: string, subText: string, accentColor: [number, number, number], titleColor: [number, number, number]) => {
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(...borderColor);
+        doc.setLineWidth(0.2);
+        doc.roundedRect(x, currentY, cardWidth, cardHeight, 1.5, 1.5, "FD");
+
+        doc.setFillColor(...accentColor);
+        doc.rect(x, currentY + 1.5, 1.5, cardHeight - 3, "F");
+
+        doc.setFont(fontName, "bold").setFontSize(7).setTextColor(...titleColor);
+        doc.text(title.toUpperCase(), x + 5, currentY + 5);
+
+        doc.setFont(fontName, "bold").setFontSize(12).setTextColor(...textDark);
+        doc.text(mainVal, x + 5, currentY + 11.5);
+
+        doc.setFont(fontName, "normal").setFontSize(7).setTextColor(...textGray);
+        doc.text(subText, x + 5 + doc.getTextWidth(mainVal) + 2, currentY + 11.5);
+      };
+
+      drawKpiCard(MARGIN, "Total Invoices", `${filteredRegistrations.length}`, "Bills Raised", [148, 163, 184], [100, 116, 139]);
+      drawKpiCard(MARGIN + cardWidth + 4, "Total Revenue", `₹${totals.total.toLocaleString("en-IN")}`, "Net Paid", [107, 33, 168], [107, 33, 168]);
+      drawKpiCard(MARGIN + (cardWidth + 4) * 2, "Cash Collected", `₹${totals.cash.toLocaleString("en-IN")}`, "Physical Cash", [16, 185, 129], [5, 150, 105]);
+      drawKpiCard(MARGIN + (cardWidth + 4) * 3, "Online Collected", `₹${totals.online.toLocaleString("en-IN")}`, "UPI / Card", [99, 102, 241], [79, 70, 229]);
+
+      currentY += cardHeight + 7;
+
+      // --- AUDITED RECEIPTS TABLE ---
+      doc.setFont(fontName, "bold").setFontSize(9.5).setTextColor(...textDark);
+      doc.text("AUDITED PATIENT RECEIPTS", MARGIN, currentY);
+      doc.setFont(fontName, "normal").setFontSize(7.5).setTextColor(...textGray);
+      doc.text(`Total ${filteredRegistrations.length} transactions found`, PAGE_W - MARGIN, currentY, { align: "right" });
+
+      currentY += 3;
+
+      const tableHeaders = [["OPD ID", "PATIENT PROFILE", "VISIT TYPE & DOCTOR", "DATE & TIME", "PAYMENT MODE", "DISCOUNT", "GROSS TOTAL", "NET PAID"]];
+      const tableRows = filteredRegistrations.map((reg) => {
+        const { netPaid } = getRegistrationPaymentDetails(reg);
+        const formattedTime = new Date(reg.created_at).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit"
+        });
+        const patInfo = `${reg.patient?.name || "Unknown Patient"}\n${reg.patient ? `${reg.patient.age}y / ${reg.patient.gender}` : "N/A"} | UHID: ${reg.patient_uhid}`;
+        const docHospital = reg.treating_doctor ? `${reg.treating_doctor}${reg.clinic_name ? ` (${reg.clinic_name})` : ""}` : (reg.clinic_name || "General");
+        const visitInfo = `${reg.visit_category || "General"}\n${docHospital}`;
+
+        return [
+          `#${reg.registration_id}`,
+          patInfo,
+          visitInfo,
+          formattedTime,
+          (reg.payment_method || "CASH").toUpperCase(),
+          `₹${reg.discount_amount}`,
+          `₹${reg.bill_amount}`,
+          `₹${netPaid}`
+        ];
+      });
+
+      autoTable(doc, {
+        startY: currentY,
+        head: tableHeaders,
+        body: tableRows,
+        theme: "plain",
+        headStyles: {
+          fillColor: primaryLight,
+          textColor: primaryColor,
+          fontSize: 8,
+          font: fontName,
+          fontStyle: "bold",
+          lineWidth: { bottom: 0.3 },
+          lineColor: [216, 180, 254],
+          cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 }
+        },
+        bodyStyles: {
+          fontSize: 8,
+          font: fontName,
+          textColor: textDark,
+          cellPadding: 2.5,
+          lineWidth: 0.05,
+          lineColor: [241, 245, 249]
+        },
+        columnStyles: {
+          0: { cellWidth: 18, fontStyle: "bold" },
+          1: { cellWidth: 60 },
+          2: { cellWidth: 55 },
+          3: { cellWidth: 35 },
+          4: { cellWidth: 25, halign: "center" },
+          5: { cellWidth: 25, halign: "right" },
+          6: { cellWidth: 25, halign: "right" },
+          7: { cellWidth: 30, halign: "right", fontStyle: "bold" }
+        },
+        margin: { left: MARGIN, right: MARGIN },
+        didDrawPage: (data) => {
+          doc.setFont(fontName, "normal").setFontSize(7).setTextColor(...textGray);
+          doc.text(`Page ${data.pageNumber} of ${doc.getNumberOfPages()}`, PAGE_W - MARGIN, PAGE_H - 6, { align: "right" });
+          doc.text("System Generated Report — Confidential", MARGIN, PAGE_H - 6);
+        }
+      });
+
+      const pdfBlob = doc.output("blob");
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      window.open(blobUrl, "_blank");
+
+    } catch (err) {
+      console.error("Failed to generate PDF report:", err);
+    }
   };
 
   if (!sessionLoaded) {
@@ -675,6 +748,20 @@ function PaymentsContent() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#F5F6F8]">
+      <style jsx global>{`
+        @media print {
+          aside, header button, .no-print {
+            display: none !important;
+          }
+          body, #__next {
+            background: white !important;
+          }
+          main {
+            padding: 0 !important;
+            overflow: visible !important;
+          }
+        }
+      `}</style>
       {/* LEFT SIDEBAR */}
       <Sidebar active="payments" />
 
@@ -690,15 +777,48 @@ function PaymentsContent() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Quick Date Range Preset Dropdown */}
+            <div className="flex items-center gap-1.5 border border-[#E5E7EB] bg-white rounded-lg px-2.5 py-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase">Range</span>
+              <select
+                value={datePreset}
+                onChange={(e) => {
+                  const val = e.target.value as "yesterday" | "today" | "this_month" | "custom";
+                  setDatePreset(val);
+                  if (val === "yesterday") {
+                    setStartDate(getYesterdayDateStr());
+                    setEndDate(getYesterdayDateStr());
+                  } else if (val === "today") {
+                    setStartDate(getTodayDateStr());
+                    setEndDate(getTodayDateStr());
+                  } else if (val === "this_month") {
+                    const d = new Date();
+                    const yyyy = d.getFullYear();
+                    const mm = String(d.getMonth() + 1).padStart(2, "0");
+                    setStartDate(`${yyyy}-${mm}-01`);
+                    setEndDate(getTodayDateStr());
+                  }
+                }}
+                className="text-[11px] font-bold text-primary focus:outline-none bg-transparent cursor-pointer"
+              >
+                <option value="yesterday">Yesterday (Default)</option>
+                <option value="today">Today</option>
+                <option value="this_month">This Month</option>
+                <option value="custom">Custom Date</option>
+              </select>
+            </div>
+
             {/* Start Date */}
             <div className="flex items-center gap-1.5 border border-[#E5E7EB] bg-white rounded-lg px-2.5 py-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase">From</span>
               <input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                disabled={userRole === "staff"}
-                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setDatePreset("custom");
+                }}
+                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent cursor-pointer"
               />
             </div>
 
@@ -708,9 +828,11 @@ function PaymentsContent() {
               <input
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                disabled={userRole === "staff"}
-                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setDatePreset("custom");
+                }}
+                className="text-[11px] font-semibold text-foreground focus:outline-none bg-transparent cursor-pointer"
               />
             </div>
 
