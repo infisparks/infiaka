@@ -780,6 +780,11 @@ function DashboardContent() {
     const params = new URLSearchParams(searchParams.toString());
     const val = typeof patientId === "string" ? patientId : "true";
     params.set("book", val);
+    if (val === "true") {
+      setBookingSearch("");
+      setSelectedBookingPatient(null);
+      resetForm();
+    }
     router.replace(`${pathname}?${params.toString()}`);
   };
 
@@ -1056,6 +1061,22 @@ function DashboardContent() {
         } else {
           setPaymentsRows([{ id: "1", mode: "Cash", amount: 0 }]);
         }
+      } else if (selectedBookingPatient.id) {
+        // Fetch latest OPD registration for this patient to pre-fill reference (referring_doctor) from previous record
+        supabase
+          .from("aka_opd_registration")
+          .select("referring_doctor")
+          .eq("patient_uhid", selectedBookingPatient.id)
+          .not("referring_doctor", "is", null)
+          .neq("referring_doctor", "")
+          .order("registration_id", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+          .then(({ data: lastReg }) => {
+            if (lastReg?.referring_doctor) {
+              setReferringDoctor(lastReg.referring_doctor);
+            }
+          });
       }
     }
   }, [selectedBookingPatient]);
@@ -1186,15 +1207,59 @@ function DashboardContent() {
     return () => clearTimeout(delayDebounceFn);
   }, [bookingSearch]);
 
-  // Keep Edit Patient loaded in drawer if page is refreshed while editing (ID is in book param)
+  // Keep Edit Patient loaded in drawer or clear on book=true
   useEffect(() => {
-    if (bookParam && bookParam !== "true" && patientDirectory.length > 0) {
-      const matched = patientDirectory.find((p) => String(p.id) === bookParam);
-      if (matched && (!selectedBookingPatient || selectedBookingPatient.id !== matched.id)) {
-        setSelectedBookingPatient(matched);
+    if (!bookParam) return;
+
+    if (bookParam === "true") {
+      if (selectedBookingPatient && !selectedBookingPatient.isNew) {
+        setSelectedBookingPatient(null);
+        resetForm();
+      }
+    } else {
+      if (!selectedBookingPatient || selectedBookingPatient.id !== bookParam) {
+        const matched = patientDirectory.find((p) => String(p.id) === bookParam) || patients.find((p) => String(p.id) === bookParam);
+        if (matched) {
+          setSelectedBookingPatient(matched);
+        } else {
+          supabase
+            .from("patient_detail")
+            .select("*")
+            .eq("uhid", bookParam)
+            .maybeSingle()
+            .then(({ data: p }) => {
+              if (p) {
+                setSelectedBookingPatient({
+                  id: p.uhid,
+                  queueNo: "",
+                  title: p.title || "Mr",
+                  name: p.name,
+                  phoneDialCode: "+91",
+                  phone: String(p.number || ""),
+                  gender: p.gender || "Male",
+                  age: p.age || 25,
+                  ageUnit: p.age_unit || "Year",
+                  dob: p.dob || "",
+                  permanentAddress: p.address || "",
+                  localAddress: p.local_address || "",
+                  country: p.country || "India",
+                  state: p.state || "Maharashtra",
+                  statusTags: [],
+                  billAmount: 0,
+                  paymentMethod: "Cash",
+                  isAbhaCreated: false,
+                  customTags: [],
+                  isCompleted: false,
+                  isOngoing: false,
+                  arrivalTime: "",
+                  arrivalMinutesAgo: 0,
+                });
+              }
+            });
+        }
       }
     }
-  }, [bookParam, patientDirectory, selectedBookingPatient]);
+  }, [bookParam, patientDirectory, patients]);
 
 
 
@@ -1765,12 +1830,27 @@ function DashboardContent() {
         }
       });
 
-      const isLegacySelect = !!selectedBookingPatient?.isLegacy;
-      const isExistingPatient = !!selectedBookingPatient && !selectedBookingPatient.isLegacy && !selectedBookingPatient.isNew && !!selectedBookingPatient.id;
-      let targetUhid = "";
+      let targetUhid = selectedBookingPatient?.id || (bookParam && bookParam !== "true" ? bookParam : "");
+      
+      // If targetUhid is missing, check if an existing patient already exists by phone number in patient_detail
+      if (!targetUhid && phone) {
+        const numPhone = Number(phone);
+        if (!isNaN(numPhone) && numPhone > 0) {
+          const { data: existingP } = await supabase
+            .from("patient_detail")
+            .select("uhid")
+            .eq("number", numPhone)
+            .maybeSingle();
+          if (existingP?.uhid) {
+            targetUhid = existingP.uhid;
+          }
+        }
+      }
 
-      if (isExistingPatient) {
-        targetUhid = selectedBookingPatient!.id;
+      const isLegacySelect = !!selectedBookingPatient?.isLegacy;
+      const isExistingPatient = !!targetUhid;
+
+      if (isExistingPatient && !isLegacySelect) {
         const { error: pError } = await supabase
           .from("patient_detail")
           .update({
@@ -1789,8 +1869,7 @@ function DashboardContent() {
           })
           .eq("uhid", targetUhid);
         if (pError) throw pError;
-      } else if (isLegacySelect && selectedBookingPatient?.id) {
-        targetUhid = selectedBookingPatient.id;
+      } else if (isLegacySelect && targetUhid) {
         const { error: pError } = await supabase
           .from("patient_detail")
           .upsert({
